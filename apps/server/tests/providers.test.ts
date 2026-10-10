@@ -6,7 +6,7 @@ import { createServices } from '../src/services.js';
 describe('injected bootstrap services', () => {
   it('keeps provider stubs while supplying real session storage', async () => {
     const services = createServices(loadConfig({
-      NODE_ENV: 'test', ELEVENLABS_API_KEY: 'fixture-key',
+      NODE_ENV: 'test',
     }));
     const context: TurnContext = {
       missionId: 'P1', mode: 'practice', tier: 0, npcId: 'xiaolin',
@@ -17,10 +17,10 @@ describe('injected bootstrap services', () => {
       status: 503, code: 'PROVIDER_UNAVAILABLE', retryable: true,
     });
     await expect(services.speechProvider.synthesize('你好', 'xiaolin')).rejects.toMatchObject({
-      status: 501, code: 'SEGMENT_NOT_IMPLEMENTED', message: expect.stringContaining('Segment-005'),
+      status: 503, code: 'SPEECH_UNAVAILABLE', retryable: true,
     });
     await expect(services.speechProvider.transcribe(new Uint8Array(), 'audio/webm')).rejects.toMatchObject({
-      status: 501, code: 'SEGMENT_NOT_IMPLEMENTED', message: expect.stringContaining('Segment-005'),
+      status: 503, code: 'TRANSCRIPTION_UNAVAILABLE', retryable: true,
     });
     await expect(services.sessionStore.get('bootstrap-session')).resolves.toBeUndefined();
   });

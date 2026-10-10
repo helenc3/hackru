@@ -11,7 +11,7 @@ test.describe('bootstrap presentation fixtures', () => {
     } }));
   });
 
-test('production shell shares a Chinese world and explicit unimplemented voice slots', async ({ page }) => {
+test('production shell shares a Chinese world and integrated voice controls', async ({ page }) => {
   await page.goto('/');
   await expect(page).toHaveTitle('VibeQuest · Mandarin in motion');
   await expect(page.getByRole('heading', { name: 'Every street has a story.' })).toBeVisible();
@@ -20,9 +20,9 @@ test('production shell shares a Chinese world and explicit unimplemented voice s
   await expect(page.locator('[lang="zh-Hans"]', { hasText: '中文' })).toBeVisible();
   await expect(page.getByTestId('world-renderer')).toBeVisible();
   await expect(page.getByTestId('fixture-state')).toContainText('XP 0');
-  await expect(page.getByTestId('recorder-stub')).toContainText('Unimplemented · Segment-005');
-  await expect(page.getByRole('button', { name: 'Start recording' })).toBeDisabled();
-  await expect(page.getByTestId('audio-controller-stub')).toContainText('Unimplemented · Segment-005');
+  await expect(page.getByTestId('recorder')).toContainText('Speak Mandarin');
+  await expect(page.getByRole('button', { name: 'Start recording' })).toBeVisible();
+  await expect(page.getByTestId('audio-controller')).toContainText('Audio ready');
   await expect(page.getByTestId('skill-debrief-stub')).toContainText('Unimplemented · Segment-006');
   await expect(page.getByTestId('validation-harness')).toHaveCount(0);
   await expect(page.getByRole('link', { name: /validation|text mode/i })).toHaveCount(0);
@@ -72,7 +72,7 @@ test('unavailable WebGL offers compatibility recovery inside the same shell', as
   await expect(page.getByRole('button', { name: 'Reload preview' })).toBeVisible();
   await expect(page.getByTestId('webgl-recovery')).toContainText('does not start a game');
   await expect(page.getByTestId('validation-harness')).toHaveCount(0);
-  await expect(page.getByTestId('recorder-stub')).toBeVisible();
+  await expect(page.getByTestId('recorder')).toBeVisible();
 });
 
 });

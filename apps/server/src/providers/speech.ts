@@ -1,14 +1,17 @@
 import type { SpeechProvider } from '@vibequest/shared';
 import type { ServerConfig } from '../config.js';
-import { SegmentNotImplementedError } from '../errors.js';
+import { createElevenLabsSpeechProvider, createUnavailableSpeechProvider } from './elevenlabs/live.js';
 
-/** Segment-005 replaces this adapter; bootstrap never contacts ElevenLabs. */
+export { createFixtureSpeechProvider } from './elevenlabs/fixture.js';
+export { createElevenLabsSpeechProvider, mp3DurationMs } from './elevenlabs/live.js';
+
+/** Live ElevenLabs when a server key exists; otherwise a recoverable 503, never fabricated audio. */
 export function createSpeechProvider(config: ServerConfig): SpeechProvider {
-  void config;
-  return {
-    synthesize: () =>
-      Promise.reject(new SegmentNotImplementedError('Segment-005', 'Mandarin speech synthesis')),
-    transcribe: () =>
-      Promise.reject(new SegmentNotImplementedError('Segment-005', 'Mandarin transcription')),
-  };
+  if (!config.elevenlabsApiKey) return createUnavailableSpeechProvider();
+  return createElevenLabsSpeechProvider({
+    apiKey: config.elevenlabsApiKey,
+    ttsModel: config.elevenlabsTtsModel,
+    sttModel: config.elevenlabsSttModel,
+    voiceIds: config.voiceIds,
+  });
 }

@@ -98,18 +98,17 @@ describe('bootstrap API boundary', () => {
     expect(response.body.error.code).toBe('VALIDATION_DISABLED');
   });
 
-  it('accepts a bounded multipart scaffold request but never fabricates a transcript', async () => {
+  it('accepts a bounded multipart request but never fabricates a transcript', async () => {
     const app = createApp({ config: developmentConfig() });
     const response = await request(app)
       .post('/api/sessions/bootstrap-session/transcriptions')
       .set('Content-Type', 'multipart/form-data; boundary=bootstrap')
       .send('--bootstrap--\r\n')
-      .expect(501);
-    expect(response.body.error).toMatchObject({ code: 'SEGMENT_NOT_IMPLEMENTED', retryable: false });
+      .expect(400);
+    expect(response.body.error).toMatchObject({ code: 'INVALID_REQUEST', retryable: false });
     expect(response.body.text).toBeUndefined();
     expect(response.body.transcriptionId).toBeUndefined();
-    const speech = await request(app).get('/api/sessions/bootstrap-session/speech/bootstrap-speech').expect(501);
-    expect(speech.body.error.code).toBe('SEGMENT_NOT_IMPLEMENTED');
+    await request(app).get('/api/sessions/bootstrap-session/speech/bootstrap-speech').expect(404);
   });
 
   it('rejects non-multipart audio and oversized upload requests', async () => {

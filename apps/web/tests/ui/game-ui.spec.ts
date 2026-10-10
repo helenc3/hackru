@@ -24,7 +24,7 @@ test('production world, sign, voice slot, typed accessibility and practice feedb
   await page.getByRole('button', { name: '入口告示 · Read sign' }).click();
   await expect(page.getByRole('dialog', { name: 'Inspected sign' })).toContainText('请从广场进入');
   const panel = await typedPanel(page);
-  await expect(panel.getByTestId('recorder-stub')).toBeVisible();
+  await expect(panel.getByTestId('recorder')).toBeVisible();
   await panel.getByRole('textbox').fill('请给我一杯水。');
   await panel.getByRole('button', { name: 'Send Mandarin' }).click();
   await expect(panel.getByTestId('npc-reply')).toContainText('一杯水五元。');

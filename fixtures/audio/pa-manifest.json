@@ -1,0 +1,93 @@
+[
+  {
+    "audioAssetId": "p1.station-directions.tier-0",
+    "cueId": "p1.station-directions",
+    "tier": 0,
+    "textZh": "走到车站。售票处在右边。",
+    "englishMeaning": "Walk to the station. The ticket counter is on the right.",
+    "voiceId": "EXAVITQu4vr4xnSDxMaL",
+    "model": "eleven_multilingual_v2",
+    "bytes": 41839,
+    "estDurationMs": 2615,
+    "sha256": "e3f3a9ad21e65186316f86b70ccc996381e35fbad817275a72bf936b0a630474",
+    "review": "pending"
+  },
+  {
+    "audioAssetId": "p1.station-directions.tier-1",
+    "cueId": "p1.station-directions",
+    "tier": 1,
+    "textZh": "从广场走到车站。进去后，售票处在右边。",
+    "englishMeaning": "Walk from the plaza to the station. Inside, the ticket counter is on the right.",
+    "voiceId": "EXAVITQu4vr4xnSDxMaL",
+    "model": "eleven_multilingual_v2",
+    "bytes": 69425,
+    "estDurationMs": 4339,
+    "sha256": "bba8032d07fbd44e66721a1b05d1c21f7bdfc296356a451e1cfe30d41bd21a7f",
+    "review": "pending"
+  },
+  {
+    "audioAssetId": "p1.station-directions.tier-2",
+    "cueId": "p1.station-directions",
+    "tier": 2,
+    "textZh": "从广场走到车站。进去后，售票处在右边。",
+    "englishMeaning": "Walk from the plaza to the station. Inside, the ticket counter is on the right.",
+    "voiceId": "EXAVITQu4vr4xnSDxMaL",
+    "model": "eleven_multilingual_v2",
+    "bytes": 64409,
+    "estDurationMs": 4026,
+    "sha256": "0fd1e53f5db8f4e5911fa3fa6f436878c5740c129bd7e65d43d02d1860c5aab8",
+    "review": "pending"
+  },
+  {
+    "audioAssetId": "p2.platform-change.tier-0",
+    "cueId": "p2.platform-change",
+    "tier": 0,
+    "textZh": "江滨的列车改到三号站台。",
+    "englishMeaning": "The Jiangbin train has moved to platform 3.",
+    "voiceId": "EXAVITQu4vr4xnSDxMaL",
+    "model": "eleven_multilingual_v2",
+    "bytes": 45601,
+    "estDurationMs": 2850,
+    "sha256": "630d21c7474525beae63ba228f3ffc0394511ff0ccbeb8dc349483b8afdc5c4f",
+    "review": "pending"
+  },
+  {
+    "audioAssetId": "p2.platform-change.tier-1",
+    "cueId": "p2.platform-change",
+    "tier": 1,
+    "textZh": "请注意：开往江滨的列车改到三号站台，不是二号站台。",
+    "englishMeaning": "Attention: the Jiangbin train has moved to platform 3, not platform 2.",
+    "voiceId": "EXAVITQu4vr4xnSDxMaL",
+    "model": "eleven_multilingual_v2",
+    "bytes": 82799,
+    "estDurationMs": 5175,
+    "sha256": "621879f7f68f3426a1cc7b37a15163167b19afc8f5bf9e8eade1206163ceab76",
+    "review": "pending"
+  },
+  {
+    "audioAssetId": "p2.platform-change.tier-2",
+    "cueId": "p2.platform-change",
+    "tier": 2,
+    "textZh": "请注意：开往江滨的列车改到三号站台，不是二号站台。二号站台的车去机场。",
+    "englishMeaning": "Attention: the Jiangbin train has moved to platform 3, not platform 2. The train at platform 2 goes to the airport.",
+    "voiceId": "EXAVITQu4vr4xnSDxMaL",
+    "model": "eleven_multilingual_v2",
+    "bytes": 114146,
+    "estDurationMs": 7134,
+    "sha256": "9d901fc046ee818565b1891a4fcd94b4e60595abb9a64774ba06eb74c6ff3a68",
+    "review": "pending"
+  },
+  {
+    "audioAssetId": "b1.harbor-change.tier-1",
+    "cueId": "b1.harbor-change",
+    "tier": 1,
+    "textZh": "开往海港的列车改到二号站台。一号站台的列车不再发车。",
+    "englishMeaning": "The Haigang train has moved to platform 2. Trains at platform 1 no longer depart.",
+    "voiceId": "EXAVITQu4vr4xnSDxMaL",
+    "model": "eleven_multilingual_v2",
+    "bytes": 90323,
+    "estDurationMs": 5645,
+    "sha256": "90c73ffb4c4df986d12a80097d7538818db8dbd5ec2aa42b4578e25a9804d2dd",
+    "review": "pending"
+  }
+]

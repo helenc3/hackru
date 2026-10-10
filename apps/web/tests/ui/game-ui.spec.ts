@@ -172,3 +172,58 @@ test('mission restart completes during a pending provider turn and ignores its l
   await expect(page.getByTestId('game-shell')).not.toContainText('旧回复');
   expect(api.failures).toEqual([]); expect(api.remaining()).toBe(0);
 });
+
+for (const hasSound of [true, false]) {
+test(`microphone check records locally, detects ${hasSound ? 'sound' : 'silence'}, releases capture and offers playback`, async ({ page }) => {
+  await page.addInitScript((hasSound) => {
+    const state = { stopped: false };
+    Object.assign(window, { microphoneCheck: state });
+    Object.defineProperty(navigator, 'mediaDevices', { configurable: true, value: {
+      getUserMedia: async () => ({ getTracks: () => [{ stop: () => { state.stopped = true; } }] }),
+    } });
+    class TestAudioContext {
+      resume() { return Promise.resolve(); }
+      close() { return Promise.resolve(); }
+      createMediaStreamSource() { return { connect: () => undefined }; }
+      createAnalyser() { return { fftSize: 2048, getFloatTimeDomainData: (samples: Float32Array) => samples.fill(hasSound ? 0.1 : 0) }; }
+    }
+    class TestMediaRecorder {
+      state = 'inactive'; mimeType = 'audio/webm';
+      ondataavailable: ((event: { data: Blob }) => void) | null = null;
+      onstop: (() => void) | null = null;
+      start() { this.state = 'recording'; }
+      stop() {
+        this.state = 'inactive';
+        this.ondataavailable?.({ data: new Blob(['test recording'], { type: this.mimeType }) });
+        this.onstop?.();
+      }
+    }
+    Object.assign(window, { AudioContext: TestAudioContext, MediaRecorder: TestMediaRecorder });
+  }, hasSound);
+  await installScriptedApi(page); await page.goto('/');
+  await page.getByRole('button', { name: 'Check microphone' }).click();
+  await expect(page.getByTestId('start-panel')).toContainText('Recording for five seconds');
+  await expect(page.getByRole('button', { name: 'Check audio', exact: true })).toBeDisabled();
+  await expect(page.getByTestId('start-panel')).toContainText(hasSound ? 'Sound detected.' : 'No sound detected.', { timeout: 10000 });
+  await expect(page.locator('audio[aria-label="Your microphone test recording"]')).toHaveAttribute('src', /^blob:/);
+  expect(await page.evaluate(() => (window as unknown as { microphoneCheck: { stopped: boolean } }).microphoneCheck.stopped)).toBe(true);
+});
+
+}
+
+test('audio check plays the prerecorded Mandarin Rutgers clip', async ({ page }) => {
+  await page.addInitScript(() => {
+    HTMLMediaElement.prototype.play = function () {
+      Object.assign(window, { checkedAudioSource: this.getAttribute('src') });
+      return Promise.resolve();
+    };
+  });
+  await installScriptedApi(page); await page.goto('/');
+  const clip = await page.request.get('/audio/rutgers-university-zh.mp3');
+  expect(clip.ok()).toBe(true);
+  expect(clip.headers()['content-type']).toContain('audio/mpeg');
+  expect((await clip.body()).length).toBeGreaterThan(1000);
+  await page.getByRole('button', { name: 'Check audio', exact: true }).click();
+  await expect(page.getByTestId('start-panel')).toContainText('Playing “罗格斯大学”');
+  expect(await page.evaluate(() => (window as unknown as { checkedAudioSource: string }).checkedAudioSource)).toBe('/audio/rutgers-university-zh.mp3');
+});

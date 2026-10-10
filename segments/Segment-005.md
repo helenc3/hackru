@@ -41,6 +41,20 @@ All other paths are read-only unless the human explicitly expands scope. Coordin
 5. Implement one playback queue, audio enable/mute/stop/replay, async cached speech jobs, bounded lifecycle signals, compact transcript confirmation, and in-world typed/subtitle fallback. Never send pinyin/English coaching to NPC TTS.
 6. Handle recognition ambiguity, TTS/STT failure, and retry/aborted-attempt callbacks without patience loss, fake progress, or spoken-evidence inflation. Delete clips after processing and preserve the original transcript only ephemerally.
 
+## Session and engine handoff
+
+Follow the session-record and pending-turn rules in [Segment-001](Segment-001.md). Segment-001 owns exported session-store registration/lookup operations and ephemeral transcription/speech-job registries. Consume them through injected services; do not edit its owned files, keep a second session registry, or mutate quest state from audio routes. If the handoff is not available, use equivalent fixture session services for this segment's acceptance and coordinate the exact interface through `.build/proposals/Segment-005.md`. Segment-001 remains outside this segment's dependency list; full integration is checked in 007.
+
+For STT, capture session/attempt and recording operation under a short lock, release it for the provider call, then register the shared `TranscriptionRecord` only if the same attempt is current. Return its server-issued ID and original text. Segment-001's turn route resolves that record and derives unchanged `stt` versus `stt-edited`; client source flags cannot grant spoken evidence. Reject stale results and expire records rather than registering them into a new attempt. Store original and edited text separately, ephemerally. STT never submits an evaluated turn automatically.
+
+For TTS, consume the once-registered speech job for a committed turn, using the engine's final Mandarin reply and NPC voice key. Synthesize outside the session lock; publish audio/status and measured asset duration only if the job still belongs to the current attempt. Pending retrieval returns 202, ready returns audio, and failed or invalidated jobs return 410; IDs belonging to another session are rejected. Repeated retrieval does not create another job or submit another turn. TTS failure preserves committed gameplay and offers playback retry or accessibility recovery.
+
+Use the job's registered operation ID for NPC `audioPhase` signals. Playback starts only after the job is ready; the server derives the pause bound from asset duration plus two seconds. Stop, replay, duplicate lifecycle messages, and unknown IDs cannot renew the same operation's allowance. PA uses the distinct `playCue`/`finishCue` path. Mission retry cancels local capture/playback and invalidates pending callbacks; cancellation alone is not sufficient, so every server completion also checks its captured attempt.
+
+Game turns reserve state briefly and release the lock during Gemini calls. Keep retry controls available during a pending turn: fetch current state/version and send `retryMission` through the action queue without waiting for the outstanding turn's provider response. Other new gameplay submissions remain blocked while pending. Handle retryable 409 `ATTEMPT_ABANDONED` by discarding the old response and synchronizing state. Provider failures permit the same turn ID with a fresh version; replaying audio never resubmits it.
+
+P1 requires a valid selected drink and correct price confirmation before either payment branch. Coordinate the `confirm_drink_price`/`priceCny` contract proposal described in Segment-001 with the schema/provider owners; this packet does not authorize changes to their files. Voice and typed accessibility feed the same semantic gate. Never infer confirmation from TTS text or label edited/typed confirmation as independent spoken evidence.
+
 ## Acceptance criteria
 
 - At least one live recorded Mandarin utterance successfully traverses STT, Gemini and voiced NPC response in the same integrated panel, using fixture session services if 001 has not yet merged. Full world integration is 007.
@@ -49,6 +63,8 @@ All other paths are read-only unless the human explicitly expands scope. Coordin
 - Mic denial/unsupported type/timeout/abort offers re-record or same-panel typed fallback; playback failure leaves valid committed quest state intact.
 - No overlapping audio, recording at page load, unbounded confirmation pause, or duplicate action on replay. Boss PA subtitles remain opt-in and mark listening assisted.
 - Chinese output/practice audio is audible and intelligible in the chosen voices; real STT/TTS proofs and component/API tests pass without committed recordings or secrets.
+- Fixture session-service tests cover original/edited/expired/unrelated transcription records, one speech job per committed reply, authoritative playback duration, and stale STT/TTS results after retry.
+- A deferred-turn component test proves mission retry does not wait for Gemini; old replies cannot play in the new attempt, and failed-turn recovery refreshes the version without creating duplicate submissions.
 
 Run all repository checks and fixture browser smoke as well. Live acceptance is additional; unavailable mandatory live evidence keeps the segment incomplete. Never put paid credentials in CI.
 

@@ -1,0 +1,87 @@
+input, textarea, select { font: inherit; color: inherit; }
+textarea, select, input:not([type=radio]) { border: 1px solid #c7d4c4; background: white; border-radius: 7px; padding: 11px; }
+input:focus-visible, textarea:focus-visible, select:focus-visible { outline: 3px solid #edb265; outline-offset: 2px; }
+.welcome-screen { max-width: 1000px; padding-top: 50px; }
+.welcome-screen > .language-chip { float: right; }
+.welcome-screen h1 { margin: 50px 0 20px; }
+.welcome-footer { margin: 22px 0; color: #6f806d; }
+.start-panel { padding: 26px; border: 1px solid var(--border); border-radius: 14px; background: white; margin-bottom: 24px; }
+.start-panel h2 { font-size: 25px; margin: 10px 0; }
+.start-panel p { color: #657565; font-size: 13px; line-height: 1.7; }
+.start-panel fieldset { border: 0; padding: 0; margin: 20px 0; display: flex; gap: 25px; }
+.start-panel legend { font-size: 13px; margin-bottom: 12px; }
+.start-panel label { font-size: 13px; }
+.start-panel input[type=radio] { accent-color: #214e40; margin-right: 8px; }
+.field-label { display: flex; flex-direction: column; gap: 8px; margin: 14px 0; font-size: 13px; }
+.setup-row { display: flex; align-items: center; gap: 18px; margin-top: 15px; }
+.start-actions, .result-actions { display: flex; gap: 12px; margin-top: 24px; }
+.start-actions > .primary { max-width: 260px; }
+.environment-notice { padding-top: 15px; color: #886727 !important; }
+.game-shell { min-height: 100vh; }
+.game-topbar { display: flex; align-items: center; gap: 28px; margin: 0 38px; padding: 20px 0; border-bottom: 1px solid var(--border); font-size: 12px; }
+.game-topbar > button { margin-left: auto; }
+.environment-banner { background: #f5ead2; padding: 12px 38px; font-size: 12px; color: #725e36; line-height: 1.6; }
+.game-main { padding-top: 24px; }
+.game-layout { display: grid; grid-template-columns: minmax(0, 1fr) 290px; gap: 22px; }
+.game-world { position: relative; min-width: 0; }
+.game-world .world-renderer { height: 470px; }
+.quest-panel { background: white; border: 1px solid var(--border); border-radius: 12px; padding: 24px; }
+.quest-panel .eyebrow { color: #7f916e; font-size: 9px; }
+.quest-panel h2 { font-size: 23px; margin: 14px 0; }
+.mission-clock { font-variant-numeric: tabular-nums; font-size: 30px; margin: 20px 0; }
+.mission-clock > span { display: block; font-size: 11px; color: #71816e; margin-top: 6px; }
+.objective-list { list-style: none; display: grid; gap: 17px; padding: 0; font-size: 13px; line-height: 1.6; margin: 23px 0; }
+.objective-list li { display: flex; gap: 12px; }
+.objective-list li[data-complete=true] { color: #6f8468; }
+.controls-note { color: #7b8972; font-size: 11px; line-height: 1.8; }
+.inventory-bar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin: 14px 0; padding: 12px 15px; border: 1px solid var(--border); border-radius: 9px; font-size: 12px; background: white; }
+.inventory-bar > span:first-child { margin-right: auto; }
+.inventory-bar .button { padding: 9px 11px; }
+.interaction-dock { margin-top: 20px; }
+.interaction-dock h2 { font-size: 16px; }
+.interaction-dock > p { color: #72816e; font-size: 11px; line-height: 1.6; margin: 7px 0 12px; }
+.interaction-dock > div, .choice-dock, .validation-controls { display: flex; gap: 8px; flex-wrap: wrap; }
+.cue-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; font-size: 12px; }
+.choice-dock { margin-top: 12px; }
+.sign-overlay { padding: 20px; margin: 12px 0; background: white; border: 1px solid var(--border); border-radius: 10px; }
+.sign-overlay > button { float: right; }
+.sign-overlay h3 { font-size: 14px; margin-bottom: 14px; }
+.sign-overlay p { font-size: 21px; line-height: 1.8; white-space: pre-line; }
+.dialogue-panel { position: fixed; z-index: 20; top: 6vh; right: 30px; width: min(560px, 65vw); max-height: 88vh; overflow-y: auto; padding: 25px; border: 1px solid #c3d1ba; border-radius: 16px; background: #fcfdf9; box-shadow: 0 20px 90px #173e3340; }
+.dialogue-panel header { display: flex; align-items: center; justify-content: space-between; }
+.dialogue-panel h2 { font-size: 28px; margin: 7px 0; }
+.mood-label { font-size: 12px; color: #6f8267; }
+.voice-intro { font-size: 13px; line-height: 1.7; margin: 18px 0 10px; }
+.conversation-status { font-size: 11px; color: #75816b; margin-bottom: 12px; }
+.recorder-mount { margin-bottom: 15px; }
+.recorder-mount[aria-busy=true] { opacity: .65; }
+.npc-reply { padding: 17px; margin: 15px 0; border-radius: 10px; background: #edf3e5; }
+.npc-reply > span { font-size: 10px; color: #7c8e6a; }
+.npc-reply > p { font-size: 22px; line-height: 1.7; margin-top: 8px; }
+.dialogue-panel textarea { width: 100%; font-size: 18px; line-height: 1.7; resize: vertical; }
+.input-footer { display: flex; align-items: center; justify-content: space-between; gap: 15px; }
+.input-footer > span { font-size: 10px; color: #7a856e; line-height: 1.6; }
+.dialogue-panel .input-footer .button.primary { width: auto; flex-shrink: 0; }
+.coach-panel { border-top: 1px solid var(--border); margin-top: 22px; padding-top: 18px; }
+.coach-panel h3 { font-size: 15px; margin: 16px 0 10px; }
+.coach-panel p { font-size: 12px; line-height: 1.7; margin-top: 7px; }
+.coach-panel .improved-example { font-size: 18px; }
+.vibe-meter { display: grid; gap: 9px; }
+.vibe-meter > div { display: grid; grid-template-columns: 90px 1fr 40px; gap: 8px; font-size: 11px; align-items: center; }
+.vibe-meter meter { width: 100%; accent-color: #386a4f; }
+.recovery-panel { background: #fff4de; border: 1px solid #dac394; border-radius: 10px; padding: 18px; margin: 18px 0; font-size: 13px; line-height: 1.7; }
+.recovery-panel > p { margin: 6px 0; }
+.recovery-panel > code { display: block; color: #806a3f; font-size: 10px; }
+.recovery-panel > div { display: flex; gap: 9px; margin-top: 12px; }
+.result-panel { background: white; border: 1px solid #c4d3ba; border-radius: 14px; margin-top: 25px; padding: 25px; }
+.result-panel h2 { font-size: 28px; margin: 12px 0; }
+.result-panel > p { font-size: 13px; line-height: 1.7; color: #6d7f65; }
+.earned-badge { display: inline-block; padding: 10px 14px; margin-top: 15px; color: #655323; background: #f6eac7; border-radius: 7px; font-size: 13px; }
+.event-feed { margin-top: 18px; padding: 15px; background: #edf2e6; border-radius: 8px; font-size: 12px; line-height: 1.8; }
+.session-footer { display: flex; align-items: center; justify-content: space-between; color: #7d8c74; font-size: 10px; padding-top: 22px; }
+.validation-panel h3 { margin: 16px 0 10px; }
+.validation-panel details { margin-top: 20px; }
+@media(max-width:1100px) { .game-layout { grid-template-columns: minmax(0,1fr) 230px; } .game-topbar { gap: 16px; margin: 0 25px; } .game-world .world-renderer { height: 400px; } .dialogue-panel { right: 20px; width: 500px; } }
+
+.game-shell .brand > span.brand-dot, .welcome-screen .brand > span.brand-dot { width: auto; height: auto; margin: 0; display: inline; border: 0; border-radius: 0; background: none; color: #698b5c; font-size: inherit; }
+.game-topbar > button:last-child { margin-left: 0; }

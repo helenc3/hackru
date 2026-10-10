@@ -1,0 +1,34 @@
+{
+  "segment": "Segment-003",
+  "specVersion": "1.2",
+  "validatedAt": "2026-10-10T19:32:38.551309+00:00",
+  "acceptance": [
+    "One world session contains sign overlays, NPC dialogue, objective/action HUD, inventory, result controls, and unchanged Recorder/AudioController/SkillDebrief slots.",
+    "Voice-led dialogue includes same-panel typed accessibility, transcript confirmation provenance, Chinese IME safety, and movement-key containment.",
+    "Active boss omits coach, hint/freeze controls, correctness meters, and suggested answers; malformed boss feedback fails transport validation.",
+    "Development-only internal validator requires server permission, separate session storage, and explicit simulated reward labels; production has no mode selector or validation link.",
+    "Scripted UI browser journeys cover café substitution/kiosk, platform direct/confirmation and wrong-board repair, boss success/failure/retry, and one sequential P1/P2/B1 campaign.",
+    "Session coordinator serializes mutations, preserves IDs/input across retries, refreshes failed-turn versions, isolates expired sessions, and discards abandoned provider replies after an immediate mission restart.",
+    "26 browser/transport cases and 33 existing unit/API tests pass, including microphone denial, WebGL recovery, server-owned countdown completion, and validation permission isolation."
+  ],
+  "checks": {
+    "npm ci": "pass",
+    "typecheck": "pass",
+    "lint": "pass",
+    "test": "pass",
+    "build": "pass",
+    "test:e2e": "pass",
+    "check:kit": "pass"
+  },
+  "manualEvidence": [
+    "Inspected production Chromium screenshots at 1440px with schema-shaped scripted HTTP responses: readable Hanzi sign overlay and integrated Mandarin dialogue with same-panel feedback; one WebGL canvas and no page errors.",
+    "Visual inspection caught and corrected a bootstrap CSS cascade collision; dialogue now has no horizontal overflow and all controls/text remain inside the panel."
+  ],
+  "limitations": [
+    "UI response tapes validate rendering and transport only; they do not certify the real mission engine, Gemini language quality, 3D movement, recording, STT, or TTS.",
+    "No paid-provider calls were made. Real audio implementation belongs to Segment-005; the real voiced campaign is accepted by Segment-007.",
+    "The bootstrap preview remains while API health explicitly reports the unimplemented engine. Owner-approved migration of the read-only bootstrap 501 smoke assertion is documented for engine integration.",
+    "Main is not branch-protected; final integration manually enforces current main and matching quality CI under the repository merge lock.",
+    "The existing 3D production bundle still triggers the large-bundle warning; no dependencies or frozen shared interfaces changed."
+  ]
+}

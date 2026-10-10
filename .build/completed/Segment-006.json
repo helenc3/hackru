@@ -29,14 +29,14 @@
     ".build/completed/Segment-001.json: requesting human confirmed direct integration into main and requested correction of the stale local-only status."
   ],
   "limitations": [
-    "Implementation and segment acceptance are complete, but PR #5 is unmerged. This branch record is not an authoritative merged completion under BUILD_PROTOCOL.md until integration passes quality and merges.",
+    "The requesting human directed direct Git integration into main while the world browser checks are failing; the quality failure remains unresolved for later repair. PR #5 was not merged through GitHub, so this direct integration does not satisfy the protocol's merged-PR completion condition.",
     "Main is not branch-protected; final integration manually enforces up-to-date main and the matching quality CI check under the merge lock.",
     "Segment-001 was integrated directly into main without a corresponding segment PR; authenticated history and the requesting human confirm the implementation is present.",
     "Existing large 3D bundle warning remains. No live provider or microphone acceptance is claimed by these fixture skill/debrief checks."
   ],
   "implementationStatus": "complete",
   "acceptanceStatus": "passed",
-  "integrationStatus": "unmerged-world-ci-blocker",
+  "integrationStatus": "directly-integrated-by-human-direction-with-known-quality-failure",
   "pullRequest": "https://github.com/helenc3/hackru/pull/5",
   "ciEvidence": {
     "run": "https://github.com/helenc3/hackru/actions/runs/38086627147",

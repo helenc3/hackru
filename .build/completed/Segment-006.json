@@ -1,0 +1,36 @@
+{
+  "segment": "Segment-006",
+  "specVersion": "1.2",
+  "validatedAt": "2026-10-10T21:08:42.868642+00:00",
+  "acceptance": [
+    "Fixed histories produce exact expected mastery/count values for correct, incorrect, and initially ambiguous independent decisions; exact tier thresholds and 0\u20132 bounds pass.",
+    "Mastery updates once per terminal mission attempt; practice tier changes only at mission start by at most one, and boss tier remains 1.",
+    "First authored conversation decisions and cue decisions cannot be farmed by duplicate requests, corrected retries, assisted cue replay, or failed-provider evidence.",
+    "Typed and edited conversation turns retain their actual provenance; only server-verified unedited STT is summarized as spoken.",
+    "Subtitle-assisted and developer-validation listening do not increase independent listening counts; listening without evidence is described as untested.",
+    "Terminal debrief shows independent actions, one correction, track counts, authored next-practice rationale, and honest modality beneath the single session badge.",
+    "Active boss has no debrief; cleared and failed boss fixtures reveal the result debrief only after termination."
+  ],
+  "checks": {
+    "npm ci": "pass: 459 packages installed; zero audit vulnerabilities",
+    "typecheck": "pass",
+    "lint": "pass",
+    "test": "pass: 105 unit/API tests, including 13 skill cases",
+    "build": "pass",
+    "test:e2e": "pass: 38 Firefox browser checks, including two debrief cases",
+    "check:kit": "pass"
+  },
+  "manualEvidence": [
+    "Inspected full-page production Firefox fixture screenshot: readable result debrief, one Station Navigator badge, distinct spoken/typed/edited counts, untested listening, next-practice explanation and accessible return control."
+  ],
+  "authorizedScopeExtensions": [
+    "packages/shared/src/engine/index.ts: requesting human authorized connecting the missing skill hooks; first-decision evidence and independent repair bookkeeping implement the segment acceptance.",
+    "apps/web/tests/shell.spec.ts: requesting human authorized replacing the obsolete Segment-006 placeholder assertion with no active-mission debrief.",
+    ".build/completed/Segment-001.json: requesting human confirmed direct integration into main and requested correction of the stale local-only status."
+  ],
+  "limitations": [
+    "Main is not branch-protected; final integration manually enforces up-to-date main and the matching quality CI check under the merge lock.",
+    "Segment-001 was integrated directly into main without a corresponding segment PR; authenticated history and the requesting human confirm the implementation is present.",
+    "Existing large 3D bundle warning remains. No live provider or microphone acceptance is claimed by these fixture skill/debrief checks."
+  ]
+}

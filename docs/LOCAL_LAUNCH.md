@@ -11,7 +11,7 @@ cp .env.example .env
 npm run dev
 ```
 
-Open `http://127.0.0.1:5173`. The development API runs at port 3001; keep `PORT=3001` for the Vite proxy. Both processes stop together. Vite reads the root `.env`; only `VITE_` names reach the browser. Never prefix a secret with `VITE_`.
+Open `http://127.0.0.1:5173`. The development API runs at port 3001; keep `PORT=3001` for the Vite proxy. The root `npm run dev` waits for API health before starting Vite, with a 30-second startup timeout. Both processes stop together. Vite reads the root `.env`; only `VITE_` names reach the browser. Never prefix a secret with `VITE_`.
 
 Segment-000 needs no API keys. Its interface shows a static Chinese district, health flags, and explicitly unfinished voice/debrief slots. Segment-001 implements session, action, and turn routes with fixture campaigns and guarded progression. Live dialogue, speech, and transcription providers remain owned by Segments 002/005 and return 501 from their scaffolds; the game API reports unavailable provider turns without committing them. A configured flag means a key is present, not that a provider was contacted. There is no playable movement or earned progress yet.
 

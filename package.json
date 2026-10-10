@@ -13,7 +13,7 @@
   },
   "packageManager": "npm@12.2.0",
   "scripts": {
-    "dev": "concurrently -k -n api,web \"npm run dev -w @vibequest/server\" \"npm run dev -w @vibequest/web\"",
+    "dev": "concurrently -k -n api,web \"npm run dev -w @vibequest/server\" \"node scripts/wait-for-api.js && npm run dev -w @vibequest/web\"",
     "typecheck": "tsc -p packages/shared/tsconfig.json --noEmit && tsc -p apps/server/tsconfig.json --noEmit && tsc -p apps/web/tsconfig.json --noEmit",
     "lint": "eslint .",
     "test": "vitest run && python3 validate_kit.py",

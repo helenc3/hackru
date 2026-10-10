@@ -25,6 +25,8 @@ Inspect the completed baseline before choosing exact imports. Extract existing b
 
 All are shared exported types with Zod schemas where they cross HTTP. Defaults preserve baseline 1.2 inputs. Names below are implementation requirements, not permission to copy private types.
 
+1.3 is the planning/packet version, not an instruction to change the existing wire-version literal blindly. During 010, keep baseline response shapes/version accepted and add optional fields through the shared schemas. If a wire-version change proves necessary, document compatibility/migration explicitly before dispatch; never relabel old fixture payloads just to make tests pass.
+
 - CharacterModel props: role (player or existing NpcId), presentation (idle/greeting/listening/speaking), facing and palette. Character geometry is centered at ground origin; target height ~1.7 units. Collision lives elsewhere. Material tokens cover paper/light/shadow/accent colors and texture budgets.
 - Scene view: a small presentation projection containing manifest geometry, visible interactables and character presentation. WorldPreview consumes this projection without fake PublicState/session IDs, quest progression or provider calls. Active WorldRenderer retains state/onAction/onTalk and gains optional onNpcProximity.
 - ProximitySnapshot: npcId or null, distance or null, stable selection and current encounter generation. Notify only after position sync succeeds; no callbacks per frame. Missing callback retains baseline E behavior. UI may show the bubble; only the server's actual proximity/attempt guard allows a turn.

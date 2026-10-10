@@ -24,6 +24,8 @@ If code reached main directly without a merged PR (for example 001/002/006), do 
 
 The requesting human must explicitly approve accepting those specific historical integrations through reconciliation, recorded with the concrete audit PR. A plan request or completion-file text alone is not approval. Once approved and normally merged, the audit PR is dependency evidence for only those listed segments. It is not the original implementation PR and does not erase prior failing CI. No future direct merge receives this exception automatically.
 
+If baseline CI is already red, an explicitly authorized small integration repair may accompany the audit, or the human may explicitly authorize Segment-007 to implement against the audited historical code and deliver the audit with its integration fixes in one green PR. That exception must name the affected dependencies and scope before implementation. This avoids a dependency deadlock without permitting a red merge or claiming missing live acceptance passed.
+
 Segment-005 already has an implementation PR; its completion record should follow up normally on the owner's branch. Pending mandatory human microphone/listening evidence cannot be marked passed by merging a record. Coordinate without taking over another branch, or obtain an explicit handoff. A merged audit/record cannot replace required live proof.
 
 010 assumes 007/008/009 will be complete but verifies actual merged records/acceptance before code work. The green-and-merge rules remain mandatory. Planning may prepare packets while prerequisites are unfinished; implementation cannot silently pass the gate.

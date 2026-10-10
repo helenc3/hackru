@@ -1,10 +1,12 @@
 # VibeQuest — HackRU implementation specification
 
-Version 1.2 · Prepared October 10, 2026 · Planning baseline: 24 elapsed hours
+Version 1.3 · Revised October 10, 2026 · Original build: 24 hours · Post-baseline overhaul: 8–12 hours
 
 This is the implementation contract for four people, three attending their first hackathon. The schedule is an assumption, not a claim about HackRU's official hours. Use elapsed time from kickoff. A 36-hour extension is specified below. This deliverable is a plan, not an implemented or tested application. For independent accounts, start with `AGENTS.md`, `BUILD_PROTOCOL.md`, `SEGMENT_REGISTRY.md`, and the requested `segments/Segment-NNN.md`. The numbered registry is authoritative for task dependencies and file ownership; this document is authoritative for product behavior.
 
 ## 1. Product and fixed decisions
+
+**Version 1.3 precedence:** Sections 17–20 define the requested post-baseline overhaul and supersede conflicting presentation, voice-submission and adaptation guidance below. Assume Segments 007, 008 and 009 will already be built when this work starts; verify that at dispatch, without claiming they are complete today. Their 1.2 packets and historical records stay intact. This revision prepares a plan/build kit only; it does not authorize implementation now.
 
 **Pitch:** Navigate a foreign city by understanding its people, signs, and announcements. AI characters react to how you communicate, and the next practice mission targets what you struggled with.
 
@@ -20,7 +22,7 @@ A judge can complete a 3–5 minute guided demonstration showing all of these:
 
 1. Walk a visible avatar through the district and inspect a Mandarin sign.
 2. Speak a novel Mandarin request into the microphone and hear the NPC answer in Mandarin.
-3. Make a recoverable misunderstanding; see practice feedback and a patience change.
+3. Make a recoverable misunderstanding and receive practice feedback. Deliberate spoken rudeness may affect patience; hesitation alone does not.
 4. Hear a Mandarin announcement and reconcile it with a written destination board.
 5. Make a consequential route choice, then complete a mission.
 6. See a skill-specific change to the next practice challenge.
@@ -192,7 +194,7 @@ apps/web/src/
   validation/       # developer-only text harness, excluded from player navigation
   world/            # scene, movement, camera, collision
   ui/               # shared HUD, dialogue, coach, debrief
-  audio/            # playback, optional recording
+  audio/            # required capture and playback; hands-free after overhaul
 apps/server/src/
   routes/           # sessions, actions, turns, speech
   providers/        # Gemini, ElevenLabs, fixture adapters
@@ -359,7 +361,7 @@ The server projects result fields by mode before serialization. Raw evaluation, 
 
 Timeout plan: 8-second model budget including at most one transient-network retry; a schema failure does not get an unbounded repair loop. On final failure, keep state unchanged and offer retry or fixture demonstration. A provider outage never subtracts patience or timer time. Fixture mode is explicitly labeled and cannot be represented as live AI.
 
-## 9. ElevenLabs and the required voice loop
+## 9. ElevenLabs and the required voice loop — baseline; 17.3 overrides capture/submission
 
 The core interaction is **approach NPC → speak Mandarin → understand the spoken reply → act in the world**. Implement this full loop in Segment-005; voice input is not an optional later segment. A short utterance capture flow is the minimum, not continuous full-duplex audio.
 
@@ -379,7 +381,7 @@ PA bookkeeping: `playCue` issues a playback ID and bounded timer pause; only com
 
 No pronunciation/tone grade is inferred from STT. Test Mandarin recognition with two speakers if available, short requests, numeral variants, background noise, and a deliberately ambiguous recognition result. The coach can model correct pronunciation by replaying authored audio without claiming to measure the player’s tones.
 
-## 10. Third-person world and shared UI
+## 10. Third-person world and shared UI — baseline; 17.1–17.2 override presentation
 
 World owner builds immediately against fixture state while the other tracks build backend, integrated dialogue UI, and validation harness. Do not wait for a finished API to begin the scene.
 
@@ -502,3 +504,87 @@ API capabilities verified against official documentation on October 10, 2026. Ac
 - [ElevenLabs speech-to-text endpoint](https://elevenlabs.io/docs/api-reference/speech-to-text/convert)
 - [React Three Fiber compatibility](https://r3f.docs.pmnd.rs/getting-started/introduction)
 - [Vite setup](https://vite.dev/guide/)
+
+## 17. Post-baseline player experience overhaul
+
+Keep React 19/Vite, Three.js/R3F, Express, Zod, the existing HTTP session client, Gemini and ElevenLabs. Keep P1/P2/B1, NPC/zone/cue/choice IDs, prices, authored routes, proximity checks, timers, rewards, provenance and boss independence. Do not migrate to Godot or Electron. A native Presage adapter is isolated from the browser game. New packets use spec 1.3; baseline packets 000–009 remain 1.2.
+
+### 17.1 Original papercraft people, environment and close camera
+
+Create original generic Xiaolin, Achen, Lao Zhou and player designs. Attached references inform paper grain, cut edges, folds, palette, proportions and lighting; they are not identities or characters to copy. Deliver renderable low-poly meshes/materials and minimal idle sway, speaking motion and greeting gestures. Generated portraits alone do not satisfy character delivery. No skeletal rigging or lip sync requirement. Character owner exports components; world owner owns placement/movement. Preserve authoritative positions, player radius, collision and interaction reach.
+
+Use the same treatment for the actual café, plaza, self-service kiosk, ticket counter, concourse, platforms and stationary train. Mountains or forests in references must not replace city/train objects. Café awnings/cups, ticket windows, speaker fixtures and train silhouettes distinguish destinations; color is secondary. Keep authored Simplified Chinese entrance, timetable and destination signs, including visible platform numbers. Remove floating geography labels, technical zone IDs, minimap and correct-route markers. Removing labels does not mean removing the language-bearing signage needed for quests. Render reviewed Unicode Chinese text legibly; never use image-generated gibberish as signage.
+
+Segment-010 freezes shared art/material tokens. At build time, attach the references, make them accessible to both art accounts through a documented reference manifest, and record allowed use/attribution. Reference-match acceptance waits for those images; provisional folded primitives can validate interfaces but cannot be called reference-matched art. Do not modify synced project sources. Original generic silhouettes/clothes must remain distinguishable in front/side/back views; screenshot character and environment comparisons separately.
+
+Camera: perspective follow view, horizontal trailing distance 4.5 units, target height 1.2, vertical rise 4.5 × tan(15°) ≈ 1.21 above the target, initial FOV 55°. The angle is downward from horizontal, not from vertical. Avatar should fill about 20–30% of viewport height at 1440×900. Allow 12–20° pitch and 3.5–5.5 distance tuning to keep head/feet visible; record final settings. Drag changes yaw; movement remains camera-relative at 4 units/sec. Obstruction checks shorten camera distance rather than passing through walls. Keep all required signs/routes visible, no floor clipping, no movement from typed/IME input. Target ≥30 measured FPS on the demo laptop, DPR ≤1.5, shared materials, modest textures, no costly postprocessing.
+
+### 17.2 World-first entry and contextual interface
+
+First paint shows the real district/avatar with one introduction modal above it. Only loading or compatibility recovery may precede rendered content. Before a session exists use the same scene as a non-progressing preview, never a forged active session. Movement and quest time start after onboarding/session creation. Continue is offered inside the modal for a resumable session; do not start a second attempt underneath it.
+
+Suggested copy: “Welcome! Hurry, there’s no time to explain. Use your Mandarin knowledge to complete tasks and catch your connecting train!” Follow with short movement/speaking instructions and Easy/Hard. Easy maps to existing initial practice tier 0; Hard maps to tier 1. Both follow P1 → P2 → B1; boss stays fixed tier 1 with no coaching. Hard is not a boss shortcut or a separate client difficulty engine.
+
+Provide a real local mic test with sound/silence detection, a real Mandarin audio test and optional camera preview/sensing opt-in. Release test tracks. Never request devices on page load. Enable microphone and Play test audio are player gestures. Camera/frame processing has a separate opt-in explaining Presage processing and the small advisory summary sent to Gemini. Camera denial/skipping leaves the language game playable. Mic denial/skipping offers typed Mandarin in the same world, honestly labeled as accessibility/degraded voice. An untested device cannot receive a green check.
+
+After the modal, remove the landing page, permanent quest/sidebar, interaction directory, event log and session/version footer. Show the world, compact mic/activity status, contextual NPC captions/bubbles, nearby deliberate sign/payment/boarding controls, brief practice coaching and terminal results. One small pause/settings control exposes mic/camera off, captions, review-before-send, replay, restart/leave, optional neutral objective, time and inventory. Boss time remains visible/available and opening settings does not pause it. Practice Pause & Learn follows existing rules. Keep keyboard focus, screen-reader names, IME protection and concise error/fixture/degraded notices. Hiding developer diagnostics must not disguise fixture output as live AI.
+
+### 17.3 Proximity and hands-free speech
+
+“Constantly on” means one visibly armed mic after explicit opt-in, without E or Start/Stop for each NPC exchange. No permission/capture before opt-in. Speech buffers/uploads are gated to a single eligible nearby NPC; no ambient uploads elsewhere. Muting, leaving, terminal result, retry, hidden tab or capture failure invalidates buffers. Hidden-tab behavior does not pause boss time. Suspend capture/upload during NPC/PA playback; resume after a short echo guard. The acquired stream may remain open while suspended, with a truthful status indicator. No full-duplex/barge-in requirement.
+
+Use existing MediaRecorder, local Web Audio voice-activity detection and batch ElevenLabs scribe_v2 first. Start a bounded utterance on sustained activity, retain short local pre-roll, finish after roughly 1.2 seconds of silence (tune 0.9–1.8), require ≥250 ms useful speech, retain 15-second/3-MB limits. Silence/noise does not create a turn. Only one STT/model request at a time. Pause ratio, onset delay and relative energy are uncertain local audio observations; ElevenLabs transcription does not establish psychological confidence. Realtime Scribe supports VAD, but migration to its streaming model/socket is excluded unless measured batch acceptance fails and a separate proposal is authorized.
+
+Default auto-send submits one unchanged final STT transcript once after utterance completion. Disclose this in onboarding; offer Review before send with compact correction/Send controls. Edited/typed/unchanged STT source rules remain server-derived. Partial transcripts/VAD events never earn evidence. Failure retains the same turn ID/draft and requires a clear retry; refresh versions and never auto-repeat a failed consequential action. Armed idle listening is not a recording phase and cannot freeze boss time. Register bounded recording only for an actual clip; all provider/playback pauses remain server-bounded.
+
+World flushes authoritative position before announcing NPC eligibility; server rechecks current attempt, 2-unit range and availability. Acquire at ≤2 units after 300 ms stable focus; release beyond 2.75 units. Nearest eligible NPC wins with deterministic ties and sticky selection. Do not switch mid-utterance/turn/playback. Drop pre-submit clips on exit; committed turns may finish but cannot play after retry. At most one automatic greeting job per NPC/attempt, with 30-second encounter cooldown; re-entry/replay cannot register a fresh boss pause. Greetings are authored Mandarin, disclose no solution, use one bounded speech job, grant no XP/evidence/patience effect and make no Gemini call. If the player speaks first, suppress greeting. Greetings, replies and PA share the single queue. Failure permits speech/typed recovery immediately. Signs, payments and boarding remain deliberate; approaching never silently completes a quest.
+
+### 17.4 Presage delivery cues and relevant practice
+
+Target a real opt-in Presage facial-expression integration behind a provider interface. Official documentation now describes a native Node SDK and custom frame input; a plain browser cannot import that native binding. Plan a same-laptop Node sidecar receiving approved browser camera frames through the existing Express origin and returning a validated small summary. Keep the game browser-based. No mandatory Redis/OnPrem stack. A hosted server cannot assume its webcam is the player's; native sensing is a local demo capability until remote frame processing is separately proven.
+
+Timebox feasibility to 60–90 minutes: verify actual package/version/platform/account/key, FACE/EXPRESSIONS output and camera input on the demo laptop. Use documented SDK methods, not invented REST endpoints. Request face metrics only; exclude pulse, breathing, HRV/stress and medical interpretations. Use a child process so native failure cannot crash gameplay. Missing SDK/key yields a neutral disabled provider. Meet the SDK's actual frame format/rate/resolution requirements, use validation feedback and a bounded latest-frame queue. Frame ingress requires explicit consent, same-origin checks, session/attempt binding, strict frame bounds and teardown; no publicly open camera-ingest route. If unavailable, retain accurately labeled fixture/adapter work and leave live Presage pending, not falsely complete or replaced by an unrelated library.
+
+Use stable recent expression probabilities, utterance pause observations and optional learner More support preference to request neutral/upbeat/reassuring/calm delivery. They are uncertain response-style cues, not verified confidence/nervousness/anger/personality labels. Unknown/stale/low-quality samples revert to neutral. Smooth several samples, expire after 3 seconds, require two recent speech observations for a hesitation trend and add hysteresis to prevent flicker. SDK confidence, STT quality and Gemini semantic confidence are distinct. Eye-contact/engagement scoring is deferred unless the installed SDK supplies a validated metric; face orientation alone proves neither attention nor attitude.
+
+Confident delivery can elicit warmer social language; hesitation receives a slower, shorter, equally respectful response. Facial tension alone selects calm language, never punishment. Stutters/looking away/expression estimates cannot lower patience, deny tasks or reduce rewards. Intentional spoken rudeness retains authored behavior. Supply a bounded advisory delivery summary to the existing single Gemini request. Critical route/price replies remain authored and semantically identical; allowlisted prefixes/pacing may vary, with full replies ≤80 Hanzi. Boss tone may vary but never coaching, translation, answer hints or evaluator scores.
+
+Practice recommendations target evidenced drink vocabulary, price/numerals, destination/platform comprehension, ticket quantity and clarification syntax. Author small variants within existing missions/tiers rather than procedural levels/new destinations. Select at mission boundaries and retain Segment-006 tier bounds/fixed boss. Sensing may suggest a gentler presentation or more practice; it cannot identify missing terminology/syntax by itself or change mastery. Explain debrief recommendations from actual language/repair evidence, separately from optional presentation adaptation. Camera-on/off runs with the same language/actions must yield identical quest, XP, mastery, rewards and boss results.
+
+Keep frames ephemeral; no raw video, images, landmarks or biometric histories in logs/Git/browser storage/completion files. Send Gemini only an allowlisted small style summary, never frames/physiology. Configure Presage telemetry off and verify installed behavior. Check actual SDK/network handling before claiming local-only processing; report provider retention limitations honestly. Revocation stops tracks, ingress, sidecar processing and influence immediately. Do not persist a mood guess as a learner trait.
+
+## 18. Compatible interfaces and ownership
+
+[Overhaul interfaces](docs/OVERHAUL_INTERFACES.md) freezes planned seams, bounds and ownership for Segment-010. It is not implemented code. 010 extracts the monolithic scene into character/environment components, mounts neutral voice/sensing facades, adds a non-progressing preview and optional proximity signal, and establishes Zod schemas for additive metadata. Existing RendererProps/session callbacks and 1.2 fixture shapes remain valid. No private duplicate contracts. Proposed routes are implemented once with defaults in 010, then owners fill their implementations.
+
+No camera frames/inferred traits enter PublicState. Server resolves a short-lived delivery-context reference bound to the current attempt; forged client scores never become language evidence. Greeting is a separate bounded operation, not a synthetic evaluated player turn. Voice uses ordinary versioned /turns with unchanged STT ID and guards. Peers are developed against neutral adapters. Root dependency files belong to 010 before dispatch, then 015; four lanes cannot independently edit the lockfile.
+
+## 19. Four-person dispatch and milestones
+
+Assume completed 007/008/009 at overhaul start, not today. Preserve their IDs and packets. Complete [Segment-010](segments/Segment-010.md) first (60–120 minutes), then dispatch the four lanes from its same merged revision:
+
+| Owner/category | Packet | Focus | Estimate |
+|---|---|---|---|
+| A — characters | [Segment-011](segments/Segment-011.md) | Three NPCs, avatar, papercraft assets/gestures | 2–4 hours |
+| B — world/camera | [Segment-012](segments/Segment-012.md) | City/station/train, closer 15° view, signs/proximity | 3–5 hours |
+| C — interface | [Segment-013](segments/Segment-013.md) | World-first entry, intro/devices, difficulty, contextual UI | 3–5 hours |
+| D — conversation/sensing | [Segment-014](segments/Segment-014.md) | Hands-free turns, greetings, Presage, tone/practice | 4–7 hours |
+
+Each lane depends on 010, not another lane. Shared defaults and pre-mounted imports permit independent work. 011 owns character components; 012 places them. 013 mounts the voice facade; 014 implements it. Root/common seams are frozen during this phase. Merge normally under the existing merge lock, synchronize current main, and do not claim simultaneous merge safety. [Segment-015](segments/Segment-015.md) owns final cross-lane repairs, acceptance and refreshed demo artifacts.
+
+Budget 8–12 additional elapsed hours including integration, not hidden extra work in the original 24-hour plan. H0–2 shared seams, reference availability and SDK feasibility; H2 first independent lane slices; H4 visual review plus proximity voice/onboarding; H6 combined live P1; H8 freeze/P2/B1/camera-off regression; H10–12 live rehearsal, FPS/latency, package refresh and buffer. Less than 6 remaining hours requires explicit reduced-scope reporting. Reserve the last two hours for verification, not native dependency rescue.
+
+## 20. Overhaul acceptance and cuts
+
+- First content is the district behind onboarding; no permanent sidebar/floating geography labels; real Chinese signs stay legible at close camera angle.
+- Reference review confirms original generic people and consistent café/station/train. Missing images leave visual-match acceptance pending.
+- Opted-in player enters NPC range, receives at most one greeting, speaks without E/record/send buttons, hears Gemini/ElevenLabs response, reads a cue and performs a deliberate action. Camera-off passes the same route.
+- NPC boundaries, noise/silence, hesitant speech, playback echo, review toggle, exit-range, hidden tab, mute/revoke, failures/duplicates and late callbacks cannot misroute turns, duplicate progress or renew boss pause.
+- Permission denial, unsupported devices/SDK and session expiry recover in-world. Record live Presage face output/style influence and neutral fallback separately from fixture proof. Camera preview alone is not Presage acceptance.
+- All P1/P2/B1 branches, boss protections, provenance, mastery/rewards and production harness blocking pass. Idle armed microphone cannot pause boss. Identical language/actions yield identical rewards/mastery with any sensor values.
+- Measure ten real turns with segmentation/STT/Gemini/TTS/playback separated from review time. Record median/range and cautious tail observations, not a reliable population p95 from ten samples. Recheck ≥30 FPS on the demo laptop with camera+voice enabled.
+- 015 reruns production/live acceptance rather than inheriting 007 evidence. Refresh 008 screenshots/script/attribution and document retained/superseded 009 behavior. Publication/submission remains separately authorized.
+
+Cut expensive rigs/textures/postprocessing/clutter first; keep folded geometry, modest gestures and a static train. Defer realtime STT, gaze inference and all physiological metrics. If Presage feasibility fails by H2, keep camera-off gameplay and report live Presage incomplete. If segmentation is unreliable, explicit recording is a degraded fallback and hands-free remains unmet. Do not hide missing core voice behind typing or silently remove requested sensing. A human can authorize an accurately labeled reduced release; builders cannot invent that authorization.
+
+Primary references checked October 10, 2026; recheck at implementation: [Presage Node SDK](https://smartspectra.presagetech.com/docs/nodejs/), [face capabilities](https://smartspectra.presagetech.com/), [payload definitions](https://smartspectra.presagetech.com/docs/data-types/), [model limitations](https://smartspectra.presagetech.com/docs/model-cards-and-limitations/), [telemetry](https://smartspectra.presagetech.com/docs/telemetry-and-privacy/), [ElevenLabs VAD strategies](https://elevenlabs.io/docs/eleven-api/guides/how-to/speech-to-text/realtime/transcripts-and-commit-strategies). SDK documentation is not live account proof. Thresholds above are project decisions to test.

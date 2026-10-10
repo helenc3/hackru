@@ -78,3 +78,10 @@ Create-session input preference defaults to voice; `setInputPreference` changes 
 Transcription returns text plus a session/attempt-bound ID. Turn input includes optional `transcriptionId` and source `typed | stt | stt-edited`; server derives the true source and rejects forged/unrelated IDs. Original STT and edited typed text are stored separately ephemerally. Only unchanged verified STT earns spoken evidence; edited/typed semantic success still follows the same quest rules.
 
 Core acceptance requires reading cue → relevant spoken NPC exchange → world action, plus a live Mandarin STT/Gemini/TTS round trip. A callback or inspection alone never proves reading/listening. In P1, receipt plus arrival at station clears; P2 also requires the pre-update NPC direction exchange. Validation harness may simulate these events but cannot certify real voice behavior.
+
+
+## Version 1.3 overhaul freeze
+
+The 1.2 baseline remains compatible and historical packets stay intact. After verified 007/008/009, Segment-010 implements the additive preparation defined in [overhaul interfaces](docs/OVERHAUL_INTERFACES.md), extracts the character/environment/preview seams and mounts neutral voice/sensing consumers. Existing RendererProps callbacks, requests and fixture fields remain valid. Shared additions are optional/default-neutral and runtime-validated.
+
+Only after 010 merges do 011–014 begin independently: characters, world/camera, interface, conversation/sensing. Root packages, shared schemas/barrel exports and server startup stay frozen for those lanes; 010 owns preparation and 015 owns final integration. No duplicated private types, concurrent lockfile edits or late cross-owner rewrites. Future sensing context is ephemeral, server/attempt-bound and cannot affect rewards/mastery or reveal boss help. No code/SDK/device work has been performed by this planning freeze.

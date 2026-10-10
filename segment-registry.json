@@ -1,0 +1,124 @@
+{
+  "specVersion": "1.2",
+  "integrationBranch": "main",
+  "segments": [
+    {
+      "id": "Segment-000",
+      "title": "Repository bootstrap and contract freeze",
+      "suggestedOwner": "A",
+      "dependencies": [],
+      "packet": "segments/Segment-000.md",
+      "optional": false,
+      "status": "planned"
+    },
+    {
+      "id": "Segment-001",
+      "title": "Authoritative engine, authored missions, and session API",
+      "suggestedOwner": "A",
+      "dependencies": [
+        "Segment-000"
+      ],
+      "packet": "segments/Segment-001.md",
+      "optional": false,
+      "status": "planned"
+    },
+    {
+      "id": "Segment-002",
+      "title": "Gemini NPC dialogue and language evaluation",
+      "suggestedOwner": "B",
+      "dependencies": [
+        "Segment-000"
+      ],
+      "packet": "segments/Segment-002.md",
+      "optional": false,
+      "status": "planned"
+    },
+    {
+      "id": "Segment-003",
+      "title": "Integrated game UI and internal text validation",
+      "suggestedOwner": "C",
+      "dependencies": [
+        "Segment-000"
+      ],
+      "packet": "segments/Segment-003.md",
+      "optional": false,
+      "status": "planned"
+    },
+    {
+      "id": "Segment-004",
+      "title": "Third-person freely navigable district",
+      "suggestedOwner": "D",
+      "dependencies": [
+        "Segment-000"
+      ],
+      "packet": "segments/Segment-004.md",
+      "optional": false,
+      "status": "planned"
+    },
+    {
+      "id": "Segment-005",
+      "title": "Required Mandarin voice loop and PA playback",
+      "suggestedOwner": "B",
+      "dependencies": [
+        "Segment-000",
+        "Segment-002"
+      ],
+      "packet": "segments/Segment-005.md",
+      "optional": false,
+      "status": "planned"
+    },
+    {
+      "id": "Segment-006",
+      "title": "Evidence-based skill adaptation and debrief",
+      "suggestedOwner": "A",
+      "dependencies": [
+        "Segment-000",
+        "Segment-001",
+        "Segment-003"
+      ],
+      "packet": "segments/Segment-006.md",
+      "optional": false,
+      "status": "planned"
+    },
+    {
+      "id": "Segment-007",
+      "title": "Integrated acceptance and production build",
+      "suggestedOwner": "A",
+      "dependencies": [
+        "Segment-000",
+        "Segment-001",
+        "Segment-002",
+        "Segment-003",
+        "Segment-004",
+        "Segment-005",
+        "Segment-006"
+      ],
+      "packet": "segments/Segment-007.md",
+      "optional": false,
+      "status": "planned"
+    },
+    {
+      "id": "Segment-008",
+      "title": "Submission package and final demo readiness",
+      "suggestedOwner": "C/D",
+      "dependencies": [
+        "Segment-007"
+      ],
+      "packet": "segments/Segment-008.md",
+      "optional": false,
+      "status": "planned"
+    },
+    {
+      "id": "Segment-009",
+      "title": "Optional conversation pacing polish",
+      "suggestedOwner": "B/C",
+      "dependencies": [
+        "Segment-005",
+        "Segment-007"
+      ],
+      "packet": "segments/Segment-009.md",
+      "optional": true,
+      "status": "planned"
+    }
+  ]
+}

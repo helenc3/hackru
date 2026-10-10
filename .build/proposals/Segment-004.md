@@ -73,3 +73,26 @@ dialogue provider; the combined revision passes 65 unit/API tests and all 35
 browser tests locally. Matching CI and a normal PR merge are required before
 the completion record becomes authoritative.
 
+## Merged-main Quality correction, 2026-10-10
+
+The earlier publishing and integration limitations above are historical. PR #3
+merged at c3fb2f12a0b71fcadcba4d074507eb74b409f710 before Quality completed.
+Its merged-main run 38083480843 passed clean install, typecheck, lint, all 65
+unit/API tests and build, but failed the demo-laptop FPS assertion on the cloud
+runner (11.9–14.8 FPS). Interaction checks passed; two validation journeys
+timed out on their first attempts and passed their retries.
+
+The packet requires 30 FPS on the actual demo laptop, separately from fixture
+browser smoke. The owned test now always checks finite advancing rendering,
+camera controls and page errors. VIBEQUEST_DEMO_LAPTOP=1 additionally enforces
+the unchanged 30 FPS acceptance target. Measurement artifacts label the
+environment, renderer and target rather than identifying every CI machine as
+the demo laptop. No browser test is skipped. Product code, shared contracts
+and CI configuration are unchanged.
+
+Against current main, typecheck, lint, 65 unit/API tests, kit validation and
+build pass. All 35 browser tests pass with VIBEQUEST_DEMO_LAPTOP=1 in installed
+Chrome at 1440x900; Intel Arc 140T records 60/60/60 FPS. Normal matching Quality
+CI and an up-to-date PR under the owned merge lock are required before this
+follow-up merges. The merged revision receives build and world smoke checks.
+

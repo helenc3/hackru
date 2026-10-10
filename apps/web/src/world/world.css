@@ -1,0 +1,16 @@
+.district-world { outline: none; font-family: 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif; }
+.district-world:focus-visible { outline: 3px solid #b96927; outline-offset: 2px; }
+.district-world canvas { touch-action: none; }
+.district-world .district-labels { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.district-landmark { position: absolute; left: 0; top: 0; white-space: nowrap; background: #fff8e8e8; border: 1px solid #6a8470; border-radius: 4px; color: #254638; padding: 3px 7px; font-size: 13px; font-weight: 700; }
+.district-world .world-caption { pointer-events: none; z-index: 2; }
+.district-world .world-note { z-index: 2; font-size: 11px; pointer-events: none; }
+.district-nearby { position: absolute; left: 12px; bottom: 52px; display: flex; flex-wrap: wrap; gap: 5px; max-width: calc(100% - 24px); z-index: 3; }
+.district-nearby button, .district-panel button { background: #fff9eb; color: #254638; border: 1px solid #53705d; padding: 7px 10px; border-radius: 5px; cursor: pointer; font-size: 13px; }
+.district-nearby button:disabled { opacity: .6; cursor: wait; }
+.district-nearby button:focus-visible, .district-panel button:focus-visible { outline: 3px solid #e1a34a; }
+.district-panel { position: absolute; inset: 62px 20px 55px; overflow: auto; background: #fff9edf7; border: 2px solid #47644d; border-radius: 9px; z-index: 4; padding: 18px; color: #254638; box-shadow: 0 8px 24px #203e362f; }
+.district-panel h3 { font-size: 17px; margin: 0 0 14px; }
+.district-panel p { white-space: pre-wrap; font-size: 20px; line-height: 1.65; margin: 0 0 15px; }
+.district-panel .district-panel-note { font-size: 13px; }
+.district-error { position: absolute; top: 55px; left: 12px; right: 12px; z-index: 5; background: #fff5df; color: #6c3d21; padding: 8px; border-radius: 5px; font-size: 12px; }

@@ -1,0 +1,52 @@
+{
+  "name": "vibequest",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=24.19.0 <25",
+    "npm": ">=12.2.0 <13"
+  },
+  "packageManager": "npm@12.2.0",
+  "scripts": {
+    "dev": "concurrently -k -n api,web \"npm run dev -w @vibequest/server\" \"npm run dev -w @vibequest/web\"",
+    "typecheck": "tsc -p packages/shared/tsconfig.json --noEmit && tsc -p apps/server/tsconfig.json --noEmit && tsc -p apps/web/tsconfig.json --noEmit",
+    "lint": "eslint .",
+    "test": "vitest run && python3 validate_kit.py",
+    "test:watch": "vitest",
+    "build": "npm run build -w @vibequest/shared && npm run build -w @vibequest/web && npm run build -w @vibequest/server",
+    "start": "npm run start -w @vibequest/server",
+    "test:e2e": "playwright test",
+    "check:kit": "python3 validate_kit.py"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.64.0",
+    "@eslint/js": "10.0.1",
+    "eslint": "10.12.0",
+    "typescript-eslint": "8.71.1",
+    "eslint-plugin-react-hooks": "7.1.1",
+    "globals": "17.13.0",
+    "typescript": "5.9.3",
+    "vitest": "4.1.11",
+    "tsx": "4.23.15",
+    "tsup": "8.5.1",
+    "concurrently": "9.2.5",
+    "@types/node": "24.19.2",
+    "supertest": "7.3.1",
+    "@types/supertest": "6.0.3",
+    "cross-env": "10.1.0"
+  },
+  "overrides": {
+    "esbuild": "0.28.2"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true,
+    "protobufjs@7.6.6": true,
+    "@google/genai@2.28.0": false,
+    "fsevents@2.3.3": false
+  }
+}

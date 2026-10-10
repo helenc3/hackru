@@ -1,0 +1,34 @@
+{
+  "segment": "Segment-000",
+  "specVersion": "1.2",
+  "validatedAt": "2026-10-10T18:07:35Z",
+  "acceptance": [
+    "Clean npm ci installs 459 packages with zero reported audit vulnerabilities.",
+    "All 33 unit/API tests pass, including 17 shared contract/geometry cases and 16 server cases.",
+    "All four production browser checks pass: Chinese shell, provider flags, honest 501 response, and WebGL compatibility recovery.",
+    "Thirteen portable baseline JSON examples and their schema checks establish frozen interfaces for Segments 001-004.",
+    "Boss output omits coaching and scores; private evaluator/provenance fields are rejected from public schemas.",
+    "Server serves the production SPA beneath a hidden checkout directory; API routes are mounted and explicitly unimplemented.",
+    "Root launch guide records exact runtime, development/production commands, environment boundaries, and browser installation."
+  ],
+  "checks": {
+    "npm ci": "pass",
+    "typecheck": "pass",
+    "lint": "pass",
+    "test": "pass",
+    "build": "pass",
+    "test:e2e": "pass",
+    "check:kit": "pass"
+  },
+  "manualEvidence": [
+    "Inspected a full-page production Chromium screenshot at 1440px: Chinese glyphs, static district preview, health flags, and unfinished voice/debrief slots render correctly.",
+    "Production page has no JavaScript errors and mounts one WebGL canvas.",
+    "Independent integration audit verified shared IDs, scene reachability, private provenance handoff, and mounted interfaces; kiosk self-service behavior is documented."
+  ],
+  "limitations": [
+    "This is the foundation only. Engine, world movement, NPC intelligence, microphone/transcription, speech, and adaptive skill logic remain explicitly unimplemented in their owning segments.",
+    "No live paid-provider calls were made; live acceptance belongs to Segments 002 and 005.",
+    "Main is not branch-protected. The builder manually enforces the quality job and up-to-date integration protocol; no repository settings were changed.",
+    "Production build reports a large initial 3D bundle; performance refinement belongs to integration."
+  ]
+}

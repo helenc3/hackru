@@ -61,6 +61,8 @@ Goal: read the entrance sign, buy a drink through spoken negotiation, and follow
 
 Fixed facts: coffee unavailable; tea ¥10; water ¥5 (CNY). Money is a mission affordance, not an economy simulation. The model cannot charge the player. Café completion and station-kiosk completion converge on the same receipt prerequisite and spoken station-directions cue. A kiosk order must still be an available drink request; the alternate route does not skip conversation.
 
+The kiosk is self-service; no fourth NPC is required. After cancelling the café order, the player asks Xiaolin for an available tea/water selection and confirms its price before leaving the café. Xiaolin supplies the same spoken station directions. The new evaluated selection authorizes the kiosk payment choice only after reaching the kiosk; an old cancelled order cannot authorize payment. This keeps the branch within the three frozen NPCs and their fixed locations.
+
 Example acceptable spoken requests: `请给我一杯咖啡。`, `我要水。`, `有茶吗？`. `我要咖啡。` is communicatively successful even without perfect politeness. Declining a drink is a valid branch, not a language error. Buying repeatedly grants no extra reward.
 
 ### Mission P2: The platform changed — practice, 3–4 minutes

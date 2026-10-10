@@ -1,0 +1,84 @@
+{
+  "sessionId": "fixture-session",
+  "version": 0,
+  "missionId": "P1",
+  "attemptId": "fixture-attempt-001",
+  "nodeId": "p1.bootstrap",
+  "mode": "practice",
+  "status": "active",
+  "zoneId": "plaza",
+  "position": {
+    "x": 0,
+    "z": 10
+  },
+  "tier": 1,
+  "flags": {},
+  "inventory": {
+    "hint": 0,
+    "freeze": 0
+  },
+  "xp": 0,
+  "badges": [],
+  "awardedRewardIds": [],
+  "unlockedMissionIds": [
+    "P1"
+  ],
+  "inspectedTargetIds": [],
+  "cuePlaybacks": [],
+  "npcState": {
+    "xiaolin": {
+      "patience": 5,
+      "mood": "warm",
+      "history": [],
+      "revealedFactIds": [],
+      "repeatCounts": {},
+      "cooldownRemainingMs": 0
+    },
+    "achen": {
+      "patience": 4,
+      "mood": "warm",
+      "history": [],
+      "revealedFactIds": [],
+      "repeatCounts": {},
+      "cooldownRemainingMs": 0
+    },
+    "laozhou": {
+      "patience": 3,
+      "mood": "neutral",
+      "history": [],
+      "revealedFactIds": [],
+      "repeatCounts": {},
+      "cooldownRemainingMs": 0
+    }
+  },
+  "evidence": [],
+  "skills": {
+    "reading": {
+      "mastery": 0.4,
+      "independentCount": 0
+    },
+    "listening": {
+      "mastery": 0.4,
+      "independentCount": 0
+    },
+    "conversation": {
+      "mastery": 0.4,
+      "independentCount": 0
+    },
+    "repair": {
+      "mastery": 0.4,
+      "independentCount": 0
+    }
+  },
+  "difficulty": 1,
+  "skillUpdatedAttemptIds": [],
+  "timer": null,
+  "audioOperations": [],
+  "activeAudioOperationId": null,
+  "pendingTurn": null,
+  "validationMode": true,
+  "inputPreference": "voice",
+  "providerStatus": "fixture",
+  "factSnapshotId": "p1.bootstrap",
+  "secretFacts": {}
+}

@@ -53,6 +53,8 @@ Only scene-relevant intents and slots are sent to the model. Explicit choices in
 
 Canonical choice IDs: `p1.enter-plaza-door`, `p1.try-closed-door`, `p1.pay-cafe`, `p1.go-kiosk`, `p1.pay-kiosk`, `p2.board-1`, `p2.board-2`, `p2.board-3`, `b1.pay-ticket`, `b1.board-1`, `b1.board-2`, `b1.board-3`. All are state guarded; no choice directly sets a completion flag. NPC interactions can enable payment only after valid evaluated order/ticket details. Movement among authored zones is otherwise free.
 
+The kiosk is self-service. After `cancel_order`, a fresh available-drink order and price confirmation to Xiaolin at the café enable the kiosk branch; Xiaolin gives the spoken directions before departure. Kiosk payment also requires kiosk proximity. Reusing the cancelled selection cannot pass. Do not add or relocate an NPC for this branch.
+
 ## Scene coordinates
 
 World bounds x/z from −20 to 20. Plaza spawn (0, 10); café entrance (−10, 6), 小林 (Xiaolin) (−10, 4); kiosk (8, 5); concourse (0, 0), 阿陈 (Achen) (−3, 0), 老周 (Lao Zhou) (3, 0); platforms 1/2/3 at x=−10/0/10, z=−12. Movement speed 4 units/sec. Interaction radius 2. Flat walkable corridors connect every zone; walls cannot seal a required route. Scene coordinates are shared with validation locations and server zone checks. D may dress the scene without changing IDs or authoritative geometry.

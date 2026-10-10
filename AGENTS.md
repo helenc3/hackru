@@ -31,4 +31,6 @@ The protocol and frozen contracts take precedence over incidental examples in th
 
 Never force-push another account's branch, edit the team's unrelated files, disable failing tests, weaken merge protections, or represent fixture behavior as live provider behavior. Complete all available checks before reporting a permission blocker. Do not publish the site, change repository security settings, or message teammates unless the human separately authorizes those actions.
 
+Use the requesting human's configured Git identity for commits. If none exists, use their authenticated GitHub login and verified GitHub noreply address; never invent an identity. Do not add AI or bot co-author trailers. The explicit numbered-build authorization above supersedes older reference instructions that prohibit commits or pushes.
+
 Spec 1.2 replaces prior language and voice scope. Keep stable segment IDs but use revised packets: 003 integrated UI/validation, 005 required spoken loop, 009 optional pacing polish. Any existing 1.1 implementation must migrate incompatible fields and rerun acceptance; a 1.1 completion record alone does not satisfy 1.2.

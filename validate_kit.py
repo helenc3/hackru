@@ -1,4 +1,4 @@
-"""Validate the portable plan, not the as-yet-unimplemented application."""
+"""Validate the portable plan independently of application checks."""
 from pathlib import Path
 import json
 import re
@@ -45,6 +45,10 @@ for segment in segments:
         assert f"]({dependency}.md)" in text, f"Packet dependency mismatch {packet}"
 
 for document in root.rglob("*.md"):
+    # Dependencies and generated test/build outputs are not part of this kit.
+    if any(part in {"node_modules", ".git", "dist", "build", "test-results", "playwright-report"}
+           for part in document.relative_to(root).parts):
+        continue
     text = document.read_text()
     assert "CODEX_TASKS.md" not in text, f"Stale reference in {document}"
     for target in re.findall(r"(?<!!)\[[^\]]+\]\(([^)]+)\)", text):

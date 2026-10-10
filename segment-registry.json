@@ -1,5 +1,5 @@
 {
-  "specVersion": "1.2",
+  "specVersion": "1.3",
   "integrationBranch": "main",
   "segments": [
     {
@@ -9,7 +9,8 @@
       "dependencies": [],
       "packet": "segments/Segment-000.md",
       "optional": false,
-      "status": "planned"
+      "status": "planned",
+      "specVersion": "1.2"
     },
     {
       "id": "Segment-001",
@@ -20,7 +21,8 @@
       ],
       "packet": "segments/Segment-001.md",
       "optional": false,
-      "status": "planned"
+      "status": "planned",
+      "specVersion": "1.2"
     },
     {
       "id": "Segment-002",
@@ -31,7 +33,8 @@
       ],
       "packet": "segments/Segment-002.md",
       "optional": false,
-      "status": "planned"
+      "status": "planned",
+      "specVersion": "1.2"
     },
     {
       "id": "Segment-003",
@@ -42,7 +45,8 @@
       ],
       "packet": "segments/Segment-003.md",
       "optional": false,
-      "status": "planned"
+      "status": "planned",
+      "specVersion": "1.2"
     },
     {
       "id": "Segment-004",
@@ -53,7 +57,8 @@
       ],
       "packet": "segments/Segment-004.md",
       "optional": false,
-      "status": "planned"
+      "status": "planned",
+      "specVersion": "1.2"
     },
     {
       "id": "Segment-005",
@@ -65,7 +70,8 @@
       ],
       "packet": "segments/Segment-005.md",
       "optional": false,
-      "status": "planned"
+      "status": "planned",
+      "specVersion": "1.2"
     },
     {
       "id": "Segment-006",
@@ -78,7 +84,8 @@
       ],
       "packet": "segments/Segment-006.md",
       "optional": false,
-      "status": "planned"
+      "status": "planned",
+      "specVersion": "1.2"
     },
     {
       "id": "Segment-007",
@@ -95,7 +102,8 @@
       ],
       "packet": "segments/Segment-007.md",
       "optional": false,
-      "status": "planned"
+      "status": "planned",
+      "specVersion": "1.2"
     },
     {
       "id": "Segment-008",
@@ -106,7 +114,8 @@
       ],
       "packet": "segments/Segment-008.md",
       "optional": false,
-      "status": "planned"
+      "status": "planned",
+      "specVersion": "1.2"
     },
     {
       "id": "Segment-009",
@@ -118,7 +127,110 @@
       ],
       "packet": "segments/Segment-009.md",
       "optional": true,
-      "status": "planned"
+      "status": "planned",
+      "specVersion": "1.2"
+    },
+    {
+      "id": "Segment-010",
+      "title": "Overhaul contracts and parallel preparation",
+      "suggestedOwner": "Integration lead",
+      "dependencies": [
+        "Segment-007",
+        "Segment-008",
+        "Segment-009"
+      ],
+      "packet": "segments/Segment-010.md",
+      "optional": false,
+      "status": "planned",
+      "specVersion": "1.3",
+      "category": "Preparation"
+    },
+    {
+      "id": "Segment-011",
+      "title": "Original papercraft characters",
+      "suggestedOwner": "A \u2014 characters",
+      "dependencies": [
+        "Segment-010"
+      ],
+      "packet": "segments/Segment-011.md",
+      "optional": false,
+      "status": "planned",
+      "specVersion": "1.3",
+      "category": "Characters"
+    },
+    {
+      "id": "Segment-012",
+      "title": "Papercraft district and close camera",
+      "suggestedOwner": "B \u2014 world/camera",
+      "dependencies": [
+        "Segment-010"
+      ],
+      "packet": "segments/Segment-012.md",
+      "optional": false,
+      "status": "planned",
+      "specVersion": "1.3",
+      "category": "World"
+    },
+    {
+      "id": "Segment-013",
+      "title": "World-first onboarding and contextual interface",
+      "suggestedOwner": "C \u2014 interface",
+      "dependencies": [
+        "Segment-010"
+      ],
+      "packet": "segments/Segment-013.md",
+      "optional": false,
+      "status": "planned",
+      "specVersion": "1.3",
+      "category": "Interface"
+    },
+    {
+      "id": "Segment-014",
+      "title": "Hands-free conversation and Presage adaptation",
+      "suggestedOwner": "D \u2014 conversation/sensing",
+      "dependencies": [
+        "Segment-010"
+      ],
+      "packet": "segments/Segment-014.md",
+      "optional": false,
+      "status": "planned",
+      "specVersion": "1.3",
+      "category": "Conversation"
+    },
+    {
+      "id": "Segment-015",
+      "title": "Overhaul integration and refreshed demo package",
+      "suggestedOwner": "Integration lead with all four reviewers",
+      "dependencies": [
+        "Segment-011",
+        "Segment-012",
+        "Segment-013",
+        "Segment-014"
+      ],
+      "packet": "segments/Segment-015.md",
+      "optional": false,
+      "status": "planned",
+      "specVersion": "1.3",
+      "category": "Integration"
+    }
+  ],
+  "baselineSpecVersion": "1.2",
+  "overhaulBaselineAssumption": [
+    "Segment-007",
+    "Segment-008",
+    "Segment-009"
+  ],
+  "parallelGroups": [
+    {
+      "id": "papercraft-overhaul",
+      "prerequisite": "Segment-010",
+      "members": [
+        "Segment-011",
+        "Segment-012",
+        "Segment-013",
+        "Segment-014"
+      ],
+      "integration": "Segment-015"
     }
   ]
 }

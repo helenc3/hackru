@@ -23,7 +23,7 @@ If the segment is complete on remote `main`, verify its completion record and do
 - Active boss responses omit coaching, translations, hints, and evaluator scores. Boss hints/freeze are rejected by the server.
 - Developer-harness PA grants no listening evidence/player achievement. Subtitle-assisted PA and edited transcripts never become independent listening/spoken evidence.
 - No API secrets in the browser or commits. Tests default to fixture providers.
-- No extra language, multiplayer, authentication, procedural city, continuous voice, or pronunciation grader.
+- No extra language, multiplayer, authentication, procedural city, full-duplex voice, or pronunciation grader. Post-baseline permissioned hands-free segmentation is defined in spec 17.3.
 
 ## Coordination rules
 
@@ -34,3 +34,9 @@ Never force-push another account's branch, edit the team's unrelated files, disa
 Use the requesting human's configured Git identity for commits. If none exists, use their authenticated GitHub login and verified GitHub noreply address; never invent an identity. Do not add AI or bot co-author trailers. The explicit numbered-build authorization above supersedes older reference instructions that prohibit commits or pushes.
 
 Spec 1.2 replaces prior language and voice scope. Keep stable segment IDs but use revised packets: 003 integrated UI/validation, 005 required spoken loop, 009 optional pacing polish. Any existing 1.1 implementation must migrate incompatible fields and rerun acceptance; a 1.1 completion record alone does not satisfy 1.2.
+
+## Post-baseline overhaul (planning version 1.3)
+
+Segments 000–009 keep historical 1.2 packets/evidence. Specification sections 17–20 and packets 010–015 define the later overhaul. They assume 007/008/009 are completed before dispatch, not that they are complete now. Read docs/OVERHAUL_INTERFACES.md. Run 010 first, then 011 characters / 012 world-camera / 013 interface / 014 conversation-sensing in separate checkouts, then 015 integration/demo refresh. Respect disjoint ownership and root dependency freeze. Do not silently rebuild baseline segments.
+
+Match completion version to the requested packet (1.2 baseline, 1.3 overhaul); this plan revision alone does not invalidate historical records. A plan request authorizes documentary preparation only, not code, claims, device capture, paid calls or builder dispatch. Missing references leave art-match pending. Missing live Presage leaves its requested feature pending. Use the approved historical reconciliation procedure in BUILD_PROTOCOL; never invent PR history.

@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { CueIdSchema, NpcIdSchema, sceneManifest, type GameAction } from '@vibequest/shared';
 import { WorldRenderer } from '../world/WorldRenderer';
 import { AudioController } from '../audio/AudioController';
@@ -26,7 +26,21 @@ export function App() {
   const [npc, setNpc] = useState<string | null>(null);
   const [paused, setPaused] = useState(false);
   const [sign, setSign] = useState<string | null>(null);
+  const signClose = useRef<HTMLButtonElement>(null);
   const [notice, setNotice] = useState('');
+  const closeSignPanel = useCallback(() => {
+    setSign(null);
+    requestAnimationFrame(() => document.querySelector<HTMLElement>('[data-testid="world-renderer"]')?.focus());
+  }, []);
+  useEffect(() => {
+    if (!sign) return;
+    signClose.current?.focus();
+    const close = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !event.isComposing) { event.preventDefault(); closeSignPanel(); }
+    };
+    document.addEventListener('keydown', close);
+    return () => document.removeEventListener('keydown', close);
+  }, [sign, closeSignPanel]);
 
   useEffect(() => {
     let disposed = false;
@@ -85,7 +99,7 @@ export function App() {
     {state.validationMode ? <div className="environment-banner">Developer validation · all XP, loot and badges are simulated. Progress stays separate from player sessions.</div> : state.providerStatus !== 'live' ? <div className="environment-banner">{state.providerStatus === 'fixture' ? 'Fixture demonstration · scripted responses' : 'Voice or AI service is degraded · retry or use the same-world fallback.'}</div> : null}
     <main className="game-main"><div className="game-layout"><div className="game-world" id="world"><WorldRenderer state={state} onAction={onAction} onTalk={onTalk} />
       <InventoryBar state={state} pending={session.pending} paused={paused} onAction={onAction} onPause={() => void onAction({ type: paused ? 'resumePractice' : 'pausePractice' }).catch(() => undefined)} />
-      {selectedCue?.text && <section className="sign-overlay" role="dialog" aria-label="Inspected sign"><button className="button secondary" onClick={() => setSign(null)} aria-label="Close sign">Close</button><h3 lang="zh-Hans">{selectedCue.label}</h3><p lang="zh-Hans">{selectedCue.text}</p></section>}
+      {selectedCue?.text && <section className="sign-overlay" role="dialog" aria-label="Inspected sign"><button ref={signClose} className="button secondary" onClick={closeSignPanel} aria-label="Close sign">Close</button><h3 lang="zh-Hans">{selectedCue.label}</h3><p lang="zh-Hans">{selectedCue.text}</p></section>}
       <AudioController state={state} onAction={onAction} speechId={session.turn?.speechId} />
       <section className="interaction-dock" aria-label="World interactions"><h2>Look, listen, speak, act.</h2><p>Approach an interaction in the world. The server checks your location and mission prerequisites.</p><div>
         {speakers.map((item) => <button className="button secondary" key={item.id} disabled={session.pending || state.status !== 'active'} onClick={() => onTalk(item.id)}><span lang="zh-Hans">{item.label}</span> · Talk</button>)}

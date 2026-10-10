@@ -38,8 +38,8 @@ class CanvasBoundary extends Component<{ children: ReactNode; onFailure: () => v
 }
 
 type Runtime = {
-  position: Position; yaw: number; keys: Set<string>; active: boolean; panel: boolean;
-  busy: boolean; lastSync: number; lastSent: Position | null;
+  position: Position; yaw: number; keys: Set<string>; active: boolean;
+  busy: boolean; syncing: boolean; lastSync: number; lastSent: Position | null;
   pending: Position | null; generation: number;
 };
 
@@ -60,9 +60,9 @@ function District({ targets }: { targets: PublicState['interactables'] }) {
     <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]}><planeGeometry args={[30, 36]} /><meshStandardMaterial color="#e8dfc5" /></mesh>
     {sceneManifest.colliders.map(({ id, bounds: b }) => <Shape key={id} x={(b.minX + b.maxX) / 2} z={(b.minZ + b.maxZ) / 2} width={b.maxX - b.minX} depth={b.maxZ - b.minZ} height={id.startsWith('platform') ? 1 : 2.4} color={id.startsWith('cafe') ? '#c27d59' : '#426658'} />)}
     {/* Flat slabs mark walkable areas; only frozen colliders are solid. */}
-    <Shape x={-10} z={5} width={8} depth={6} height={0.04} color="#e6b28b" />
+    <Shape x={-10} z={5} width={8} depth={6} height={0.045} color="#e6b28b" />
     <Shape x={8} z={5} width={6} depth={4} height={0.04} color="#e5cc85" />
-    <Shape x={0} z={-2.5} width={30} depth={10} height={0.04} color="#91b5a9" />
+    <Shape x={0} z={-2.5} width={30} depth={10} height={0.03} color="#91b5a9" />
     {[-10, 0, 10].map((x) => <group key={x}>
       <Shape x={x} z={-12} width={7} depth={8} height={0.05} color="#6b9585" />
       <Shape x={x} z={-17.8} width={7} depth={0.4} height={0.07} color="#d7bd6f" />
@@ -90,7 +90,7 @@ function Motion({ runtime, root, labels, state, tick, sync }: {
   useFrame(({ camera, size }, delta) => {
     const r = runtime.current;
     const k = r.keys;
-    const blocked = !r.active || r.panel || r.busy || document.activeElement !== root.current || document.hidden;
+    const blocked = !r.active || r.busy || state.status !== 'active' || document.activeElement !== root.current || document.hidden;
     const right = blocked ? 0 : Number(k.has('KeyD') || k.has('ArrowRight')) - Number(k.has('KeyA') || k.has('ArrowLeft'));
     const forward = blocked ? 0 : Number(k.has('KeyW') || k.has('ArrowUp')) - Number(k.has('KeyS') || k.has('ArrowDown'));
     const moving = Boolean(right || forward);
@@ -142,36 +142,28 @@ function Motion({ runtime, root, labels, state, tick, sync }: {
 export function WorldRenderer({ state, onAction, onTalk }: RendererProps) {
   const [hasWebGl, setHasWebGl] = useState(webGlIsAvailable);
   const [position, setPosition] = useState(() => initialPosition(state));
-  const [signId, setSignId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const root = useRef<HTMLElement>(null);
-  const closeButton = useRef<HTMLButtonElement>(null);
   const labels = useRef<(HTMLSpanElement | null)[]>([]);
   const current = useRef({ state, onAction, onTalk });
   current.current = { state, onAction, onTalk };
-  const runtime = useRef<Runtime>({ position: initialPosition(state), yaw: 0, keys: new Set(), active: false, panel: false, busy: false, lastSync: 0, lastSent: null, pending: null, generation: 0 });
+  const runtime = useRef<Runtime>({ position: initialPosition(state), yaw: 0, keys: new Set(), active: false, busy: false, syncing: false, lastSync: 0, lastSent: null, pending: null, generation: 0 });
+  const syncPromise = useRef<Promise<void>>(Promise.resolve());
   const drag = useRef<{ x: number; pointerId: number } | null>(null);
   const sessionKey = `${state.sessionId}:${state.missionId}`;
   useEffect(() => {
     const r = runtime.current;
     r.generation++; r.position = initialPosition(current.current.state); r.lastSent = null; r.pending = null;
-    r.keys.clear(); r.panel = false; r.busy = false;
-    setPosition({ ...r.position }); setSignId(null); setBusy(false); setError('');
+    r.keys.clear(); r.busy = false; r.syncing = false; syncPromise.current = Promise.resolve();
+    setPosition({ ...r.position }); setBusy(false); setError('');
   }, [sessionKey]);
-  useEffect(() => {
-    if (signId) closeButton.current?.focus();
-  }, [signId]);
   useEffect(() => {
     const clear = () => { runtime.current.keys.clear(); runtime.current.active = false; drag.current = null; };
     window.addEventListener('blur', clear);
     document.addEventListener('visibilitychange', clear);
     return () => { clear(); window.removeEventListener('blur', clear); document.removeEventListener('visibilitychange', clear); runtime.current.generation++; };
   }, []);
-
-  function closeSign() {
-    runtime.current.panel = false; runtime.current.keys.clear(); setSignId(null); root.current?.focus();
-  }
 
   async function flushPosition(next: Position) {
     const r = runtime.current;
@@ -184,10 +176,10 @@ export function WorldRenderer({ state, onAction, onTalk }: RendererProps) {
   function sync(next: Position) {
     const r = runtime.current;
     r.pending = next;
-    if (r.busy) return;
+    if (r.busy || r.syncing) return;
     const generation = r.generation;
-    r.busy = true;
-    void (async () => {
+    r.syncing = true;
+    syncPromise.current = (async () => {
       try {
         while (r.pending && generation === r.generation) {
           const value = r.pending; r.pending = null;
@@ -195,18 +187,20 @@ export function WorldRenderer({ state, onAction, onTalk }: RendererProps) {
         }
       } catch (cause) {
         if (generation === r.generation) { r.pending = null; setError(cause instanceof Error ? cause.message : 'Position could not sync. Try again.'); }
-      } finally { if (generation === r.generation) r.busy = false; }
+      } finally { if (generation === r.generation) r.syncing = false; }
     })();
   }
 
   async function interact(id: string) {
     const r = runtime.current;
-    if (r.busy || r.panel || !hasWebGl) return;
+    if (r.busy || current.current.state.status !== 'active' || !hasWebGl) return;
     const target = nearbyTargets(current.current.state, r.position).find((item) => item.id === id);
     if (!target) return;
     const generation = r.generation;
     r.busy = true; r.keys.clear(); r.pending = null; setBusy(true); setError('');
     try {
+      await syncPromise.current;
+      if (generation !== r.generation) return;
       await flushPosition({ ...r.position });
       if (generation !== r.generation) return;
       if (target.kind === 'npc') current.current.onTalk(target.id);
@@ -214,7 +208,6 @@ export function WorldRenderer({ state, onAction, onTalk }: RendererProps) {
         const action = targetAction(target);
         if (action) await current.current.onAction(action);
         if (generation !== r.generation) return;
-        if (target.kind === 'sign') { r.panel = true; setSignId(target.id); }
       }
     } catch (cause) {
       if (generation === r.generation) setError(cause instanceof Error ? cause.message : 'Interaction failed. Try again.');
@@ -222,14 +215,11 @@ export function WorldRenderer({ state, onAction, onTalk }: RendererProps) {
   }
 
   const nearby = nearbyTargets(state, position);
-  const sign = state.visibleCues.find((cue) => cue.id === signId);
-  const signTarget = state.interactables.find((target) => target.id === signId);
   const movementKeys = ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
   return <section ref={root} tabIndex={0} className="world-renderer district-world" aria-label="Mandarin district — keyboard navigation" data-testid="world-renderer"
     onFocus={(event) => { runtime.current.active = event.target === root.current; }}
     onBlur={() => { runtime.current.keys.clear(); runtime.current.active = false; }}
     onKeyDown={(event) => {
-      if (event.key === 'Escape' && signId) { event.preventDefault(); event.stopPropagation(); closeSign(); return; }
       if (event.target !== root.current || event.nativeEvent.isComposing) return;
       if (movementKeys.includes(event.code)) { event.preventDefault(); runtime.current.keys.add(event.code); }
       if (event.code === 'KeyE' && !event.repeat) { event.preventDefault(); const target = nearbyTargets(current.current.state, runtime.current.position)[0]; if (target) void interact(target.id); }
@@ -240,7 +230,7 @@ export function WorldRenderer({ state, onAction, onTalk }: RendererProps) {
         root.current?.focus(); drag.current = { x: event.clientX, pointerId: event.pointerId }; event.currentTarget.setPointerCapture(event.pointerId);
       }
     }}
-    onPointerMove={(event) => { if (drag.current && !runtime.current.panel) { runtime.current.yaw -= (event.clientX - drag.current.x) * .006; drag.current.x = event.clientX; } }}
+    onPointerMove={(event) => { if (drag.current) { runtime.current.yaw -= (event.clientX - drag.current.x) * .006; drag.current.x = event.clientX; } }}
     onPointerUp={(event) => { drag.current = null; if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId); }}
     onPointerCancel={() => { drag.current = null; }}>
     {hasWebGl ? <CanvasBoundary onFailure={() => { runtime.current.keys.clear(); runtime.current.active = false; setHasWebGl(false); }}><Canvas dpr={[1, 1.5]} camera={{ position: [0, 8.5, 19], fov: 52, near: .1, far: 85 }} gl={{ antialias: false, powerPreference: 'high-performance' }}
@@ -250,12 +240,7 @@ export function WorldRenderer({ state, onAction, onTalk }: RendererProps) {
     {hasWebGl && <>
       <div className="district-labels" aria-hidden="true">{landmarks.map((mark, i) => <span key={mark.label} ref={(node) => { labels.current[i] = node; }} className="district-landmark" lang="zh-Hans">{mark.label}</span>)}</div>
       <div className="world-caption"><span className="live-dot" />The district<span>Third-person navigation</span></div>
-      {!signId && <div className="district-nearby" aria-label="Nearby interactions">{nearby.map((target, i) => <button key={target.id} disabled={busy} onClick={() => void interact(target.id)} data-target-id={target.id}><span lang="zh-Hans">{target.label}</span>{i === 0 ? ' · E' : ''}</button>)}</div>}
-      {signId && <div className="district-panel" role="dialog" aria-modal="false" aria-label={signTarget?.label ?? 'Sign'}>
-        <h3 lang="zh-Hans">{signTarget?.label ?? '告示'}</h3>
-        {sign?.text ? <p lang="zh-Hans">{sign.text}</p> : <p className="district-panel-note">The sign text is not available yet. Close and try again when the session updates.</p>}
-        <button ref={closeButton} onClick={closeSign}>Close sign · Escape</button>
-      </div>}
+      <div className="district-nearby" aria-label="Nearby interactions">{nearby.map((target, i) => <button key={target.id} disabled={busy || state.status !== 'active'} onClick={() => void interact(target.id)} data-target-id={target.id}><span lang="zh-Hans">{target.label}</span>{i === 0 ? ' · E' : ''}</button>)}</div>
       <div className="world-note">Click the district · WASD / arrows to walk · Drag to turn · E to interact</div>
       {error && <div className="district-error" role="alert">{error}<button onClick={() => { setError(''); root.current?.focus(); }}>Dismiss</button></div>}
     </>}

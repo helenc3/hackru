@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { createBaselineState, type GameAction, type MissionId } from '@vibequest/shared';
 import { WorldRenderer } from '../../apps/web/src/world/WorldRenderer';
@@ -12,6 +12,12 @@ function Fixture() {
   const [npc, setNpc] = useState<string | null>(null);
   const [delay, setDelay] = useState(false);
   const [fail, setFail] = useState(false);
+  const [sign, setSign] = useState(false);
+  const signClose = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (sign) signClose.current?.focus();
+  }, [sign]);
+  const closeSign = () => { setSign(false); document.querySelector<HTMLElement>('[data-testid="world-renderer"]')?.focus(); };
   return <div style={{ maxWidth: 1100, margin: '20px auto' }}>
     <h1>World callback fixture</h1>
     <p>Fixture callbacks only. No mission progression or provider calls.</p>
@@ -22,8 +28,10 @@ function Fixture() {
       if (delay) await new Promise((resolve) => setTimeout(resolve, 400));
       if (fail) throw new Error('Fixture connection failed');
       setActions((previous) => [...previous, action]);
+      if (action.type === 'inspect') setSign(true);
       setState((previous) => ({ ...previous, version: previous.version + 1, ...(action.type === 'moveZone' ? { zoneId: action.zoneId } : {}) }));
     }} onTalk={setNpc} />
+    {sign && <section role="dialog" aria-label="Inspected sign" onKeyDown={(event) => { if (event.key === 'Escape' && !event.nativeEvent.isComposing) closeSign(); }}><p lang="zh-Hans">{state.visibleCues[0]?.text ?? 'Fixture sign'}</p><button ref={signClose} onClick={closeSign}>Close sign · Escape</button></section>}
     {npc && <section role="dialog" aria-label="NPC conversation" onKeyDown={(event) => { if (event.key === 'Escape') { setNpc(null); document.querySelector<HTMLElement>('[data-testid="world-renderer"]')?.focus(); } }}><h2>{npc}</h2><textarea aria-label="Dialogue input" autoFocus /><button onClick={() => setNpc(null)}>Close conversation</button></section>}
     <output data-testid="actions">{JSON.stringify(actions)}</output>
     <output data-testid="reward-state">{JSON.stringify({ xp: state.xp, badges: state.badges, inventory: state.inventory })}</output>

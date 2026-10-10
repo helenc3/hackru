@@ -23,7 +23,7 @@ test('production shell shares a Chinese world and integrated voice controls', as
   await expect(page.getByTestId('recorder')).toContainText('Speak Mandarin');
   await expect(page.getByRole('button', { name: 'Start recording' })).toBeVisible();
   await expect(page.getByTestId('audio-controller')).toContainText('Audio ready');
-  await expect(page.getByTestId('skill-debrief-stub')).toContainText('Unimplemented · Segment-006');
+  await expect(page.getByTestId('skill-debrief')).toHaveCount(0);
   await expect(page.getByTestId('validation-harness')).toHaveCount(0);
   await expect(page.getByRole('link', { name: /validation|text mode/i })).toHaveCount(0);
   await expect(page.getByRole('button', { name: /validation|text mode/i })).toHaveCount(0);

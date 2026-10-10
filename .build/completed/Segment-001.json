@@ -1,10 +1,16 @@
 {
   "segment": "Segment-001",
   "specVersion": "1.2",
-  "deliveryStatus": "local-only-unmerged",
+  "deliveryStatus": "merged-into-main",
+  "integrationEvidence": {
+    "implementationCommit": "d06f730",
+    "verifiedRemoteMain": "98e0da5f644be44cc7e270df61f42d446ea26558",
+    "confirmation": "The requesting human confirmed Segment-001 is finished and merged into main; its implementation and completion record are present on fetched origin/main.",
+    "pullRequestVerification": "Authenticated GitHub PR history has no Segment-001 PR; implementation was integrated directly into main in d06f730, as confirmed by the requesting human."
+  },
   "validatedAt": "2026-10-10T20:05:24.239813+00:00",
   "acceptance": [
-    "Real fixture API campaigns clear P1 café and cancellation/kiosk branches, P2 direct/clarification with wrong-board repair, and B1.",
+    "Real fixture API campaigns clear P1 caf\u00e9 and cancellation/kiosk branches, P2 direct/clarification with wrong-board repair, and B1.",
     "P1 requires the exact uncancelled tea/10 or water/5 confirmation, receipt, delivered station directions, and station arrival.",
     "Boss board application, target-language ticket request/clarification, payment, PA delivery, timer and correct boarding gates are server enforced; wrong boarding fails once.",
     "Completed/pending duplicates preserve original results; stale versions and changed payloads conflict; deferred-provider retry resolves before the old call and discards its late result.",
@@ -26,8 +32,7 @@
   },
   "manualEvidence": [],
   "limitations": [
-    "This local record is not authoritative completion: no authenticated remote claim, PR, CI head verification, merge, or merged-revision smoke was possible because gh is unauthenticated.",
-    "The spec-1.2 Segment-000 record is present on origin/main; its corresponding merged PR could not be verified through authenticated GitHub access.",
+    "Segment-001 was integrated directly into main without a corresponding segment PR. Original check evidence is retained; the status correction does not claim a new Segment-001 merged-revision smoke run.",
     "Mandarin reviewer approval remains pending. Cue asset IDs and eight-second PA fixture durations are Segment-005 integration seams; no live audio or paid-provider acceptance is claimed.",
     "Live Gemini, microphone/STT, TTS and world navigation remain owned by Segments 002/004/005. Skill adaptation remains owned by Segment-006.",
     "Production build retains the existing large 3D bundle warning. No repository protection settings were changed."

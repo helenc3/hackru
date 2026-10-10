@@ -6,7 +6,7 @@ import { createServices } from '../src/services.js';
 describe('injected bootstrap services', () => {
   it('has explicit provider and store stubs even when API keys are configured', async () => {
     const services = createServices(loadConfig({
-      NODE_ENV: 'test', GEMINI_API_KEY: 'fixture-key', ELEVENLABS_API_KEY: 'fixture-key',
+      NODE_ENV: 'test', ELEVENLABS_API_KEY: 'fixture-key',
     }));
     const context: TurnContext = {
       missionId: 'P1', mode: 'practice', tier: 0, npcId: 'xiaolin',
@@ -14,7 +14,7 @@ describe('injected bootstrap services', () => {
       facts: {}, history: [],
     };
     await expect(services.dialogueProvider.evaluate(context, '你好')).rejects.toMatchObject({
-      status: 501, code: 'SEGMENT_NOT_IMPLEMENTED', message: expect.stringContaining('Segment-002'),
+      status: 503, code: 'PROVIDER_UNAVAILABLE', retryable: true,
     });
     await expect(services.speechProvider.synthesize('你好', 'xiaolin')).rejects.toMatchObject({
       status: 501, code: 'SEGMENT_NOT_IMPLEMENTED', message: expect.stringContaining('Segment-005'),

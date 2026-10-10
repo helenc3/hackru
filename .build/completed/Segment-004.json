@@ -1,0 +1,32 @@
+{
+  "segment": "Segment-004",
+  "specVersion": "1.2",
+  "pullRequest": "https://github.com/helenc3/hackru/pull/3",
+  "acceptance": [
+    "All manifest zones and interactables reachable with collision-safe keyboard steps",
+    "Camera-relative movement, normalized diagonal speed, wall sliding and bounds verified",
+    "Shared sign, NPC, PA and choice callbacks retain frozen IDs and suppress duplicate interactions",
+    "Focused dialogue and sign panels pause motion; Escape closes panels and restores world focus",
+    "Callback retry and unsupported/lost WebGL recovery preserve the app shell",
+    "Original primitive assets and system-font use documented with no redistributed external assets"
+  ],
+  "checks": {
+    "npm ci": "pass in PR #3 Quality run 38082405310; dependency manifests unchanged by the follow-up",
+    "typecheck": "pass locally and on original PR CI",
+    "lint": "pass locally and on original PR CI",
+    "test": "65 unit/API tests and build-kit validator pass after synchronization with latest main",
+    "build": "pass locally and on original PR CI",
+    "test:e2e": "35 pass locally after main synchronization; nine owned tests also pass with software rendering"
+  },
+  "manualEvidence": [
+    "User confirmed this machine is the demo laptop",
+    "Installed Chrome at 1440x900, Intel Arc 140T hardware WebGL: 60/60/60 FPS across three 2-second windows after warm-up",
+    "SwiftShader software WebGL follow-up: 33/33.3/33.3 FPS with the same assertions",
+    "Rendered screenshot inspected for a visible capsule and readable Chinese landmarks",
+    "User approved the small App.tsx shared sign-panel focus/Escape integration exception"
+  ],
+  "limitations": [
+    "Local Windows dependency/browser/server-lifecycle adaptations documented in the segment proposal",
+    "Production build retains the large JavaScript chunk warning"
+  ]
+}

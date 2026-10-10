@@ -52,3 +52,24 @@ helper in this sandbox. The remote claim, PR, completion record, CI and merge
 remain pending. There is no authoritative Segment-004 completion on main.
 The concrete local branch and validation evidence are preserved for handoff.
 
+## PR #3 CI follow-up, 2026-10-10
+
+The human published the original claim and branch and opened PR #3. Quality
+run 38082405310 passed clean `npm ci`, typecheck, lint, unit/API tests and build.
+Its browser failures came from keyboard movement overshooting interaction
+targets during slow Playwright protocol round trips. Position telemetry now
+reflects each rendered frame, and the owned walking helper releases keys in
+the browser animation loop. The same callback, duplicate-dispatch and FPS
+assertions remain intact. The revised full suite passes all 35 tests locally;
+the nine owned tests also pass with SwiftShader software rendering, with
+33/33.3/33.3 FPS samples. Hardware demo-laptop samples remain 60/60/60 FPS.
+
+GitHub reads are restored, but connector code writes still return 403 Resource
+not accessible by integration. The tested fix was published through the user's
+configured Git credentials outside the Windows sandbox. Latest main also
+received the original district implementation and Segment-002 while this fix
+was in progress. A normal main merge preserved the timing fix and the new
+dialogue provider; the combined revision passes 65 unit/API tests and all 35
+browser tests locally. Matching CI and a normal PR merge are required before
+the completion record becomes authoritative.
+

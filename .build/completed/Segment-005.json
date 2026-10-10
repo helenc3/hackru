@@ -1,0 +1,32 @@
+{
+  "segment": "Segment-005",
+  "specVersion": "1.2",
+  "validatedAt": "2026-10-10T23:25:00Z",
+  "acceptance": [
+    "Live server loop (real routes, live providers, player session): a Mandarin clip of 你好，请给我一杯茶。 went through scribe_v2 STT (exact, 0.5 s), Send created the turn with Gemini plus authored reply (1.5 s, evidence spoken), and the eleven_flash_v2_5 speech job returned 200 audio/mpeg (3.4 s clip, 1.0 s).",
+    "Seven PA/directions assets generated with eleven_multilingual_v2 and machine round-tripped through STT; all quest-critical content (江滨, 海港, 机场, 一/二/三号站台) matches exactly (fixtures/audio/pa-review.md).",
+    "Only Send advances gameplay; edited transcripts are labeled stt-edited regardless of client claims; forged, unrelated and expired transcription IDs are rejected.",
+    "Mic denial, 15-second auto-stop, empty transcript and provider failure offer re-record or same-panel typed fallback without changing quest state; TTS failure returns 410 and keeps committed gameplay.",
+    "One speech job per committed reply (202 then 200 with measured duration); replay never renews the lifecycle; stale STT/TTS after mission retry is discarded.",
+    "Deferred-turn browser test: retry does not wait for Gemini, the old reply stays silent, and failed-turn recovery reuses one turn with a fresh version.",
+    "PA plays the reviewed asset and reports finishCue only after it ends."
+  ],
+  "checks": {
+    "typecheck": "pass",
+    "lint": "pass",
+    "test": "pass: 117 unit/API tests",
+    "build": "pass",
+    "test:e2e": "pass: 48 Firefox checks"
+  },
+  "manualEvidence": [
+    "scripts/smoke-elevenlabs.ts: TTS passed for all three NPC voices (270–503 ms); STT exact for 小林 and 阿陈 replies.",
+    "scripts/smoke-gemini.ts: practice and boss evaluations passed; boss reply had no coaching.",
+    "Live dev server started with Gemini and ElevenLabs configured for human browser testing."
+  ],
+  "limitations": [
+    "A human-recorded browser utterance, a two-speaker numeral/destination test, and a human listening review of the voices and PA clips were not recorded at merge time.",
+    "STT heard sentence-initial 广场 in the P1 directions clips as 演唱/延长, and 老周's 十五 as 是五; needs a human listen, a different voice, or rephrasing by the content owner.",
+    "Homebrew Node on the dev Mac needs NODE_EXTRA_CA_CERTS (GlobalSign Root CA) to reach Google APIs.",
+    "Health endpoint still reports segments.speech 'unimplemented' (000/007-owned file); see .build/proposals/Segment-005.md."
+  ]
+}

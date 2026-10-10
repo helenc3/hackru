@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { NpcIdSchema, type PublicState, type RendererProps, type TurnRequest, type TurnResponse } from '@vibequest/shared';
 import { Recorder } from '../audio/Recorder';
+import { finishConfirmation } from '../audio/audio-bus';
 import { CoachPanel } from './CoachPanel';
 
 export function DialoguePanel({ state, npcId, pending, turn, onAction, onSubmit, onClose }: {
@@ -27,7 +28,7 @@ export function DialoguePanel({ state, npcId, pending, turn, onAction, onSubmit,
   async function send() {
     if (composing.current || pending || !draft.trim()) return;
     const input: TurnRequest['input'] = transcription ? { text: draft, transcriptionId: transcription.id, source: draft === transcription.original ? 'stt' : 'stt-edited' } : { text: draft, source: 'typed' };
-    try { await onSubmit(npc, input); setDraft(''); setTranscription(null); setNotice(''); } catch { /* parent shows structured recovery without losing the draft */ }
+    try { await finishConfirmation(); await onSubmit(npc, input); setDraft(''); setTranscription(null); setNotice(''); } catch { /* parent shows structured recovery without losing the draft */ }
   }
 
   return <section className="dialogue-panel" role="dialog" aria-modal="false" aria-labelledby="dialogue-title" data-testid="dialogue-panel" onKeyDown={(event) => {

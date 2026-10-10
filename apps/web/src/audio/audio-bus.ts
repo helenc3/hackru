@@ -21,8 +21,9 @@ export function useAudioActivity(): AudioActivity {
 let confirmation: (() => Promise<void>) | null = null;
 export function setConfirmation(finish: (() => Promise<void>) | null): void { confirmation = finish; }
 export async function finishConfirmation(): Promise<void> {
-  const finish = confirmation; confirmation = null;
+  const finish = confirmation;
   await finish?.();
+  if (confirmation === finish) confirmation = null;
 }
 
 export class AudioApiError extends Error {

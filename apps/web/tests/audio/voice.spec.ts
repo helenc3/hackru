@@ -77,6 +77,10 @@ test('nothing records at load; a recording becomes a transcript that only Send s
   expect(api.requests.some((request) => request.path.endsWith('/turns'))).toBe(false);
   await panel.getByRole('button', { name: 'Send Mandarin' }).click();
   await expect(panel.getByTestId('npc-reply')).toBeVisible();
+  expect(phases(api).map((action) => action.phase)).toEqual(['recording', 'transcribing', 'confirming', 'idle']);
+  const turnIndex = api.requests.findIndex((request) => request.path.endsWith('/turns'));
+  const idleIndex = api.requests.findIndex((request) => request.path.endsWith('/actions') && (request.body as { action: { phase?: string } }).action.phase === 'idle');
+  expect(idleIndex).toBeLessThan(turnIndex);
   const turn = api.requests.find((request) => request.path.endsWith('/turns'))!.body as { input: { source: string; transcriptionId: string } };
   expect(turn.input).toMatchObject({ source: 'stt', transcriptionId: 'tx-1' });
 });

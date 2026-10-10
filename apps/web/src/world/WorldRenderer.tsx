@@ -1,144 +1,248 @@
-import { Component, useState, type ReactNode } from 'react';
-import { Canvas } from '@react-three/fiber';
-import type { RendererProps } from '@vibequest/shared';
+﻿import { Component, useEffect, useRef, useState, type ReactNode } from 'react';
+import { Canvas, useFrame } from '@react-three/fiber';
+import { Group, Vector3 } from 'three';
+import { sceneManifest, type Position, type PublicState, type RendererProps } from '@vibequest/shared';
+import { distance, movePlayer, nearbyTargets, targetAction, zoneAt } from './navigation';
+import './world.css';
+
+const landmarks = [
+  { label: '广场', x: 0, z: 11 }, { label: '咖啡店', x: -10, z: 7.8 },
+  { label: '售货亭', x: 8, z: 7 }, { label: '车站', x: 0, z: 1 },
+  ...[-10, 0, 10].map((x, i) => ({ label: ['一号站台', '二号站台', '三号站台'][i], x, z: -13.8 })),
+];
 
 function webGlIsAvailable(): boolean {
   try {
-    const canvas = document.createElement('canvas');
-    const context = canvas.getContext('webgl2') ?? canvas.getContext('webgl');
+    const context = document.createElement('canvas').getContext('webgl2');
     if (!context) return false;
     context.getExtension('WEBGL_lose_context')?.loseContext();
     return true;
-  } catch {
-    return false;
-  }
+  } catch { return false; }
 }
 
 function CompatibilityRecovery() {
-  return (
-    <div className="compatibility-screen" data-testid="webgl-recovery" role="status">
-      <span className="compatibility-icon" aria-hidden="true">◇</span>
-      <h3>The district needs WebGL</h3>
-      <p>Enable hardware acceleration in a current desktop browser, then reload. This preview requires 3D graphics.</p>
-      <button className="button secondary" onClick={() => window.location.reload()}>Reload preview</button>
-      <small>The world is unimplemented in Segment-000. Compatibility recovery does not start a game.</small>
-    </div>
-  );
+  return <div className="compatibility-screen" data-testid="webgl-recovery" role="status">
+    <span className="compatibility-icon" aria-hidden="true">◇</span>
+    <h3>The district needs WebGL</h3>
+    <p>Enable hardware acceleration in a current desktop browser, then reload. Your session stays in the app.</p>
+    <button className="button secondary" onClick={() => window.location.reload()}>Reload preview</button>
+    <small>Compatibility recovery does not start a game or advance a mission.</small>
+  </div>;
 }
 
-class CanvasBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
+class CanvasBoundary extends Component<{ children: ReactNode; onFailure: () => void }, { failed: boolean }> {
   state = { failed: false };
-  static getDerivedStateFromError() {
-    return { failed: true };
-  }
-  render() {
-    return this.state.failed ? <CompatibilityRecovery /> : this.props.children;
-  }
+  static getDerivedStateFromError() { return { failed: true }; }
+  componentDidCatch() { this.props.onFailure(); }
+  render() { return this.state.failed ? <CompatibilityRecovery /> : this.props.children; }
 }
 
-function Building({ x, z, width, depth, color }: { x: number; z: number; width: number; depth: number; color: string }) {
-  return (
-    <group position={[x, 0, z]}>
-      <mesh castShadow receiveShadow position={[0, 1.7, 0]}>
-        <boxGeometry args={[width, 3.4, depth]} />
-        <meshStandardMaterial color={color} />
-      </mesh>
-      <mesh castShadow position={[0, 3.5, 0]}>
-        <boxGeometry args={[width + 0.35, 0.35, depth + 0.35]} />
-        <meshStandardMaterial color="#1a4038" />
-      </mesh>
-    </group>
-  );
+type Runtime = {
+  position: Position; yaw: number; keys: Set<string>; active: boolean;
+  busy: boolean; syncing: boolean; lastSync: number; lastSent: Position | null;
+  pending: Position | null; generation: number;
+};
+
+function initialPosition(state: PublicState): Position {
+  return { ...(state.zoneId === 'plaza' ? sceneManifest.spawn : sceneManifest.zones.find((zone) => zone.id === state.zoneId)?.center ?? sceneManifest.spawn) };
 }
 
-function DistrictPreview() {
-  return (
-    <>
-      <color attach="background" args={['#dce9de']} />
-      <ambientLight intensity={1.7} />
-      <directionalLight position={[15, 30, 12]} intensity={2.4} castShadow shadow-mapSize={[1024, 1024]} />
-      <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow position={[0, -0.06, 0]}>
-        <planeGeometry args={[40, 40]} />
-        <meshStandardMaterial color="#bacfb7" />
-      </mesh>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow position={[0, 0, -1]}>
-        <planeGeometry args={[34, 8]} />
-        <meshStandardMaterial color="#f0e9d3" />
-      </mesh>
-      <mesh rotation={[-Math.PI / 2, 0, 0]} receiveShadow position={[0, 0.01, 0]}>
-        <planeGeometry args={[8, 34]} />
-        <meshStandardMaterial color="#f0e9d3" />
-      </mesh>
-      <Building x={-12} z={7} width={7} depth={6} color="#de9874" />
-      <Building x={10} z={7} width={5} depth={4} color="#edcf80" />
-      <Building x={-13} z={-4} width={6} depth={5} color="#98b7a2" />
-      <Building x={12} z={-4} width={7} depth={5} color="#91adb0" />
-      {[-10, 0, 10].map((x) => (
-        <group key={x} position={[x, 0, -12]}>
-          <mesh receiveShadow position={[0, 0.18, 0]}>
-            <boxGeometry args={[5.5, 0.3, 4]} />
-            <meshStandardMaterial color="#8eaa9b" />
-          </mesh>
-          <mesh castShadow position={[0, 2.5, -0.9]}>
-            <boxGeometry args={[6, 0.3, 3]} />
-            <meshStandardMaterial color="#36594c" />
-          </mesh>
-          <mesh position={[-2.4, 1.3, -0.9]}>
-            <boxGeometry args={[0.16, 2.5, 0.16]} />
-            <meshStandardMaterial color="#36594c" />
-          </mesh>
-          <mesh position={[2.4, 1.3, -0.9]}>
-            <boxGeometry args={[0.16, 2.5, 0.16]} />
-            <meshStandardMaterial color="#36594c" />
-          </mesh>
-        </group>
-      ))}
-      <group position={[0, 0, 10]}>
-        <mesh castShadow position={[0, 0.85, 0]}>
-          <cylinderGeometry args={[0.42, 0.42, 1.1, 12]} />
-          <meshStandardMaterial color="#ee925a" />
-        </mesh>
-        <mesh castShadow position={[0, 1.7, 0]}>
-          <sphereGeometry args={[0.35, 16, 16]} />
-          <meshStandardMaterial color="#f1d4b1" />
-        </mesh>
-      </group>
-    </>
-  );
+function Shape({ x, z, width, depth, height, color }: { x: number; z: number; width: number; depth: number; height: number; color: string }) {
+  return <mesh position={[x, height / 2, z]}><boxGeometry args={[width, height, depth]} /><meshStandardMaterial color={color} /></mesh>;
 }
 
-/** Static greybox only. Segment-004 owns movement, camera, and interaction. */
-export function WorldRenderer({ state }: RendererProps) {
+function District({ targets }: { targets: PublicState['interactables'] }) {
+  return <>
+    <color attach="background" args={['#dce9de']} />
+    <ambientLight intensity={1.8} />
+    <directionalLight position={[12, 24, 14]} intensity={2.1} />
+    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.03, 0]}><planeGeometry args={[40, 40]} /><meshStandardMaterial color="#b9ccb3" /></mesh>
+    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]}><planeGeometry args={[30, 36]} /><meshStandardMaterial color="#e8dfc5" /></mesh>
+    {sceneManifest.colliders.map(({ id, bounds: b }) => <Shape key={id} x={(b.minX + b.maxX) / 2} z={(b.minZ + b.maxZ) / 2} width={b.maxX - b.minX} depth={b.maxZ - b.minZ} height={id.startsWith('platform') ? 1 : 2.4} color={id.startsWith('cafe') ? '#c27d59' : '#426658'} />)}
+    {/* Flat slabs mark walkable areas; only frozen colliders are solid. */}
+    <Shape x={-10} z={5} width={8} depth={6} height={0.045} color="#e6b28b" />
+    <Shape x={8} z={5} width={6} depth={4} height={0.04} color="#e5cc85" />
+    <Shape x={0} z={-2.5} width={30} depth={10} height={0.03} color="#91b5a9" />
+    {[-10, 0, 10].map((x) => <group key={x}>
+      <Shape x={x} z={-12} width={7} depth={8} height={0.05} color="#6b9585" />
+      <Shape x={x} z={-17.8} width={7} depth={0.4} height={0.07} color="#d7bd6f" />
+      <Shape x={x} z={-18.8} width={7} depth={0.1} height={0.07} color="#4a6258" />
+    </group>)}
+    {targets.filter((target) => target.kind === 'npc').map((target) => <group key={target.id} position={[target.position.x, 0, target.position.z]}>
+      <mesh position={[0, .7, 0]}><capsuleGeometry args={[.27, .65, 4, 8]} /><meshStandardMaterial color="#396d67" /></mesh>
+      <mesh position={[0, 1.4, 0]}><sphereGeometry args={[.24, 8, 8]} /><meshStandardMaterial color="#eed2ad" /></mesh>
+    </group>)}
+    {targets.filter((target) => target.kind === 'sign' || target.kind === 'pa').map((target) => <group key={target.id} position={[target.position.x, 0, target.position.z]}>
+      <mesh position={[.6, .7, 0]}><boxGeometry args={[.08, 1.4, .08]} /><meshStandardMaterial color="#405c4a" /></mesh>
+      <mesh position={[.6, 1.4, 0]}><boxGeometry args={[target.kind === 'sign' ? 1 : .35, .6, .1]} /><meshStandardMaterial color="#efcb7f" /></mesh>
+    </group>)}
+  </>;
+}
+
+function Motion({ runtime, root, labels, state, tick, sync }: {
+  runtime: React.RefObject<Runtime>; root: React.RefObject<HTMLElement | null>;
+  labels: React.RefObject<(HTMLSpanElement | null)[]>; state: PublicState;
+  tick: (position: Position) => void; sync: (position: Position) => void;
+}) {
+  const avatar = useRef<Group>(null);
+  const clock = useRef({ ui: 0, frames: 0, elapsed: 0, wasMoving: false });
+  const projected = useRef(new Vector3());
+  useFrame(({ camera, size }, delta) => {
+    const r = runtime.current;
+    const k = r.keys;
+    const blocked = !r.active || r.busy || state.status !== 'active' || document.activeElement !== root.current || document.hidden;
+    const right = blocked ? 0 : Number(k.has('KeyD') || k.has('ArrowRight')) - Number(k.has('KeyA') || k.has('ArrowLeft'));
+    const forward = blocked ? 0 : Number(k.has('KeyW') || k.has('ArrowUp')) - Number(k.has('KeyS') || k.has('ArrowDown'));
+    const moving = Boolean(right || forward);
+    const previous = r.position;
+    r.position = movePlayer(r.position, right, forward, r.yaw, delta);
+    if (avatar.current) {
+      avatar.current.position.set(r.position.x, 0, r.position.z);
+      if (distance(previous, r.position) > .0001) avatar.current.rotation.y = Math.atan2(r.position.x - previous.x, r.position.z - previous.z);
+    }
+    // Fixed elevated pitch keeps the capsule visible; yaw is the only orbit axis.
+    camera.position.set(r.position.x + Math.sin(r.yaw) * 9, 8.5, r.position.z + Math.cos(r.yaw) * 9);
+    camera.lookAt(r.position.x, .7, r.position.z);
+    camera.updateMatrixWorld();
+    landmarks.forEach((mark, i) => {
+      const node = labels.current[i];
+      if (!node) return;
+      const p = projected.current.set(mark.x, 1.9, mark.z).project(camera);
+      node.style.display = p.z < 1 && p.z > -1 && Math.abs(p.x) < 1.05 && Math.abs(p.y) < 1.05 ? 'block' : 'none';
+      node.style.transform = `translate(${(p.x + 1) * size.width / 2}px, ${(-p.y + 1) * size.height / 2}px) translate(-50%, -100%)`;
+    });
+    const c = clock.current;
+    c.ui += delta; c.elapsed += delta; c.frames++;
+    if (c.ui >= .1) {
+      c.ui = 0;
+      tick({ ...r.position });
+      root.current?.setAttribute('data-position-x', r.position.x.toFixed(3));
+      root.current?.setAttribute('data-position-z', r.position.z.toFixed(3));
+      root.current?.setAttribute('data-zone', zoneAt(r.position));
+    }
+    if (c.elapsed >= 2) {
+      root.current?.setAttribute('data-fps', (c.frames / c.elapsed).toFixed(1));
+      c.elapsed = 0; c.frames = 0;
+    }
+    const now = performance.now();
+    if ((moving && now - r.lastSync >= 300) || (!moving && c.wasMoving)) {
+      r.lastSync = now;
+      if (distance(r.lastSent ?? initialPosition(state), r.position) > .02) sync({ ...r.position });
+    }
+    c.wasMoving = moving;
+  });
+  return <group ref={avatar} position={[runtime.current.position.x, 0, runtime.current.position.z]}>
+    <mesh position={[0, .72, 0]}><capsuleGeometry args={[sceneManifest.playerRadius, .7, 4, 10]} /><meshStandardMaterial color="#e78348" /></mesh>
+    <mesh position={[0, 1.48, 0]}><sphereGeometry args={[.27, 10, 8]} /><meshStandardMaterial color="#f3d4af" /></mesh>
+    <mesh position={[0, 1.35, .26]}><boxGeometry args={[.14, .1, .12]} /><meshStandardMaterial color="#4c4639" /></mesh>
+  </group>;
+}
+
+/** Presentation-only world. Every interaction uses the frozen shared callbacks. */
+export function WorldRenderer({ state, onAction, onTalk }: RendererProps) {
   const [hasWebGl, setHasWebGl] = useState(webGlIsAvailable);
+  const [position, setPosition] = useState(() => initialPosition(state));
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const root = useRef<HTMLElement>(null);
+  const labels = useRef<(HTMLSpanElement | null)[]>([]);
+  const current = useRef({ state, onAction, onTalk });
+  current.current = { state, onAction, onTalk };
+  const runtime = useRef<Runtime>({ position: initialPosition(state), yaw: 0, keys: new Set(), active: false, busy: false, syncing: false, lastSync: 0, lastSent: null, pending: null, generation: 0 });
+  const syncPromise = useRef<Promise<void>>(Promise.resolve());
+  const drag = useRef<{ x: number; pointerId: number } | null>(null);
+  const sessionKey = `${state.sessionId}:${state.missionId}`;
+  useEffect(() => {
+    const r = runtime.current;
+    r.generation++; r.position = initialPosition(current.current.state); r.lastSent = null; r.pending = null;
+    r.keys.clear(); r.busy = false; r.syncing = false; syncPromise.current = Promise.resolve();
+    setPosition({ ...r.position }); setBusy(false); setError('');
+  }, [sessionKey]);
+  useEffect(() => {
+    const clear = () => { runtime.current.keys.clear(); runtime.current.active = false; drag.current = null; };
+    window.addEventListener('blur', clear);
+    document.addEventListener('visibilitychange', clear);
+    return () => { clear(); window.removeEventListener('blur', clear); document.removeEventListener('visibilitychange', clear); runtime.current.generation++; };
+  }, []);
 
-  return (
-    <section className="world-renderer" aria-label="Mandarin district preview" data-testid="world-renderer">
-      {hasWebGl ? (
-        <CanvasBoundary>
-          <Canvas
-            shadows
-            dpr={[1, 1.5]}
-            camera={{ position: [27, 32, 33], fov: 43 }}
-            onCreated={({ gl, camera }) => {
-              camera.lookAt(0, 0, 0);
-              gl.domElement.addEventListener('webglcontextlost', () => setHasWebGl(false), { once: true });
-            }}
-            fallback={<CompatibilityRecovery />}
-          >
-            <DistrictPreview />
-          </Canvas>
-        </CanvasBoundary>
-      ) : <CompatibilityRecovery />}
-      {hasWebGl && (
-        <>
-          <div className="world-caption"><span className="live-dot" />District preview <span>Static greybox</span></div>
-          <div className="world-location cafe"><span lang="zh-Hans">咖啡店</span><small>Café</small></div>
-          <div className="world-location station"><span lang="zh-Hans">车站</span><small>Station</small></div>
-          <div className="world-location plaza"><span lang="zh-Hans">广场</span><small>Plaza · Spawn</small></div>
-          <div className="world-note">Movement & interaction unimplemented · Segment-004</div>
-        </>
-      )}
-      <span className="sr-only">Fixture preview for {state.missionId}; no playable navigation.</span>
-    </section>
-  );
+  async function flushPosition(next: Position) {
+    const r = runtime.current;
+    const generation = r.generation;
+    if (r.lastSent && distance(r.lastSent, next) < .02) return;
+    await current.current.onAction({ type: 'moveZone', zoneId: zoneAt(next), position: next });
+    if (generation === r.generation) r.lastSent = { ...next };
+  }
+
+  function sync(next: Position) {
+    const r = runtime.current;
+    r.pending = next;
+    if (r.busy || r.syncing) return;
+    const generation = r.generation;
+    r.syncing = true;
+    syncPromise.current = (async () => {
+      try {
+        while (r.pending && generation === r.generation) {
+          const value = r.pending; r.pending = null;
+          await flushPosition(value);
+        }
+      } catch (cause) {
+        if (generation === r.generation) { r.pending = null; setError(cause instanceof Error ? cause.message : 'Position could not sync. Try again.'); }
+      } finally { if (generation === r.generation) r.syncing = false; }
+    })();
+  }
+
+  async function interact(id: string) {
+    const r = runtime.current;
+    if (r.busy || current.current.state.status !== 'active' || !hasWebGl) return;
+    const target = nearbyTargets(current.current.state, r.position).find((item) => item.id === id);
+    if (!target) return;
+    const generation = r.generation;
+    r.busy = true; r.keys.clear(); r.pending = null; setBusy(true); setError('');
+    try {
+      await syncPromise.current;
+      if (generation !== r.generation) return;
+      await flushPosition({ ...r.position });
+      if (generation !== r.generation) return;
+      if (target.kind === 'npc') current.current.onTalk(target.id);
+      else {
+        const action = targetAction(target);
+        if (action) await current.current.onAction(action);
+        if (generation !== r.generation) return;
+      }
+    } catch (cause) {
+      if (generation === r.generation) setError(cause instanceof Error ? cause.message : 'Interaction failed. Try again.');
+    } finally { if (generation === r.generation) { r.busy = false; setBusy(false); } }
+  }
+
+  const nearby = nearbyTargets(state, position);
+  const movementKeys = ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
+  return <section ref={root} tabIndex={0} className="world-renderer district-world" aria-label="Mandarin district — keyboard navigation" data-testid="world-renderer"
+    onFocus={(event) => { runtime.current.active = event.target === root.current; }}
+    onBlur={() => { runtime.current.keys.clear(); runtime.current.active = false; }}
+    onKeyDown={(event) => {
+      if (event.target !== root.current || event.nativeEvent.isComposing) return;
+      if (movementKeys.includes(event.code)) { event.preventDefault(); runtime.current.keys.add(event.code); }
+      if (event.code === 'KeyE' && !event.repeat) { event.preventDefault(); const target = nearbyTargets(current.current.state, runtime.current.position)[0]; if (target) void interact(target.id); }
+    }}
+    onKeyUp={(event) => { runtime.current.keys.delete(event.code); }}
+    onPointerDown={(event) => {
+      if (event.target instanceof HTMLCanvasElement && event.button === 0) {
+        root.current?.focus(); drag.current = { x: event.clientX, pointerId: event.pointerId }; event.currentTarget.setPointerCapture(event.pointerId);
+      }
+    }}
+    onPointerMove={(event) => { if (drag.current) { runtime.current.yaw -= (event.clientX - drag.current.x) * .006; drag.current.x = event.clientX; } }}
+    onPointerUp={(event) => { drag.current = null; if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId); }}
+    onPointerCancel={() => { drag.current = null; }}>
+    {hasWebGl ? <CanvasBoundary onFailure={() => { runtime.current.keys.clear(); runtime.current.active = false; setHasWebGl(false); }}><Canvas dpr={[1, 1.5]} camera={{ position: [0, 8.5, 19], fov: 52, near: .1, far: 85 }} gl={{ antialias: false, powerPreference: 'high-performance' }}
+      onCreated={({ gl }) => { gl.domElement.addEventListener('webglcontextlost', (event) => { event.preventDefault(); runtime.current.keys.clear(); runtime.current.active = false; setHasWebGl(false); }, { once: true }); }} fallback={<CompatibilityRecovery />}>
+      <District targets={state.interactables} /><Motion runtime={runtime} root={root} labels={labels} state={state} tick={setPosition} sync={sync} />
+    </Canvas></CanvasBoundary> : <CompatibilityRecovery />}
+    {hasWebGl && <>
+      <div className="district-labels" aria-hidden="true">{landmarks.map((mark, i) => <span key={mark.label} ref={(node) => { labels.current[i] = node; }} className="district-landmark" lang="zh-Hans">{mark.label}</span>)}</div>
+      <div className="world-caption"><span className="live-dot" />The district<span>Third-person navigation</span></div>
+      <div className="district-nearby" aria-label="Nearby interactions">{nearby.map((target, i) => <button key={target.id} disabled={busy || state.status !== 'active'} onClick={() => void interact(target.id)} data-target-id={target.id}><span lang="zh-Hans">{target.label}</span>{i === 0 ? ' · E' : ''}</button>)}</div>
+      <div className="world-note">Click the district · WASD / arrows to walk · Drag to turn · E to interact</div>
+      {error && <div className="district-error" role="alert">{error}<button onClick={() => { setError(''); root.current?.focus(); }}>Dismiss</button></div>}
+    </>}
+  </section>;
 }

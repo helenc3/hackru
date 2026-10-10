@@ -45,6 +45,10 @@ All other paths are read-only for this segment unless the human explicitly expan
 
 Run the repository-wide typecheck, lint, unit/API tests, production build, and fixture browser smoke. Acceptance above is additional to these checks. Use existing shared fixtures and put segment-specific cases in owned paths. Live credentials are never required by CI. A mandatory live check that cannot run remains pending.
 
+### CI browser note
+
+GitHub Actions runs Playwright Firefox headlessly on Ubuntu without a physical GPU. A CI run failed both world interaction tests while waiting for the renderer's initial `data-position-x`/`data-position-z` attributes; these attributes are written from React Three Fiber's frame loop. If this recurs while local macOS passes, inspect the Playwright trace and error context for Canvas/WebGL initialization or the compatibility recovery screen before increasing test timeouts. The preliminary WebGL probe uses a separate canvas, so it does not prove the scene Canvas can start.
+
 ## Exclusions
 
 Do not edit app shell, shared client, authoritative geometry, content IDs, mission logic or providers. No physics engine, animated crowds, jumping, city streaming, or procedural map.

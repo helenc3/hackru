@@ -1,1 +1,24 @@
-CLAUDE-HELEN.md	
+CLAUDE-HELEN.md
+
+# deps / build
+node_modules/
+dist/
+build/
+.vite/
+
+# secrets (Gemini, ElevenLabs, TigerData keys)
+.env
+.env.*
+!.env.example
+
+# logs
+*.log
+npm-debug.log*
+
+# OS / editor
+.DS_Store
+.vscode/
+.idea/
+
+# local Claude settings
+.claude/settings.local.json

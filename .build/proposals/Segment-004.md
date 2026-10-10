@@ -65,7 +65,11 @@ the nine owned tests also pass with SwiftShader software rendering, with
 33/33.3/33.3 FPS samples. Hardware demo-laptop samples remain 60/60/60 FPS.
 
 GitHub reads are restored, but connector code writes still return 403 Resource
-not accessible by integration. The CI browser rerun on the fix and the normal
-PR merge remain pending until the fix is published. The completion record is
-pre-merge evidence and is authoritative only after a corresponding PR merge.
+not accessible by integration. The tested fix was published through the user's
+configured Git credentials outside the Windows sandbox. Latest main also
+received the original district implementation and Segment-002 while this fix
+was in progress. A normal main merge preserved the timing fix and the new
+dialogue provider; the combined revision passes 65 unit/API tests and all 35
+browser tests locally. Matching CI and a normal PR merge are required before
+the completion record becomes authoritative.
 

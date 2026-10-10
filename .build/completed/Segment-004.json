@@ -14,9 +14,9 @@
     "npm ci": "pass in PR #3 Quality run 38082405310; dependency manifests unchanged by the follow-up",
     "typecheck": "pass locally and on original PR CI",
     "lint": "pass locally and on original PR CI",
-    "test": "33 unit/API tests and build-kit validator pass",
+    "test": "65 unit/API tests and build-kit validator pass after synchronization with latest main",
     "build": "pass locally and on original PR CI",
-    "test:e2e": "35 pass locally; nine owned tests also pass with software rendering; CI rerun pending publication"
+    "test:e2e": "35 pass locally after main synchronization; nine owned tests also pass with software rendering"
   },
   "manualEvidence": [
     "User confirmed this machine is the demo laptop",
@@ -26,7 +26,6 @@
     "User approved the small App.tsx shared sign-panel focus/Escape integration exception"
   ],
   "limitations": [
-    "Original CI browser failure fixed locally; matching CI rerun, normal merge and merged-main smoke remain pending",
     "Local Windows dependency/browser/server-lifecycle adaptations documented in the segment proposal",
     "Production build retains the large JavaScript chunk warning"
   ]

@@ -113,11 +113,11 @@ function Motion({ runtime, root, labels, state, tick, sync }: {
     });
     const c = clock.current;
     c.ui += delta; c.elapsed += delta; c.frames++;
+    root.current?.setAttribute('data-position-x', r.position.x.toFixed(3));
+    root.current?.setAttribute('data-position-z', r.position.z.toFixed(3));
     if (c.ui >= .1) {
       c.ui = 0;
       tick({ ...r.position });
-      root.current?.setAttribute('data-position-x', r.position.x.toFixed(3));
-      root.current?.setAttribute('data-position-z', r.position.z.toFixed(3));
       root.current?.setAttribute('data-zone', zoneAt(r.position));
     }
     if (c.elapsed >= 2) {

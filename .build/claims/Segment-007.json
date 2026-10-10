@@ -1,0 +1,13 @@
+{
+  "segment": "Segment-007",
+  "account": "msenedrs",
+  "claimId": "e47b0e23-000e-4260-99b0-55cff887a4bb",
+  "baseMainSha": "832e1ceb18a84ef9b55704eb98447a393b393131",
+  "claimedAt": "2026-10-10T23:42:28.338521+00:00",
+  "authorizedHistoricalDependencies": [
+    "Segment-001",
+    "Segment-002",
+    "Segment-006"
+  ],
+  "authorization": "The requesting human replied Go after the explicit proposal to accept the direct integrations, audit them in the integration report, and complete remaining Segment-005 live acceptance during Segment-007."
+}

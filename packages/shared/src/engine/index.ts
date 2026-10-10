@@ -5,6 +5,7 @@ import {
 import { authoredFacts, cues, groundedReplies, npcs, sceneManifest } from '../content/index.js';
 import { missionFor } from '../content/missions.js';
 import { advanceClock } from './clock.js';
+import { selectPracticeTier, updateSkillsAfterAttempt } from './skills.js';
 export { advanceClock } from './clock.js';
 export { createFixtureDialogueProvider } from './fixture-dialogue.js';
 
@@ -47,14 +48,17 @@ function guardPasses(state: InternalState, guard: Guard): boolean {
     case 'timeRemainingAbove': return (state.timer?.remainingMs ?? Infinity) > guard.remainingMs;
   }
 }
-function evidence(state: InternalState, track: EvidenceRecord['track'], score: EvidenceRecord['score'], cueId?: EvidenceRecord['cueId'], assisted = false): void {
+function evidence(state: InternalState, track: EvidenceRecord['track'], score: EvidenceRecord['score'], cueId?: EvidenceRecord['cueId'], assisted = false, decisionId = state.nodeId): void {
   const turnId = track === 'conversation' ? state.pendingTurn?.turnId : undefined;
-  if (state.evidence.some((entry) => entry.attemptId === state.attemptId && entry.track === track && entry.cueId === cueId && entry.turnId === turnId)) return;
-  const id = `evidence-${state.evidence.length + 1}`;
+  const previous = state.evidence.filter((entry) => entry.attemptId === state.attemptId && entry.track === track && entry.cueId === cueId && entry.turnId === turnId);
+  if (previous.some((entry) => entry.listeningAssisted === assisted) || previous.length && !assisted) return;
+  const decisionPrefix = `evidence.${track}.${decisionId}.`;
+  const firstAttempt = previous.length === 0 && (track !== 'conversation' || !state.evidence.some((entry) => entry.attemptId === state.attemptId && entry.id.startsWith(decisionPrefix)));
+  const id = `${decisionPrefix}${state.evidence.length + 1}`;
   const source = state.pendingTurn?.source;
   state.evidence.push({ id, attemptId: state.attemptId, missionId: state.missionId, track, score, cueId,
     ...(track === 'conversation' ? { turnId: state.pendingTurn?.turnId, conversationSource: source === 'stt' ? 'spoken' : source === 'stt-edited' ? 'edited' : 'typed' } : {}),
-    independent: !assisted && !state.validationMode, firstAttempt: true, validationMode: state.validationMode, listeningAssisted: assisted, providerFailure: false });
+    independent: !assisted && !state.validationMode, firstAttempt, validationMode: state.validationMode, listeningAssisted: assisted, providerFailure: false });
 }
 function terminal(state: InternalState, result: 'clear' | 'fail', events: EngineResult['events']): void {
   if (state.status !== 'active') return;
@@ -69,14 +73,7 @@ function terminal(state: InternalState, result: 'clear' | 'fail', events: Engine
     if (next && !state.unlockedMissionIds.includes(next)) state.unlockedMissionIds.push(next);
     events.push({ id: `${state.attemptId}.reward`, kind: 'reward', message: state.validationMode ? 'Simulated validation reward.' : 'Mission reward earned.' });
   }
-  const units = state.evidence.filter((entry) => entry.attemptId === state.attemptId);
-  state.debrief = { tracks: structuredClone(state.skills), strengths: [], improvement: 'Continue connecting Mandarin cues with world actions.', nextPracticeReason: 'Skill adaptation is supplied by Segment-006.', evidenceSummary: {
-    spokenTurns: units.filter((entry) => entry.track === 'conversation' && entry.conversationSource === 'spoken').length,
-    typedTurns: units.filter((entry) => entry.track === 'conversation' && entry.conversationSource === 'typed').length,
-    editedTurns: units.filter((entry) => entry.track === 'conversation' && entry.conversationSource === 'edited').length,
-    independentListening: units.filter((entry) => entry.track === 'listening' && entry.independent).length,
-    assistedListening: units.filter((entry) => entry.track === 'listening' && entry.listeningAssisted).length,
-  } };
+  Object.assign(state, updateSkillsAfterAttempt(state));
   state.timer!.pauseReasons = [];
   state.timer!.freezeRemainingMs = 0;
   events.push({ id: `${state.attemptId}.result`, kind: 'result', message: result === 'clear' ? 'Mission complete.' : 'Attempt ended. Retry for a fresh attempt.' });
@@ -145,7 +142,8 @@ export function applyAction(state: InternalState, raw: GameAction, nowMs: number
     requireRule(next.unlockedMissionIds.includes(missionId), 'Complete the prerequisite mission first.');
     const fresh = createGame({ sessionId: next.sessionId, attemptId: `${prefix(next)}.${nowMs}.${next.version + 1}`, missionId, initialTier: next.difficulty === 0 ? 0 : 1, validationMode: next.validationMode, inputPreference: next.inputPreference, providerStatus: next.providerStatus }, nowMs);
     for (const key of ['version', 'inventory', 'xp', 'badges', 'awardedRewardIds', 'unlockedMissionIds', 'skills', 'evidence', 'difficulty', 'skillUpdatedAttemptIds'] as const) Object.assign(fresh, { [key]: structuredClone(next[key]) });
-    if (fresh.mode === 'practice') fresh.tier = next.difficulty;
+    fresh.tier = selectPracticeTier(next, missionId);
+    if (fresh.mode === 'practice') fresh.difficulty = fresh.tier;
     return { state: fresh, events };
   }
   if (action.type === 'setInputPreference') { next.inputPreference = action.preference; return result; }
@@ -296,12 +294,22 @@ export function applyEvaluation(state: InternalState, npcId: NpcId, raw: TurnEva
   if (evaluation.intent === 'confirm_drink_price') next.flags['p1.price-confirmed'] = false;
   if (successful) {
     const before = next.nodeId;
+    const options = currentNode(next).intentTransitions.filter((entry) => entry.trigger.intent === evaluation.intent);
+    const relevantDecision = options.length > 0;
+    const missingDetail = relevantDecision && options.some((entry) => entry.trigger.slots.some((required) => !evaluation.slots.some((slot) => slot.key === required.key)));
     const transitioned = transition(next, evaluation, result.events);
     if (transitioned) {
       npc.patience = Math.min(5, npc.patience + 1);
-      evidence(next, 'conversation', 1, undefined, next.pendingTurn!.assisted);
+      evidence(next, 'conversation', 1, undefined, next.pendingTurn!.assisted, before);
+      if (next.flags[`${prefix(next)}.skill-ambiguous-${before.split('.')[1]}`]) evidence(next, 'repair', 0.5, undefined, next.pendingTurn!.assisted || Boolean(next.flags[`${prefix(next)}.skill-example-${before.split('.')[1]}`]));
       if (before === 'p2.conversation') evidence(next, 'reading', 1, 'p2.timetable', next.pendingTurn!.assisted);
       if (next.missionId === 'B1' && evaluation.intent === 'buy_ticket' && next.flags['b1.ticket-requested']) evidence(next, 'reading', 1, 'b1.destination-board', next.pendingTurn!.assisted);
+    } else if (relevantDecision) {
+      evidence(next, 'conversation', 0, undefined, next.pendingTurn!.assisted, before);
+      if (missingDetail) next.flags[`${prefix(next)}.skill-ambiguous-${before.split('.')[1]}`] = true;
+      if (evaluation.coach?.improvedExample) next.flags[`${prefix(next)}.skill-example-${before.split('.')[1]}`] = true;
+      if (!missingDetail && before === 'p2.conversation') evidence(next, 'reading', 0, 'p2.timetable', next.pendingTurn!.assisted);
+      if (!missingDetail && next.missionId === 'B1' && evaluation.intent === 'buy_ticket') evidence(next, 'reading', 0, 'b1.destination-board', next.pendingTurn!.assisted);
     }
   }
   if (evaluation.intent === 'request_repeat') {

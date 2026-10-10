@@ -3,7 +3,7 @@
   "specVersion": "1.2",
   "validatedAt": "2026-10-10T21:08:42.868642+00:00",
   "acceptance": [
-    "Fixed histories produce exact expected mastery/count values for correct, incorrect, and initially ambiguous independent decisions; exact tier thresholds and 0\u20132 bounds pass.",
+    "Fixed histories produce exact expected mastery/count values for correct, incorrect, and initially ambiguous independent decisions; exact tier thresholds and 0–2 bounds pass.",
     "Mastery updates once per terminal mission attempt; practice tier changes only at mission start by at most one, and boss tier remains 1.",
     "First authored conversation decisions and cue decisions cannot be farmed by duplicate requests, corrected retries, assisted cue replay, or failed-provider evidence.",
     "Typed and edited conversation turns retain their actual provenance; only server-verified unedited STT is summarized as spoken.",
@@ -17,7 +17,7 @@
     "lint": "pass",
     "test": "pass: 105 unit/API tests, including 13 skill cases",
     "build": "pass",
-    "test:e2e": "pass: 38 Firefox browser checks, including two debrief cases",
+    "test:e2e": "local pass: 38 Firefox checks; CI: both Segment-006 debrief cases passed, two existing world cases failed and four world cases did not run",
     "check:kit": "pass"
   },
   "manualEvidence": [
@@ -29,8 +29,25 @@
     ".build/completed/Segment-001.json: requesting human confirmed direct integration into main and requested correction of the stale local-only status."
   ],
   "limitations": [
+    "Implementation and segment acceptance are complete, but PR #5 is unmerged. This branch record is not an authoritative merged completion under BUILD_PROTOCOL.md until integration passes quality and merges.",
     "Main is not branch-protected; final integration manually enforces up-to-date main and the matching quality CI check under the merge lock.",
     "Segment-001 was integrated directly into main without a corresponding segment PR; authenticated history and the requesting human confirm the implementation is present.",
     "Existing large 3D bundle warning remains. No live provider or microphone acceptance is claimed by these fixture skill/debrief checks."
-  ]
+  ],
+  "implementationStatus": "complete",
+  "acceptanceStatus": "passed",
+  "integrationStatus": "unmerged-world-ci-blocker",
+  "pullRequest": "https://github.com/helenc3/hackru/pull/5",
+  "ciEvidence": {
+    "run": "https://github.com/helenc3/hackru/actions/runs/38086627147",
+    "testedHead": "3839e288c65951421598b619c991393e96dfc08d",
+    "quality": "failed",
+    "segmentChecks": "13 skill unit tests and both debrief browser checks passed",
+    "failedChecks": [
+      "apps/web/tests/world/integration.spec.ts: shared app sign panel pauses movement and Escape restores world focus",
+      "apps/web/tests/world/world.spec.ts: sign, NPC, focus and held-key interactions use shared callbacks once"
+    ],
+    "failure": "Existing world renderer did not expose data-position-x during CI initialization; neither failing test nor world renderer was changed by Segment-006. Root cause was not fully diagnosed.",
+    "humanDirection": "The requesting human asked to mark this segment complete and leave unrelated world failures outside its scope."
+  }
 }

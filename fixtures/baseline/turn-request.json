@@ -1,0 +1,10 @@
+{
+  "turnId": "fixture-turn-001",
+  "expectedVersion": 0,
+  "npcId": "xiaolin",
+  "input": {
+    "text": "请给我一杯茶。",
+    "source": "stt",
+    "transcriptionId": "fixture-transcription-001"
+  }
+}

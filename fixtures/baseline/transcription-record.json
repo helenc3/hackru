@@ -1,0 +1,8 @@
+{
+  "id": "fixture-transcription-001",
+  "sessionId": "fixture-session",
+  "attemptId": "fixture-attempt-001",
+  "originalText": "请给我一杯茶。",
+  "createdAtMs": 1791653400000,
+  "expiresAtMs": 1791653460000
+}

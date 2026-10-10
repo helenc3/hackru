@@ -1,0 +1,130 @@
+{
+  "turnId": "fixture-turn-boss",
+  "state": {
+    "sessionId": "fixture-session",
+    "version": 0,
+    "missionId": "B1",
+    "mode": "boss",
+    "status": "active",
+    "zoneId": "concourse",
+    "tier": 1,
+    "objectives": [
+      {
+        "id": "b1.bootstrap",
+        "label": "Mission unimplemented — build Segment-001",
+        "complete": false
+      }
+    ],
+    "interactables": [
+      {
+        "id": "xiaolin",
+        "kind": "npc",
+        "label": "小林",
+        "position": {
+          "x": -10,
+          "z": 4
+        }
+      },
+      {
+        "id": "achen",
+        "kind": "npc",
+        "label": "阿陈",
+        "position": {
+          "x": -3,
+          "z": 0
+        }
+      },
+      {
+        "id": "laozhou",
+        "kind": "npc",
+        "label": "老周",
+        "position": {
+          "x": 3,
+          "z": 0
+        }
+      },
+      {
+        "id": "b1.destination-board",
+        "kind": "sign",
+        "label": "目的地看板",
+        "position": {
+          "x": 1,
+          "z": 0
+        }
+      },
+      {
+        "id": "b1.harbor-change",
+        "kind": "pa",
+        "label": "车站广播",
+        "position": {
+          "x": 0,
+          "z": -2
+        }
+      },
+      {
+        "id": "b1.pay-ticket",
+        "kind": "choice",
+        "label": "支付车票",
+        "position": {
+          "x": 3,
+          "z": 0
+        }
+      },
+      {
+        "id": "b1.board-1",
+        "kind": "choice",
+        "label": "一号站台上车",
+        "position": {
+          "x": -10,
+          "z": -12
+        }
+      },
+      {
+        "id": "b1.board-2",
+        "kind": "choice",
+        "label": "二号站台上车",
+        "position": {
+          "x": 0,
+          "z": -12
+        }
+      },
+      {
+        "id": "b1.board-3",
+        "kind": "choice",
+        "label": "三号站台上车",
+        "position": {
+          "x": 10,
+          "z": -12
+        }
+      }
+    ],
+    "visibleCues": [],
+    "npcMood": {
+      "xiaolin": "warm",
+      "achen": "warm",
+      "laozhou": "neutral"
+    },
+    "inventory": {
+      "hint": 0,
+      "freeze": 0
+    },
+    "xp": 0,
+    "badges": [],
+    "timer": {
+      "remainingMs": 180000,
+      "running": false,
+      "syncedAtMs": 1791653400000
+    },
+    "capabilities": {
+      "coach": false,
+      "hints": false,
+      "freeze": false
+    },
+    "validationMode": true,
+    "inputPreference": "voice",
+    "providerStatus": "fixture"
+  },
+  "events": [],
+  "npcReply": "一张去海港的票，十五元。",
+  "speechId": "fixture-speech-boss"
+}

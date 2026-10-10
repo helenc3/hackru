@@ -1,0 +1,370 @@
+{
+  "P1": {
+    "sessionId": "fixture-session",
+    "version": 0,
+    "missionId": "P1",
+    "mode": "practice",
+    "status": "active",
+    "zoneId": "plaza",
+    "tier": 1,
+    "objectives": [
+      {
+        "id": "p1.bootstrap",
+        "label": "Mission unimplemented — build Segment-001",
+        "complete": false
+      }
+    ],
+    "interactables": [
+      {
+        "id": "xiaolin",
+        "kind": "npc",
+        "label": "小林",
+        "position": {
+          "x": -10,
+          "z": 4
+        }
+      },
+      {
+        "id": "achen",
+        "kind": "npc",
+        "label": "阿陈",
+        "position": {
+          "x": -3,
+          "z": 0
+        }
+      },
+      {
+        "id": "laozhou",
+        "kind": "npc",
+        "label": "老周",
+        "position": {
+          "x": 3,
+          "z": 0
+        }
+      },
+      {
+        "id": "p1.entrance-sign",
+        "kind": "sign",
+        "label": "入口告示",
+        "position": {
+          "x": -10,
+          "z": 6
+        }
+      },
+      {
+        "id": "p1.station-directions",
+        "kind": "pa",
+        "label": "去车站的路线",
+        "position": {
+          "x": -10,
+          "z": 4
+        }
+      },
+      {
+        "id": "p1.enter-plaza-door",
+        "kind": "choice",
+        "label": "广场入口",
+        "position": {
+          "x": -10,
+          "z": 6
+        }
+      },
+      {
+        "id": "p1.try-closed-door",
+        "kind": "choice",
+        "label": "关闭的侧门",
+        "position": {
+          "x": -14,
+          "z": 4
+        }
+      },
+      {
+        "id": "p1.pay-cafe",
+        "kind": "choice",
+        "label": "付款",
+        "position": {
+          "x": -10,
+          "z": 4
+        }
+      },
+      {
+        "id": "p1.go-kiosk",
+        "kind": "choice",
+        "label": "售货亭",
+        "position": {
+          "x": 8,
+          "z": 5
+        }
+      },
+      {
+        "id": "p1.pay-kiosk",
+        "kind": "choice",
+        "label": "付款",
+        "position": {
+          "x": 8,
+          "z": 5
+        }
+      }
+    ],
+    "visibleCues": [],
+    "npcMood": {
+      "xiaolin": "warm",
+      "achen": "warm",
+      "laozhou": "neutral"
+    },
+    "inventory": {
+      "hint": 0,
+      "freeze": 0
+    },
+    "xp": 0,
+    "badges": [],
+    "timer": null,
+    "capabilities": {
+      "coach": true,
+      "hints": true,
+      "freeze": true
+    },
+    "validationMode": true,
+    "inputPreference": "voice",
+    "providerStatus": "fixture"
+  },
+  "P2": {
+    "sessionId": "fixture-session",
+    "version": 0,
+    "missionId": "P2",
+    "mode": "practice",
+    "status": "active",
+    "zoneId": "concourse",
+    "tier": 1,
+    "objectives": [
+      {
+        "id": "p2.bootstrap",
+        "label": "Mission unimplemented — build Segment-001",
+        "complete": false
+      }
+    ],
+    "interactables": [
+      {
+        "id": "xiaolin",
+        "kind": "npc",
+        "label": "小林",
+        "position": {
+          "x": -10,
+          "z": 4
+        }
+      },
+      {
+        "id": "achen",
+        "kind": "npc",
+        "label": "阿陈",
+        "position": {
+          "x": -3,
+          "z": 0
+        }
+      },
+      {
+        "id": "laozhou",
+        "kind": "npc",
+        "label": "老周",
+        "position": {
+          "x": 3,
+          "z": 0
+        }
+      },
+      {
+        "id": "p2.timetable",
+        "kind": "sign",
+        "label": "列车时刻表",
+        "position": {
+          "x": -1,
+          "z": 0
+        }
+      },
+      {
+        "id": "p2.platform-change",
+        "kind": "pa",
+        "label": "车站广播",
+        "position": {
+          "x": 0,
+          "z": -2
+        }
+      },
+      {
+        "id": "p2.board-1",
+        "kind": "choice",
+        "label": "一号站台上车",
+        "position": {
+          "x": -10,
+          "z": -12
+        }
+      },
+      {
+        "id": "p2.board-2",
+        "kind": "choice",
+        "label": "二号站台上车",
+        "position": {
+          "x": 0,
+          "z": -12
+        }
+      },
+      {
+        "id": "p2.board-3",
+        "kind": "choice",
+        "label": "三号站台上车",
+        "position": {
+          "x": 10,
+          "z": -12
+        }
+      }
+    ],
+    "visibleCues": [],
+    "npcMood": {
+      "xiaolin": "warm",
+      "achen": "warm",
+      "laozhou": "neutral"
+    },
+    "inventory": {
+      "hint": 0,
+      "freeze": 0
+    },
+    "xp": 0,
+    "badges": [],
+    "timer": {
+      "remainingMs": 120000,
+      "running": false,
+      "syncedAtMs": 1791653400000
+    },
+    "capabilities": {
+      "coach": true,
+      "hints": true,
+      "freeze": true
+    },
+    "validationMode": true,
+    "inputPreference": "voice",
+    "providerStatus": "fixture"
+  },
+  "B1": {
+    "sessionId": "fixture-session",
+    "version": 0,
+    "missionId": "B1",
+    "mode": "boss",
+    "status": "active",
+    "zoneId": "concourse",
+    "tier": 1,
+    "objectives": [
+      {
+        "id": "b1.bootstrap",
+        "label": "Mission unimplemented — build Segment-001",
+        "complete": false
+      }
+    ],
+    "interactables": [
+      {
+        "id": "xiaolin",
+        "kind": "npc",
+        "label": "小林",
+        "position": {
+          "x": -10,
+          "z": 4
+        }
+      },
+      {
+        "id": "achen",
+        "kind": "npc",
+        "label": "阿陈",
+        "position": {
+          "x": -3,
+          "z": 0
+        }
+      },
+      {
+        "id": "laozhou",
+        "kind": "npc",
+        "label": "老周",
+        "position": {
+          "x": 3,
+          "z": 0
+        }
+      },
+      {
+        "id": "b1.destination-board",
+        "kind": "sign",
+        "label": "目的地看板",
+        "position": {
+          "x": 1,
+          "z": 0
+        }
+      },
+      {
+        "id": "b1.harbor-change",
+        "kind": "pa",
+        "label": "车站广播",
+        "position": {
+          "x": 0,
+          "z": -2
+        }
+      },
+      {
+        "id": "b1.pay-ticket",
+        "kind": "choice",
+        "label": "支付车票",
+        "position": {
+          "x": 3,
+          "z": 0
+        }
+      },
+      {
+        "id": "b1.board-1",
+        "kind": "choice",
+        "label": "一号站台上车",
+        "position": {
+          "x": -10,
+          "z": -12
+        }
+      },
+      {
+        "id": "b1.board-2",
+        "kind": "choice",
+        "label": "二号站台上车",
+        "position": {
+          "x": 0,
+          "z": -12
+        }
+      },
+      {
+        "id": "b1.board-3",
+        "kind": "choice",
+        "label": "三号站台上车",
+        "position": {
+          "x": 10,
+          "z": -12
+        }
+      }
+    ],
+    "visibleCues": [],
+    "npcMood": {
+      "xiaolin": "warm",
+      "achen": "warm",
+      "laozhou": "neutral"
+    },
+    "inventory": {
+      "hint": 0,
+      "freeze": 0
+    },
+    "xp": 0,
+    "badges": [],
+    "timer": {
+      "remainingMs": 180000,
+      "running": false,
+      "syncedAtMs": 1791653400000
+    },
+    "capabilities": {
+      "coach": false,
+      "hints": false,
+      "freeze": false
+    },
+    "validationMode": true,
+    "inputPreference": "voice",
+    "providerStatus": "fixture"
+  }
+}

@@ -1,12 +1,24 @@
-import type { RendererProps } from '@vibequest/shared';
+import { useState } from 'react';
+import { sceneManifest, type RendererProps } from '@vibequest/shared';
 
-/** Developer-only mount. Segment-003 implements the internal text validator. */
-export function ValidationHarness({ state }: RendererProps) {
-  return (
-    <aside className="validation-panel" data-testid="validation-harness">
-      <strong>Internal validation harness</strong>
-      <p>Unimplemented · Segment-003. Fixture mission {state.missionId}; no player progress or rewards.</p>
-      <pre>{JSON.stringify({ sessionId: state.sessionId, version: state.version, validationMode: state.validationMode }, null, 2)}</pre>
-    </aside>
-  );
+/** The same HTTP actions and shared dialogue panel, in an isolated server validation session. */
+export function ValidationHarness({ state, onAction, onTalk }: RendererProps) {
+  const [playbackId, setPlaybackId] = useState('');
+  if (!import.meta.env.DEV || import.meta.env.VITE_ENABLE_VALIDATION_HARNESS !== 'true' || !state.validationMode) return null;
+  return <aside className="validation-panel" data-testid="validation-harness">
+    <h2>Internal validation harness</h2><p>Developer-only session. Simulated achievements cannot transfer to player progress. Dialogue uses the same NPC panel and typed Mandarin fallback.</p>
+    <h3>Locations</h3><div className="validation-controls">{sceneManifest.zones.map((zone) => <button className="button secondary" key={zone.id} onClick={() => void onAction({ type: 'moveZone', zoneId: zone.id, position: zone.center }).catch(() => undefined)}>{zone.id}</button>)}</div>
+    <h3>Scene targets</h3><div className="validation-controls">{state.interactables.map((target) => {
+      const located = sceneManifest.interactables.find((item) => item.id === target.id);
+      return <button className="button secondary" key={target.id} onClick={() => void (async () => {
+        if (located) await onAction({ type: 'moveZone', zoneId: located.zoneId, position: target.position });
+        if (target.kind === 'npc') onTalk(target.id);
+        else if (target.kind === 'choice') await onAction({ type: 'choose', choiceId: target.id as Extract<Parameters<typeof onAction>[0], { type: 'choose' }>['choiceId'] });
+        else if (target.kind === 'sign') await onAction({ type: 'inspect', targetId: target.id });
+        else await onAction({ type: 'playCue', cueId: target.id as Extract<Parameters<typeof onAction>[0], { type: 'playCue' }>['cueId'], channel: 'validation-text' });
+      })().catch(() => undefined)}>{target.kind} · {target.id}</button>;
+    })}</div>
+    <form onSubmit={(event) => { event.preventDefault(); if (playbackId.trim()) void onAction({ type: 'finishCue', playbackId: playbackId.trim() }).catch(() => undefined); }}><label className="field-label">Server-issued cue playback ID<input value={playbackId} onChange={(event) => setPlaybackId(event.target.value)} maxLength={128} /></label><button className="button secondary" disabled={!playbackId.trim()}>Finish delivered cue</button></form>
+    <details><summary>Projected state · no evaluator or secret facts</summary><pre>{JSON.stringify(state, null, 2)}</pre></details>
+  </aside>;
 }

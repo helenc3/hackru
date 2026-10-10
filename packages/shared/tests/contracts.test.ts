@@ -11,7 +11,7 @@ import {
   baselineEvaluation, baselineInternalState, baselinePracticeTurnResponse, baselineStates, baselineTranscriptionRecord,
   baselineTurnContext, baselineTurnProvenance, baselineTurnRequest, createBaselineState, malformedEvaluation,
 } from '../src/fixtures.js';
-import { createGame, SegmentNotImplementedError } from '../src/engine/index.js';
+import { createGame } from '../src/engine/index.js';
 
 describe('shared contract boundary fixtures', () => {
   it('validates all three missions without inventing completed gameplay', () => {
@@ -164,7 +164,7 @@ describe('declarative authored graph boundaries', () => {
     expect(MissionDefinitionSchema.safeParse({ ...graph, nodes: [...graph.nodes, { ...graph.nodes[0], id: 'p1.orphan' }] }).success).toBe(false);
   });
 
-  it('leaves the real engine visibly unimplemented', () => {
-    expect(() => createGame({ sessionId: 's-1', attemptId: 'a-1', missionId: 'P1', initialTier: 1, validationMode: true, inputPreference: 'voice', providerStatus: 'fixture' }, BASELINE_NOW_MS)).toThrow(SegmentNotImplementedError);
+  it('creates a schema-valid authoritative initial game', () => {
+    expect(InternalStateSchema.safeParse(createGame({ sessionId: 's-1', attemptId: 'a-1', missionId: 'P1', initialTier: 1, validationMode: true, inputPreference: 'voice', providerStatus: 'fixture' }, BASELINE_NOW_MS)).success).toBe(true);
   });
 });

@@ -23,7 +23,7 @@ export function createApp(options: AppOptions = {}): Express {
   app.get('/api/health', (_request, response) => {
     response.json({
       status: 'ok',
-      buildId: 'segment-000',
+      buildId: 'segment-001',
       specVersion: '1.2',
       providers: {
         geminiConfigured: Boolean(config.geminiApiKey),
@@ -34,7 +34,7 @@ export function createApp(options: AppOptions = {}): Express {
         fixtures: config.enableDemoFixtures,
       },
       segments: {
-        engine: 'unimplemented',
+        engine: 'implemented',
         dialogue: 'unimplemented',
         speech: 'unimplemented',
       },

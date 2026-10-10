@@ -35,11 +35,11 @@ describe('bootstrap API boundary', () => {
     const response = await request(createApp({ config })).get('/api/health').expect(200);
     expect(response.body).toEqual({
       status: 'ok',
-      buildId: 'segment-000',
+      buildId: 'segment-001',
       specVersion: '1.2',
       providers: { geminiConfigured: true, elevenlabsConfigured: true },
       features: { validationHarness: true, fixtures: true },
-      segments: { engine: 'unimplemented', dialogue: 'unimplemented', speech: 'unimplemented' },
+      segments: { engine: 'implemented', dialogue: 'unimplemented', speech: 'unimplemented' },
     });
     expect(response.text).not.toContain('test-gemini-secret');
     expect(response.text).not.toContain('test-elevenlabs-secret');
@@ -54,24 +54,18 @@ describe('bootstrap API boundary', () => {
     expect(response.body.features).toEqual({ validationHarness: false, fixtures: false });
   });
 
-  it('mounts every game route with an explicit unimplemented response', async () => {
+  it('creates sessions and returns honest errors for unknown session IDs', async () => {
     const app = createApp({ config: developmentConfig() });
-    const responses = await Promise.all([
-      request(app).post('/api/sessions').send(sessionRequest),
+    const created = await request(app).post('/api/sessions').send(sessionRequest).expect(201);
+    expect(created.body.state).toMatchObject({ missionId: 'P1', status: 'active', xp: 0, version: 0 });
+    await request(app).get(`/api/sessions/${created.body.state.sessionId}`).expect(200);
+    for (const response of await Promise.all([
       request(app).get('/api/sessions/bootstrap-session'),
       request(app).post('/api/sessions/bootstrap-session/actions').send(actionRequest),
       request(app).post('/api/sessions/bootstrap-session/turns').send(turnRequest),
-    ]);
-    for (const response of responses) {
-      expect(response.status).toBe(501);
-      expect(response.body).toEqual({
-        error: {
-          code: 'SEGMENT_NOT_IMPLEMENTED',
-          message: 'Game session API is unimplemented. Build Segment-001.',
-          retryable: false,
-        },
-      });
-      expect(response.body.state).toBeUndefined();
+    ])) {
+      expect(response.status).toBe(404);
+      expect(response.body.error.code).toBe('SESSION_NOT_FOUND');
     }
   });
 

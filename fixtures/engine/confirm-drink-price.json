@@ -1,0 +1,28 @@
+{
+  "intent": "confirm_drink_price",
+  "slots": [
+    {
+      "key": "drink",
+      "value": "tea"
+    },
+    {
+      "key": "priceCny",
+      "value": 10
+    }
+  ],
+  "evidenceQuote": "茶十元",
+  "intentGrade": {
+    "score": 0.95,
+    "confidence": 0.95
+  },
+  "clarity": 0.9,
+  "courtesy": 0.9,
+  "targetLanguageUse": "yes",
+  "interaction": "relevant",
+  "replyZh": "好的，请付款。",
+  "coach": {
+    "understood": "You asked for tea.",
+    "explanation": "Your request was clear.",
+    "improvedExample": "请给我一杯茶，谢谢。"
+  }
+}

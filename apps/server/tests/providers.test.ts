@@ -4,7 +4,7 @@ import { loadConfig } from '../src/config.js';
 import { createServices } from '../src/services.js';
 
 describe('injected bootstrap services', () => {
-  it('has explicit provider and store stubs even when API keys are configured', async () => {
+  it('keeps provider stubs while supplying real session storage', async () => {
     const services = createServices(loadConfig({
       NODE_ENV: 'test', GEMINI_API_KEY: 'fixture-key', ELEVENLABS_API_KEY: 'fixture-key',
     }));
@@ -22,8 +22,6 @@ describe('injected bootstrap services', () => {
     await expect(services.speechProvider.transcribe(new Uint8Array(), 'audio/webm')).rejects.toMatchObject({
       status: 501, code: 'SEGMENT_NOT_IMPLEMENTED', message: expect.stringContaining('Segment-005'),
     });
-    await expect(services.sessionStore.get('bootstrap-session')).rejects.toMatchObject({
-      status: 501, code: 'SEGMENT_NOT_IMPLEMENTED', message: expect.stringContaining('Segment-001'),
-    });
+    await expect(services.sessionStore.get('bootstrap-session')).resolves.toBeUndefined();
   });
 });

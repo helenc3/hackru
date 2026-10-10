@@ -9,6 +9,7 @@
     "order_drink",
     "accept_substitute",
     "cancel_order",
+    "confirm_drink_price",
     "greeting",
     "request_repeat",
     "unknown"

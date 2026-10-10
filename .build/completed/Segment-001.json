@@ -1,0 +1,35 @@
+{
+  "segment": "Segment-001",
+  "specVersion": "1.2",
+  "deliveryStatus": "local-only-unmerged",
+  "validatedAt": "2026-10-10T20:05:24.239813+00:00",
+  "acceptance": [
+    "Real fixture API campaigns clear P1 café and cancellation/kiosk branches, P2 direct/clarification with wrong-board repair, and B1.",
+    "P1 requires the exact uncancelled tea/10 or water/5 confirmation, receipt, delivered station directions, and station arrival.",
+    "Boss board application, target-language ticket request/clarification, payment, PA delivery, timer and correct boarding gates are server enforced; wrong boarding fails once.",
+    "Completed/pending duplicates preserve original results; stale versions and changed payloads conflict; deferred-provider retry resolves before the old call and discards its late result.",
+    "Malformed/provider failure does not mutate quest facts, patience or rewards; same-ID provider retry uses a fresh version.",
+    "Fake clocks verify bounded provider/speech/PA/confirmation waiting, freeze allowance, cooldown, boss expiry and recoverable practice expiry.",
+    "Transcription source is server derived; original/edited texts remain private. Ready current-attempt speech jobs bind playback duration; repeat and abandoned callbacks cannot renew pauses.",
+    "Validation rewards are simulated; typed/edited speech and subtitle/validation PA evidence remain honestly labeled, with no independent validation evidence.",
+    "Graph schemas and runtime cross-reference validation pass; active boss projections omit hidden facts, transcripts, coaching and evaluation scores.",
+    "Firefox production smoke starts a real authoritative session; integrated UI/validation regression journeys pass."
+  ],
+  "checks": {
+    "npm ci": "pass",
+    "typecheck": "pass",
+    "lint": "pass",
+    "test": "pass: 60 unit/API tests",
+    "build": "pass",
+    "test:e2e": "pass: 27 Firefox browser/transport tests",
+    "check:kit": "pass"
+  },
+  "manualEvidence": [],
+  "limitations": [
+    "This local record is not authoritative completion: no authenticated remote claim, PR, CI head verification, merge, or merged-revision smoke was possible because gh is unauthenticated.",
+    "The spec-1.2 Segment-000 record is present on origin/main; its corresponding merged PR could not be verified through authenticated GitHub access.",
+    "Mandarin reviewer approval remains pending. Cue asset IDs and eight-second PA fixture durations are Segment-005 integration seams; no live audio or paid-provider acceptance is claimed.",
+    "Live Gemini, microphone/STT, TTS and world navigation remain owned by Segments 002/004/005. Skill adaptation remains owned by Segment-006.",
+    "Production build retains the existing large 3D bundle warning. No repository protection settings were changed."
+  ]
+}

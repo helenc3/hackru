@@ -1,7 +1,8 @@
 import { DESTINATION_ALIASES, INTENT_SLOT_KEYS, MANDARIN_NUMERAL_ALIASES, type Intent, type TurnContext } from '@vibequest/shared';
 
 const MAX_HISTORY_ENTRIES = 12; // six exchanges
-const SLOT_VALUES = { drink: ['coffee', 'tea', 'water'], destination: ['jiangbin', 'haigang', 'airport'], platform: ['1', '2', '3'], quantity: ['1'] } as const;
+const SLOT_VALUES = { drink: ['coffee', 'tea', 'water'], destination: ['jiangbin', 'haigang', 'airport'], platform: ['1', '2', '3'], quantity: ['1'],
+  priceCny: 'integer CNY; must equal a price stated in facts' } as const;
 const TIER_LIMITS = [
   'Tier 0: one short clause, common words only.',
   'Tier 1: at most two clauses, ordinary vocabulary.',
@@ -60,6 +61,11 @@ export function buildPrompt(context: TurnContext, playerText: string): { systemI
   return { systemInstruction, contents };
 }
 
+function slotValueSchema(slots: ReturnType<typeof sceneSlots>) {
+  const strings = { type: 'string', enum: [...new Set(Object.values(slots).filter(Array.isArray).flat())] };
+  return 'priceCny' in slots ? { anyOf: [strings, { type: 'integer', minimum: 0, maximum: 1000 }] } : strings;
+}
+
 /** responseJsonSchema for one TurnEvaluation, narrowed to the active scene. */
 export function responseSchemaFor(context: TurnContext) {
   const shortText = { type: 'string', maxLength: 240 };
@@ -72,7 +78,7 @@ export function responseSchemaFor(context: TurnContext) {
       intent: { type: 'string', enum: sceneIntents(context) },
       slots: {
         type: 'array', maxItems: 2,
-        items: { type: 'object', properties: { key: { type: 'string', enum: Object.keys(slots) }, value: { type: 'string', enum: [...new Set(Object.values(slots).flat())] } }, required: ['key', 'value'] },
+        items: { type: 'object', properties: { key: { type: 'string', enum: Object.keys(slots) }, value: slotValueSchema(slots) }, required: ['key', 'value'] },
       },
       evidenceQuote: { type: 'string', maxLength: 500 },
       intentGrade: { type: 'object', properties: { score: unit, confidence: unit }, required: ['score', 'confidence'] },

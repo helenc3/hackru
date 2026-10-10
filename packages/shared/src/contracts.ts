@@ -14,7 +14,7 @@ export const ZoneIdSchema = z.enum(['plaza', 'cafe', 'kiosk', 'concourse', 'plat
 export const NpcIdSchema = z.enum(['xiaolin', 'achen', 'laozhou']);
 export const CueIdSchema = z.enum(['p1.entrance-sign', 'p1.station-directions', 'p2.timetable', 'p2.platform-change', 'b1.destination-board', 'b1.harbor-change']);
 export const ChoiceIdSchema = z.enum(['p1.enter-plaza-door', 'p1.try-closed-door', 'p1.pay-cafe', 'p1.go-kiosk', 'p1.pay-kiosk', 'p2.board-1', 'p2.board-2', 'p2.board-3', 'b1.pay-ticket', 'b1.board-1', 'b1.board-2', 'b1.board-3']);
-export const IntentSchema = z.enum(['order_drink', 'accept_substitute', 'cancel_order', 'ask_direction', 'confirm_platform', 'request_repeat', 'buy_ticket', 'confirm_ticket', 'greeting', 'unknown']);
+export const IntentSchema = z.enum(['order_drink', 'accept_substitute', 'cancel_order', 'confirm_drink_price', 'ask_direction', 'confirm_platform', 'request_repeat', 'buy_ticket', 'confirm_ticket', 'greeting', 'unknown']);
 export const GameActionTypeSchema = z.enum(['moveZone', 'inspect', 'playCue', 'finishCue', 'audioPhase', 'choose', 'useItem', 'pausePractice', 'resumePractice', 'setInputPreference', 'retryMission', 'startMission']);
 export const DESTINATION_ALIASES = {
   jiangbin: ['江滨', '江濱', 'Jiangbin', 'Riverside'],
@@ -132,10 +132,11 @@ export const SlotSchema = z.discriminatedUnion('key', [
   z.strictObject({ key: z.literal('destination'), value: z.enum(['jiangbin', 'haigang', 'airport']) }),
   z.strictObject({ key: z.literal('platform'), value: z.enum(['1', '2', '3']) }),
   z.strictObject({ key: z.literal('quantity'), value: z.literal('1') }),
+  z.strictObject({ key: z.literal('priceCny'), value: z.number().int().min(0).max(1000) }),
 ]);
 export type Slot = z.infer<typeof SlotSchema>;
 export const INTENT_SLOT_KEYS: Record<Intent, readonly Slot['key'][]> = {
-  order_drink: ['drink'], accept_substitute: ['drink'], cancel_order: [], ask_direction: ['destination'],
+  order_drink: ['drink'], accept_substitute: ['drink'], cancel_order: [], confirm_drink_price: ['drink', 'priceCny'], ask_direction: ['destination'],
   confirm_platform: ['platform'], request_repeat: [], buy_ticket: ['destination', 'quantity'], confirm_ticket: ['destination', 'quantity'], greeting: [], unknown: [],
 };
 export const TurnEvaluationSchema = z.strictObject({
@@ -147,12 +148,12 @@ export const TurnEvaluationSchema = z.strictObject({
   if (new Set(evaluation.slots.map((slot) => slot.key)).size !== evaluation.slots.length) context.addIssue({ code: 'custom', path: ['slots'], message: 'A slot key may appear only once.' });
   evaluation.slots.forEach((slot, index) => {
     if (!INTENT_SLOT_KEYS[evaluation.intent].includes(slot.key)) context.addIssue({ code: 'custom', path: ['slots', index], message: 'Slot is not allowed for this intent.' });
-    if (evaluation.intent === 'accept_substitute' && slot.key === 'drink' && slot.value === 'coffee') context.addIssue({ code: 'custom', path: ['slots', index], message: 'Only tea/water are available substitutes.' });
+    if (['accept_substitute', 'confirm_drink_price'].includes(evaluation.intent) && slot.key === 'drink' && slot.value === 'coffee') context.addIssue({ code: 'custom', path: ['slots', index], message: 'Only tea/water are available drinks.' });
     if (['buy_ticket', 'confirm_ticket'].includes(evaluation.intent) && slot.key === 'destination' && slot.value !== 'haigang') context.addIssue({ code: 'custom', path: ['slots', index], message: 'The authored ticket destination is Haigang.' });
   });
 });
 export type TurnEvaluation = z.infer<typeof TurnEvaluationSchema>;
-export const TurnContextSchema = z.strictObject({ missionId: MissionIdSchema, mode: ModeSchema, tier: TierSchema, npcId: NpcIdSchema, persona: z.string().min(1).max(500), patience: z.number().int().min(0).max(5), allowedIntents: z.array(IntentSchema).min(1).max(10), facts: z.record(identifier, z.string().max(500)), history: z.array(z.strictObject({ role: z.enum(['player', 'npc']), text: z.string().max(500) })).max(12) });
+export const TurnContextSchema = z.strictObject({ missionId: MissionIdSchema, mode: ModeSchema, tier: TierSchema, npcId: NpcIdSchema, persona: z.string().min(1).max(500), patience: z.number().int().min(0).max(5), allowedIntents: z.array(IntentSchema).min(1).max(11), facts: z.record(identifier, z.string().max(500)), history: z.array(z.strictObject({ role: z.enum(['player', 'npc']), text: z.string().max(500) })).max(12) });
 export type TurnContext = z.infer<typeof TurnContextSchema>;
 export interface DialogueProvider { evaluate(context: TurnContext, playerText: string): Promise<TurnEvaluation> }
 export interface SpeechProvider { synthesize(text: string, voiceKey: string): Promise<Uint8Array>; transcribe(audio: Uint8Array, mimeType: string): Promise<string> }
@@ -254,7 +255,7 @@ export type MissionNode = z.infer<typeof MissionNodeSchema>;
 export type ActionTransition = z.infer<typeof ActionTransitionSchema>;
 export type IntentTransition = z.infer<typeof IntentTransitionSchema>;
 export type RewardDefinition = z.infer<typeof RewardDefinitionSchema>;
-export const NpcDefinitionSchema = z.strictObject({ id: NpcIdSchema, nameZh: shortText, persona: z.string().min(1).max(500), initialPatience: z.number().int().min(0).max(5), zoneId: ZoneIdSchema, position: PositionSchema, voiceKey: NpcIdSchema, allowedIntents: z.array(IntentSchema).min(1).max(10) });
+export const NpcDefinitionSchema = z.strictObject({ id: NpcIdSchema, nameZh: shortText, persona: z.string().min(1).max(500), initialPatience: z.number().int().min(0).max(5), zoneId: ZoneIdSchema, position: PositionSchema, voiceKey: NpcIdSchema, allowedIntents: z.array(IntentSchema).min(1).max(11) });
 export type NpcDefinition = z.infer<typeof NpcDefinitionSchema>;
 export const CueDefinitionSchema = z.strictObject({ id: CueIdSchema, missionId: MissionIdSchema, kind: z.enum(['sign', 'pa', 'directions']), label: shortText, zoneId: ZoneIdSchema, position: PositionSchema, textZh: z.string().min(1).max(500), englishMeaning: shortText, pinyin: z.string().max(500).optional(), audioAssetId: identifier.optional(), factSnapshotId: identifier, review: z.enum(['pending', 'reviewed']), variants: z.array(z.strictObject({ tier: TierSchema, textZh: z.string().min(1).max(500), englishMeaning: shortText, audioAssetId: identifier.optional() })).max(3) });
 export type CueDefinition = z.infer<typeof CueDefinitionSchema>;

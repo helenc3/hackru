@@ -41,8 +41,22 @@ async function coordinate(page: Page, axis: 'x' | 'z') {
 }
 async function walk(page: Page, key: string, axis: 'x' | 'z', destination: number, direction: number) {
   await page.getByTestId('world-renderer').focus();
+  const code = `Key${key.toUpperCase()}`;
+  // Stop within the browser's animation loop. A CI protocol round trip can
+  // take several frames and otherwise overshoot from a sign into an NPC.
+  const stopped = page.getByTestId('world-renderer').evaluate((root, options) => new Promise<void>((resolve, reject) => {
+    const deadline = performance.now() + 15000;
+    const release = () => root.dispatchEvent(new KeyboardEvent('keyup', { code: options.code, bubbles: true }));
+    const watch = () => {
+      const position = Number(root.getAttribute(`data-position-${options.axis}`));
+      if (position * options.direction >= options.destination * options.direction) { release(); resolve(); }
+      else if (performance.now() >= deadline) { release(); reject(new Error(`Walking ${options.code} stopped at ${position}, expected ${options.destination}`)); }
+      else requestAnimationFrame(watch);
+    };
+    requestAnimationFrame(watch);
+  }), { code, axis, destination, direction });
   await page.keyboard.down(key);
-  try { await expect.poll(async () => (await coordinate(page, axis)) * direction, { timeout: 15000, intervals: [50] }).toBeGreaterThanOrEqual(destination * direction); }
+  try { await stopped; }
   finally { await page.keyboard.up(key); }
 }
 async function actions(page: Page) { return JSON.parse(await page.getByTestId('actions').innerText()); }

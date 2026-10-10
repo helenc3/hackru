@@ -287,6 +287,7 @@ export const TimerStateSchema = z.strictObject({ initialMs: z.number().int().min
 export const InternalStateSchema = z.strictObject({
   sessionId: identifier, version: count, missionId: MissionIdSchema, attemptId: identifier, nodeId: identifier,
   mode: ModeSchema, status: StatusSchema, zoneId: ZoneIdSchema, position: PositionSchema, tier: TierSchema,
+  lastMovementAtMs: z.number().int().nonnegative().optional(),
   flags: FlagsSchema, inventory: InventorySchema, xp: count, badges: z.array(identifier).max(10), awardedRewardIds: z.array(identifier).max(100), unlockedMissionIds: z.array(MissionIdSchema).min(1).max(3),
   inspectedTargetIds: z.array(InteractableIdSchema).max(40), cuePlaybacks: z.array(CuePlaybackRecordSchema).max(100), npcState: z.record(NpcIdSchema, NpcRuntimeStateSchema),
   evidence: z.array(EvidenceRecordSchema).max(500), skills: SkillTracksSchema, difficulty: TierSchema, skillUpdatedAttemptIds: z.array(identifier).max(100),

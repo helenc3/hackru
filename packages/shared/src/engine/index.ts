@@ -29,7 +29,7 @@ export function createGame(options: CreateGameOptions, nowMs: number): InternalS
   const snapshot = parsed.missionId === 'P1' ? 'p1.cafe' : parsed.missionId === 'P2' ? 'p2.original' : 'b1.original';
   return InternalStateSchema.parse({
     sessionId: parsed.sessionId, attemptId: parsed.attemptId, missionId: parsed.missionId, validationMode: parsed.validationMode, inputPreference: parsed.inputPreference, providerStatus: parsed.providerStatus, version: 0, nodeId: mission.startNode, mode: mission.mode, status: 'active', zoneId: parsed.missionId === 'P1' ? 'plaza' : 'concourse',
-    position: parsed.missionId === 'P1' ? sceneManifest.spawn : { x: 0, z: 0 }, tier: mission.mode === 'boss' ? 1 : parsed.initialTier,
+    position: parsed.missionId === 'P1' ? sceneManifest.spawn : { x: 0, z: 0 }, lastMovementAtMs: nowMs, tier: mission.mode === 'boss' ? 1 : parsed.initialTier,
     flags: { 'p1.kiosk': false }, inventory: { hint: 0, freeze: 0 }, xp: 0, badges: [], awardedRewardIds: [], unlockedMissionIds: ['P1'], inspectedTargetIds: [], cuePlaybacks: [],
     npcState: Object.fromEntries(npcs.map((npc) => [npc.id, { patience: npc.initialPatience, mood: mood(npc.initialPatience), history: [], revealedFactIds: [], repeatCounts: {}, cooldownRemainingMs: 0 }])),
     evidence: [], skills: Object.fromEntries(['reading', 'listening', 'conversation', 'repair'].map((track) => [track, { mastery: 0.4, independentCount: 0 }])), difficulty: parsed.initialTier, skillUpdatedAttemptIds: [],
@@ -154,9 +154,11 @@ export function applyAction(state: InternalState, raw: GameAction, nowMs: number
       const position = action.position ?? zone.center;
       requireRule(next.validationMode || Boolean(action.position), 'World movement requires a position.');
       requireRule(position.x >= zone.bounds.minX && position.x <= zone.bounds.maxX && position.z >= zone.bounds.minZ && position.z <= zone.bounds.maxZ, 'Position is outside the requested zone.');
-      requireRule(next.validationMode || Math.hypot(position.x - state.position.x, position.z - state.position.z) <= sceneManifest.movementSpeed * Math.max(0, nowMs - state.timer!.lastUpdatedAtMs) / 1000 + 0.25, 'Movement exceeds the authored speed.');
+      // Timer synchronization also runs on reads and unrelated actions. Movement
+      // needs its own baseline, advanced only when a position is accepted.
+      requireRule(next.validationMode || Math.hypot(position.x - state.position.x, position.z - state.position.z) <= sceneManifest.movementSpeed * Math.max(0, nowMs - (state.lastMovementAtMs ?? state.timer!.lastUpdatedAtMs)) / 1000 + 0.25, 'Movement exceeds the authored speed.');
       requireRule(!sceneManifest.colliders.some(({ bounds }) => position.x >= bounds.minX - sceneManifest.playerRadius && position.x <= bounds.maxX + sceneManifest.playerRadius && position.z >= bounds.minZ - sceneManifest.playerRadius && position.z <= bounds.maxZ + sceneManifest.playerRadius), 'Position intersects a wall.');
-      next.zoneId = action.zoneId; next.position = position;
+      next.zoneId = action.zoneId; next.position = position; next.lastMovementAtMs = nowMs;
       if (next.missionId === 'P1' && action.zoneId === 'concourse' && next.flags['p1.receipt'] && delivered(next, 'p1.station-directions')) {
         const playback = [...next.cuePlaybacks].reverse().find((entry) => entry.cueId === 'p1.station-directions' && entry.delivered);
         evidence(next, 'listening', 1, 'p1.station-directions', !playback || playback.listeningAssisted || next.cuePlaybacks.some((entry) => entry.cueId === 'p1.station-directions' && entry.listeningAssisted));

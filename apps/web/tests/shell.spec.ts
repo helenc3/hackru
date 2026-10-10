@@ -1,5 +1,16 @@
 import { expect, test } from '@playwright/test';
 
+// Preserve the bootstrap presentation regression as an explicit health fixture.
+test.describe('bootstrap presentation fixtures', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.route('**/api/health', (route) => route.fulfill({ json: {
+      status: 'ok', buildId: 'segment-000', specVersion: '1.2',
+      providers: { geminiConfigured: false, elevenlabsConfigured: false },
+      features: { fixtures: false, validationHarness: false },
+      segments: { engine: 'unimplemented', dialogue: 'unimplemented', speech: 'unimplemented' },
+    } }));
+  });
+
 test('production shell shares a Chinese world and explicit unimplemented voice slots', async ({ page }) => {
   await page.goto('/');
   await expect(page).toHaveTitle('VibeQuest · Mandarin in motion');
@@ -39,11 +50,10 @@ test('API configured flags are visible without claiming a live call', async ({ p
   await expect(health).toContainText('No live provider call has been verified');
 });
 
-test('unimplemented API responds visibly and does not fabricate progress', async ({ page }) => {
+test('bootstrap preview checks the implemented session API without advancing progress', async ({ page }) => {
   await page.goto('/');
   await page.getByRole('button', { name: 'Check session seam' }).click();
-  await expect(page.getByTestId('session-notice')).toContainText('HTTP 501');
-  await expect(page.getByTestId('session-notice')).toContainText(/unimplemented/i);
+  await expect(page.getByTestId('session-notice')).toContainText('The session endpoint responded.');
   await expect(page.getByTestId('fixture-state')).toContainText('XP 0');
   await expect(page.getByTestId('fixture-state')).toContainText('active');
 });
@@ -63,4 +73,18 @@ test('unavailable WebGL offers compatibility recovery inside the same shell', as
   await expect(page.getByTestId('webgl-recovery')).toContainText('does not start a game');
   await expect(page.getByTestId('validation-harness')).toHaveCount(0);
   await expect(page.getByTestId('recorder-stub')).toBeVisible();
+});
+
+});
+
+test('implemented engine starts an authoritative production session', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.getByTestId('start-panel')).toBeVisible();
+  await page.getByRole('button', { name: 'Start Practice' }).click();
+  await expect(page.getByTestId('world-renderer')).toBeVisible();
+  await expect(page.locator('.session-footer')).toContainText('Version 0');
+  await expect(page.getByText('Segment-000 scaffold', { exact: true })).toHaveCount(0);
+  await expect(page.getByTestId('validation-harness')).toHaveCount(0);
+  const health = await page.request.get('/api/health');
+  expect((await health.json()).segments.engine).toBe('implemented');
 });

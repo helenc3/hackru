@@ -43,8 +43,10 @@ test('Chinese IME Enter waits for composition to finish and the focused panel co
   const api = await installScriptedApi(page, { steps: [{ text: '我要水。', reply: '好的。', feedback: true }] });
   await start(page); const panel = await typedPanel(page);
   const input = panel.getByRole('textbox');
+  // fill() can end composition in Firefox; establish the draft before simulating IME.
+  await input.fill('我要水。');
   await input.dispatchEvent('compositionstart', { data: '我要水' });
-  await input.fill('我要水。'); await input.press('Enter');
+  await input.press('Enter');
   expect(api.requests.filter((request) => request.path.endsWith('/turns'))).toHaveLength(0);
   await page.evaluate(() => { (window as unknown as { movementKeys: string[] }).movementKeys = []; window.addEventListener('keydown', (event) => { if (['w', 'a', 's', 'd'].includes(event.key)) (window as unknown as { movementKeys: string[] }).movementKeys.push(event.key); }); });
   await input.press('w');

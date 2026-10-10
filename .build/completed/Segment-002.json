@@ -1,0 +1,28 @@
+{
+  "segment": "Segment-002",
+  "specVersion": "1.2",
+  "validatedAt": "2026-10-10T19:42:23Z",
+  "acceptance": [
+    "Live adapter returned a valid practice evaluation (P1 xiaolin, 请给我一杯茶。 -> order_drink drink=tea) and a boss evaluation with coach null (B1 laozhou, 我要一张去海港的票。 -> buy_ticket destination=haigang quantity=1) on gemini-3-flash-preview, two consecutive runs, ~1.2-1.4 s per call; credentials kept out of artifacts.",
+    "Every live and fixture evaluation is validated with shared schemas and validateEvaluationForContext; invented slot values, out-of-scene intents, non-substring evidence and boss coaching are rejected as PROVIDER_INVALID_OUTPUT.",
+    "23 documented language examples exercised through the fixture provider; 6/6 designated valid Mandarin intents pass the progression gate; English-only and prompt-injection examples fail it.",
+    "Timeout (8 s budget), quota (429, no retry) and transient 5xx (one retry) map to recoverable 503 errors without mutating game state; fixture provider is labeled 'fixture' and asks for clarification on any undocumented input.",
+    "System-override dialogue yields unknown/irrelevant evaluations with no slots, so it cannot satisfy a state transition or reward."
+  ],
+  "checks": {
+    "typecheck": "pass",
+    "lint": "pass",
+    "test": "pass",
+    "build": "pass",
+    "test:e2e": "pass"
+  },
+  "manualEvidence": [
+    "scripts/smoke-gemini.ts PASS for practice and boss on gemini-3-flash-preview (live account call)."
+  ],
+  "limitations": [
+    "Spec default gemini-3.8-flash returned 503 (high demand) and gemini-2.5-flash is unavailable to new users; the verified model is gemini-3-flash-preview, set via GEMINI_MODEL.",
+    "Game routes that call the provider belong to Segment-001; Segment-002 is exercised through unit tests and the smoke script only.",
+    "apps/server/tests/providers.test.ts (Segment-000) was minimally updated to stop a dummy key from triggering a live call; see .build/proposals/Segment-002.md.",
+    "Free-tier keys can hit 429 quota limits during rehearsals."
+  ]
+}

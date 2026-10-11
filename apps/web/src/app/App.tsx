@@ -88,8 +88,11 @@ export function App() {
         <WorldInteractions state={state} pending={session.pending} onAction={onAction} onTalk={onTalk} onShowSubtitles={setSign} />
         <InventoryBar state={state} pending={session.pending} paused={paused} onAction={onAction} onPause={() => void onAction({ type: paused ? 'resumePractice' : 'pausePractice' }).catch(() => undefined)} />
       </div>
-      <AudioController state={state} onAction={onAction} speechId={session.turn?.speechId} />
+      <div className="hud-bottom-right">
       {!state.validationMode && <div className="hud-music"><BackgroundMusic active={state.status === 'active' && !paused} conversation={Boolean(npc)} /></div>}
+      <footer className="session-footer">{state.validationMode ? 'Validation session' : 'Player session'} · {state.sessionId} · Version {state.version}<button className="button secondary" disabled={session.pending} onClick={() => void session.refresh().catch(() => undefined)}>Refresh session</button></footer>
+      <AudioController state={state} onAction={onAction} speechId={session.turn?.speechId} />
+      </div>
       {selectedCue?.text && <section className="sign-overlay" role="dialog" aria-label="Inspected sign"><button ref={signClose} className="button secondary" onClick={closeSignPanel} aria-label="Close sign">Close</button><h3 lang="zh-Hans">{selectedCue.label}</h3><p lang="zh-Hans">{selectedCue.text}</p></section>}
       <RecoveryPanel problem={session.problem} pending={session.pending} onRetry={session.retry} onRefresh={session.refresh} onNew={session.abandon} onDismiss={session.dismiss} />
       {notice && <div className="action-notice" role="status">{notice}</div>}
@@ -98,7 +101,6 @@ export function App() {
       {npc && state.status === 'active' && <DialoguePanel key={`${state.sessionId}:${state.missionId}:${npc}`} state={state} npcId={npc} pending={session.pending} turn={session.turnNpc === npc ? session.turn : null} choices={npcChoices} onAction={onAction} onSubmit={session.submit} onLiveTurn={session.applyTurn} onClose={closeConversation} />}
       <ResultPanel state={state} pending={session.pending} onAction={onAction} onExit={session.abandon} />
       {validation && state.validationMode && ValidationHarness && <Suspense fallback={<p>Loading internal validator…</p>}><ValidationHarness state={state} onAction={onAction} onTalk={onTalk} /></Suspense>}
-      <footer className="session-footer">{state.validationMode ? 'Validation session' : 'Player session'} · {state.sessionId} · Version {state.version}<button className="button secondary" disabled={session.pending} onClick={() => void session.refresh().catch(() => undefined)}>Refresh session</button></footer>
     </main>
   </div>;
 }

@@ -7,7 +7,8 @@
 .district-landmark::after { content: ""; position: absolute; left: 50%; bottom: -7px; width: 12px; height: 12px; margin-left: -6px; background: var(--cream); border-right: 3px solid var(--ink); border-bottom: 3px solid var(--ink); transform: rotate(45deg); }
 .district-world .world-caption { pointer-events: none; z-index: 2; }
 .district-world .world-note { z-index: 2; font-size: 11px; pointer-events: none; }
-.district-nearby { position: absolute; left: 50%; bottom: 24px; transform: translateX(-50%); display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; max-width: 40%; z-index: 3; }
+/* Above the HUD bars (z 6) and clear of them: a long audio status must never cover a target. */
+.district-nearby { position: absolute; left: 50%; bottom: 96px; transform: translateX(-50%); display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; max-width: 44%; z-index: 7; }
 .district-nearby button, .district-error button { background: var(--cream); color: var(--ink); border: var(--outline); padding: 7px 12px; border-radius: 14px; box-shadow: var(--shadow-sticker-sm); cursor: pointer; font-size: 13px; font-weight: 800; transition: transform .14s var(--bounce), box-shadow .14s, background-color .14s; }
 .district-nearby button:hover:not(:disabled), .district-error button:hover { background: var(--lemon); transform: translate(-2px, -2px); box-shadow: 5px 5px 0 var(--ink); }
 .district-nearby button:active:not(:disabled), .district-error button:active { transform: translate(3px, 3px); box-shadow: 0 0 0 var(--ink); }

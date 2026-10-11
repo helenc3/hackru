@@ -11,7 +11,7 @@ Live NPC dialogue uses `eleven_v4_turbo`: Coco Li for 小林, James Gao for 阿�
 and Adam Li for 老周. Playback requires no browser API key.
 
 Regenerate: `node --env-file-if-exists=.env --import tsx scripts/generate-pa.ts --force --verify`.
-Voice assignments are authored in `packages/shared/src/content/index.ts`: character
-`voice` descriptions for NPCs and `audioVoices` for PA and setup audio.
+Approved overrides: `ELEVENLABS_VOICE_XIAOLIN` for directions, `ELEVENLABS_VOICE_PA`
+for announcements, and `ELEVENLABS_VOICE_SETUP` for the setup check.
 The manifest records actual Hanzi, voices, models, and hashes.
 See `fixtures/audio/pa-review.md` for verification and listening limitations.

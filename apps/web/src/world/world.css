@@ -18,5 +18,3 @@
 /* Full-bleed layout: HUD cards sit in the corners, so in-world chrome moves to the top centre. */
 .district-world .world-caption { display: none; }
 .district-world .world-note { top: 12px; bottom: auto; left: 50%; right: auto; transform: translateX(-50%); width: max-content; max-width: 40%; }
-
-.world-renderer > [data-testid="webgl-reconnecting"] { position: absolute; inset: 0; z-index: 3; }

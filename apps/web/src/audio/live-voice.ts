@@ -1,5 +1,4 @@
 import { TurnResponseSchema, type TurnResponse } from '@vibequest/shared';
-import { getAudioSettings, subscribeAudioSettings } from './audio-settings';
 import { setAudioActivity } from './audio-bus';
 
 /**
@@ -29,9 +28,6 @@ export function startLiveVoice(sessionId: string, npcId: string, listener: (even
   const ws = new WebSocket(`${protocol}://${location.host}/api/sessions/${encodeURIComponent(sessionId)}/live?npcId=${encodeURIComponent(npcId)}`);
   let ctx: AudioContext | null = null;
   let stream: MediaStream | null = null;
-  let output: GainNode | null = null;
-  const adjustVolume = () => { const { muted, speakers } = getAudioSettings(); if (output) output.gain.value = muted ? 0 : speakers; };
-  const unsubscribe = subscribeAudioSettings(adjustVolume);
   let ready = false, stopped = false, paused = false, speaking = false;
   let cursor = 0;
   const playing = new Set<AudioBufferSourceNode>();
@@ -65,7 +61,6 @@ export function startLiveVoice(sessionId: string, npcId: string, listener: (even
     stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
     if (stopped) { for (const track of stream.getTracks()) track.stop(); return; }
     ctx = new AudioContext();
-    output = ctx.createGain(); output.connect(ctx.destination); adjustVolume();
     await ctx.resume().catch(() => undefined);
     const source = ctx.createMediaStreamSource(stream);
     const rate = ctx.sampleRate;
@@ -90,7 +85,7 @@ export function startLiveVoice(sessionId: string, npcId: string, listener: (even
     const channel = buffer.getChannelData(0);
     for (let i = 0; i < samples.length; i++) channel[i] = samples[i]! / 32768;
     const node = ctx.createBufferSource();
-    node.buffer = buffer; node.connect(output ?? ctx.destination);
+    node.buffer = buffer; node.connect(ctx.destination);
     const start = Math.max(ctx.currentTime, cursor);
     node.start(start); cursor = start + buffer.duration;
     playing.add(node);
@@ -125,7 +120,7 @@ export function startLiveVoice(sessionId: string, npcId: string, listener: (even
         stopped = true; ws.close();
         if (stream) for (const track of stream.getTracks()) track.stop();
         setAudioActivity('idle');
-        const finish = () => { unsubscribe(); void ctx?.close().catch(() => undefined); listener({ kind: 'status', status: 'ended', reason }); };
+        const finish = () => { void ctx?.close().catch(() => undefined); listener({ kind: 'status', status: 'ended', reason }); };
         const cap = setTimeout(finish, 6_000);
         for (const node of playing) node.onended = () => { playing.delete(node); if (playing.size === 0) { clearTimeout(cap); finish(); } };
         break;
@@ -139,7 +134,6 @@ export function startLiveVoice(sessionId: string, npcId: string, listener: (even
   function stop() {
     if (stopped) return;
     stopped = true;
-    unsubscribe();
     flush();
     if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'stop' }));
     ws.close();

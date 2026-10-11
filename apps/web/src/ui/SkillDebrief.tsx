@@ -1,4 +1,3 @@
-import { Card } from './primitives';
 import type { SkillDebriefProps } from '@vibequest/shared';
 
 /** Only the server's terminal projection supplies evidence and recommendations. */
@@ -6,7 +5,7 @@ export function SkillDebrief({ state }: SkillDebriefProps) {
   if (state.status === 'active' || !state.debrief) return null;
   const { tracks, strengths, improvement, nextPracticeReason, evidenceSummary: summary } = state.debrief;
   return (
-    <Card asChild><section className="skill-debrief" style={{ fontSize: 14, lineHeight: 1.5, padding: 20 }} data-testid="skill-debrief" aria-label="Mission skill debrief">
+    <section className="skill-debrief" style={{ fontSize: 14, lineHeight: 1.5, padding: 20 }} data-testid="skill-debrief" aria-label="Mission skill debrief">
       <div>
         <h2>{state.status === 'cleared' ? 'Mission complete' : 'Practice after this attempt'}</h2>
         {state.validationMode && <p>Developer validation: simulated progress, no player achievement.</p>}
@@ -24,6 +23,6 @@ export function SkillDebrief({ state }: SkillDebriefProps) {
         <p>Listening: {summary.independentListening} independent, {summary.assistedListening} assisted decisions. Subtitles and validation do not count as independent listening.</p>
         <p>These practice estimates do not assess pronunciation or certify a language level.</p>
       </div>
-    </section></Card>
+    </section>
   );
 }

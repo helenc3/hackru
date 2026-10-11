@@ -26,13 +26,13 @@ test('journey music fades in, ducks throughout conversation, restores and mutes'
   const levels = () => page.evaluate(() => (window as unknown as { musicLevels: { value: number; seconds: number }[] }).musicLevels);
   // Unlock with a gesture that remains valid if the async label changes meanwhile.
   await page.keyboard.press('Shift');
-  await expect(page.getByRole('button', { name: 'Mute audio', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Mute music', exact: true })).toBeVisible();
   await expect.poll(async () => (await levels())[0]?.value).toBe(.24);
   expect((await levels())[0].seconds).toBeCloseTo(8, 1);
   await page.getByRole('button', { name: '小林 · Talk', exact: true }).click();
   await expect.poll(async () => (await levels()).at(-1)?.value).toBe(.045);
   await page.getByRole('button', { name: 'Close conversation', exact: true }).click();
   await expect.poll(async () => (await levels()).at(-1)?.value).toBe(.24);
-  await page.getByRole('button', { name: 'Mute audio', exact: true }).click();
+  await page.getByRole('button', { name: 'Mute music', exact: true }).click();
   await expect.poll(async () => (await levels()).at(-1)?.value).toBe(0);
 });

@@ -12,14 +12,13 @@ async function fakeAudio(page: Page) {
       sampleRate = 48_000; currentTime = 0; destination = {};
       audioWorklet = { addModule: async () => undefined };
       resume = async () => undefined; close = async () => undefined;
-      createGain() { return { gain: { value: 1 }, connect() { /* fake */ } }; }
       createMediaStreamSource() { return { connect() { /* fake */ } }; }
       createBuffer(_channels: number, length: number, rate: number) { return { duration: length / rate, getChannelData: () => new Float32Array(length) }; }
       createBufferSource() { return { buffer: null, onended: null as null | (() => void), connect() { /* fake */ }, start() { w.__scheduled++; }, stop() { w.__stopped++; } }; }
     }
     class FakeWorkletNode {
       port: { onmessage: ((event: { data: Float32Array }) => void) | null } = { onmessage: null };
-      constructor() { const emit = () => { if (!w.__capturePaused) this.port.onmessage?.({ data: new Float32Array(4800) }); setTimeout(emit, 100); }; setTimeout(emit, 20); }
+      constructor() { const emit = () => { this.port.onmessage?.({ data: new Float32Array(4800) }); setTimeout(emit, 100); }; setTimeout(emit, 20); }
     }
     (window as unknown as { AudioContext: unknown }).AudioContext = FakeContext;
     (window as unknown as { AudioWorkletNode: unknown }).AudioWorkletNode = FakeWorkletNode;
@@ -40,7 +39,6 @@ async function openPanel(page: Page) {
 
 test('live voice streams mic audio, renders transcripts, applies turns and honours interruptions', async ({ page }) => {
   await fakeAudio(page);
-  await page.addInitScript(() => { (window as unknown as Record<string, number>).__capturePaused = 1; });
   const urls: string[] = [];
   const binaryFrames: number[] = [];
   const texts: string[] = [];
@@ -66,12 +64,11 @@ test('live voice streams mic audio, renders transcripts, applies turns and honou
   await expect(status).toHaveAttribute('data-status', /^(live|npc-speaking)$/);
   expect(urls[0]).toMatch(/^ws:\/\/[^/]+\/api\/sessions\/ui-player-P1\/live\?npcId=xiaolin$/);
   expect(await counter(page, '__gum')).toBe(1);
-  await page.evaluate(() => { (window as unknown as Record<string, number>).__capturePaused = 0; });
   await expect(panel.getByRole('button', { name: 'Start recording' })).toHaveCount(0);
   await expect(panel.getByTestId('npc-reply')).toHaveText('一杯茶十元。');
   await expect(panel.locator('.bubble.player')).toHaveText('我要一杯茶。');
   expect(binaryFrames[0]).toBeGreaterThanOrEqual(1280); // ≥ one 40 ms PCM16 frame at 16 kHz
-  await expect(page.getByTestId('quest-panel').locator('.current-goal')).toHaveAttribute('data-completed-objectives', '1');
+  await expect(page.getByTestId('quest-panel').locator('li[data-complete="true"]')).toHaveCount(1);
   await expect(page.getByLabel('Mission updates')).toContainText('Order placed.');
   await expect(panel.getByTestId('live-coach')).toContainText('Say the price back to confirm.');
   await expect(panel.getByTestId('live-coach').locator('.mandarin-chip')).toHaveText('茶十元。');

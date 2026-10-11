@@ -1,7 +1,5 @@
-import { Button } from '../ui/primitives';
 import { useEffect, useRef, useState } from 'react';
 import type { AudioControllerProps } from '@vibequest/shared';
-import { useAudioSettings } from './audio-settings';
 import { fetchCuePlayback, fetchSpeech, setAudioActivity, setInterrupt, useAudioActivity } from './audio-bus';
 
 /** PA tracks carry the earliest time the server accepts finishCue for them. */
@@ -10,8 +8,7 @@ type Track = { kind: 'speech'; id: string; url: string } | { kind: 'pa'; id: str
 /** One playback lane for NPC replies and PA. Playback never changes quest state by itself. */
 export function AudioController({ state, onAction, speechId }: AudioControllerProps) {
   const element = useRef<HTMLAudioElement | null>(null);
-  const { muted, speakers } = useAudioSettings();
-  const levels = useRef({ muted, speakers });
+  const [muted, setMuted] = useState(false);
   const [status, setStatus] = useState('Audio ready');
   const [failed, setFailed] = useState<string | null>(null);
   const [blockedTrack, setBlockedTrack] = useState<Track | null>(null);
@@ -69,8 +66,7 @@ export function AudioController({ state, onAction, speechId }: AudioControllerPr
     const player = audio();
     playing.current = track; last.current = track;
     setAudioActivity(track.kind === 'speech' ? 'playing' : 'announcing'); setFailed(null); setBlockedTrack(null);
-    player.muted = levels.current.muted;
-    player.volume = levels.current.speakers;
+    player.muted = muted;
     player.src = track.url;
     player.onended = () => { setStatus('Audio ready'); settle(track, true, report); };
     player.onerror = () => { setFailed(track.id); setStatus('Audio playback failed. Retry or read the reply.'); settle(track, false, report); };
@@ -127,17 +123,18 @@ export function AudioController({ state, onAction, speechId }: AudioControllerPr
     element.current?.pause();
     playing.current = null; last.current = null; setAudioActivity('idle');
   }, [attempt]);
-  useEffect(() => { levels.current = { muted, speakers }; if (element.current) { element.current.muted = muted; element.current.volume = speakers; } }, [muted, speakers]);
+  useEffect(() => { if (element.current) element.current.muted = muted; }, [muted]);
 
   const busy = (activity === 'playing' || activity === 'announcing') && Boolean(playing.current);
   return (
     <div className="audio-status" data-testid="audio-controller" role="group" aria-label="Audio controls">
       <span aria-hidden="true">♫</span>
       <span role="status">{status}</span>
-      {blockedTrack && <Button type="button" className="button secondary" onClick={() => { const track = blockedTrack; setBlockedTrack(null); void audio().play().catch(() => settle(track, false, true)); setStatus('Playing reply…'); }}>Play</Button>}
-      <Button type="button" className="button secondary" disabled={!busy} onClick={() => stop()}>Stop</Button>
-      <Button type="button" className="button secondary" disabled={busy || !last.current} onClick={() => { if (last.current) void play(last.current, true); }}>Replay</Button>
-      {failed && speechId === failed && <Button type="button" className="button secondary" onClick={() => { setFailed(null); if (last.current?.id === failed) void play(last.current, true); else setRefetch((count) => count + 1); }}>Retry audio</Button>}
+      {blockedTrack && <button type="button" className="button secondary" onClick={() => { const track = blockedTrack; setBlockedTrack(null); void audio().play().catch(() => settle(track, false, true)); setStatus('Playing reply…'); }}>Play</button>}
+      <button type="button" className="button secondary" aria-pressed={muted} onClick={() => setMuted((value) => !value)}>{muted ? 'Unmute' : 'Mute'}</button>
+      <button type="button" className="button secondary" disabled={!busy} onClick={() => stop()}>Stop</button>
+      <button type="button" className="button secondary" disabled={busy || !last.current} onClick={() => { if (last.current) void play(last.current, true); }}>Replay</button>
+      {failed && speechId === failed && <button type="button" className="button secondary" onClick={() => { setFailed(null); if (last.current?.id === failed) void play(last.current, true); else setRefetch((count) => count + 1); }}>Retry audio</button>}
     </div>
   );
 }

@@ -1,14 +1,15 @@
-// Live Gemini acceptance smoke: one practice and one boss structured-output call.
+// Live dialogue acceptance smoke: one practice and one boss structured-output call against
+// whichever text model the server would pick (Claude when ANTHROPIC_API_KEY is set, else Gemini).
 // Run: node --env-file-if-exists=.env --import tsx scripts/smoke-gemini.ts
 // Prints only classification results; never the key or raw response.
 import { baselineTurnContext, type TurnContext } from '@vibequest/shared';
-import { meetsProgressionGate } from '../apps/server/src/providers/gemini/gate.js';
-import { createGeminiDialogueProvider } from '../apps/server/src/providers/gemini/live.js';
+import { loadConfig } from '../apps/server/src/config.js';
+import { createDialogueProvider, meetsProgressionGate } from '../apps/server/src/providers/dialogue.js';
 
-const apiKey = process.env.GEMINI_API_KEY?.trim();
-const model = process.env.GEMINI_MODEL?.trim() || 'gemini-3.8-flash';
-if (!apiKey) {
-  console.error('GEMINI_API_KEY is not set; live smoke cannot run.');
+const config = loadConfig();
+const model = config.anthropicApiKey ? `claude ${config.anthropicModel}` : config.geminiApiKey ? `gemini ${config.geminiModel}` : undefined;
+if (!model) {
+  console.error('Neither ANTHROPIC_API_KEY nor GEMINI_API_KEY is set; live smoke cannot run.');
   process.exit(2);
 }
 
@@ -21,7 +22,7 @@ const cases = [
   { label: 'boss B1 laozhou', context: bossContext, text: '我要一张去海港的票。', intent: 'buy_ticket' },
 ] as const;
 
-const provider = createGeminiDialogueProvider({ apiKey, model });
+const provider = createDialogueProvider(config);
 let failed = false;
 console.log(`model=${model}`);
 for (const { label, context, text, intent } of cases) {

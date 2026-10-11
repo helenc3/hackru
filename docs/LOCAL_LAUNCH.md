@@ -13,7 +13,7 @@ npm run dev
 
 Open `http://127.0.0.1:5173`. The development API runs at port 3001; keep `PORT=3001` for the Vite proxy. The root `npm run dev` waits for API health before starting Vite, with a 30-second startup timeout. Both processes stop together. Vite reads the root `.env`; only `VITE_` names reach the browser. Never prefix a secret with `VITE_`.
 
-Without keys the game still starts: fixture sessions (with `ENABLE_DEMO_FIXTURES=true`) play the full campaign with scripted, clearly labelled replies, and live sessions report a retryable provider outage without committing the turn. With `GEMINI_API_KEY` and `ELEVENLABS_API_KEY` set, the player loop is microphone → ElevenLabs STT → transcript confirmation → Gemini → ElevenLabs reply speech. `/api/health` reports `dialogue`/`speech` as `live` when a key is present; that means configured, not that a provider was contacted.
+Without keys the game still starts: fixture sessions (with `ENABLE_DEMO_FIXTURES=true`) play the full campaign with scripted, clearly labelled replies, and live sessions report a retryable provider outage without committing the turn. With `GEMINI_API_KEY` and `ELEVENLABS_API_KEY` set, the player loop is microphone → ElevenLabs STT → transcript confirmation → Gemini → ElevenLabs reply speech. With `ANTHROPIC_API_KEY` also set, the text dialogue evaluation runs on Claude (`ANTHROPIC_MODEL`) instead of Gemini; the real-time voice relay stays on Gemini Live. `/api/health` reports `dialogue`/`speech` as `live` when a key is present; that means configured, not that a provider was contacted.
 
 ## Production preview
 

@@ -1,7 +1,7 @@
 # Approved Mandarin voices
 
 These nine ElevenLabs voices were judged accurate by the requesting human after
-listening to the 20-voice comparison in [audio_test](../audio_test/README.md).
+listening to a 20-voice comparison.
 This is the approved voice list for future character assignments. Use exact voice
 IDs; similarly named voices are not interchangeable. In particular, Anna Su's
 “Casual, Friendly and Bright” voice (`9lHjugDhwqoxA5MhX0az`) was explicitly
@@ -40,10 +40,8 @@ comparison were tested but were not included in the approved list.
 The human listened to all 120 samples: 20 Chinese-labeled voices, two authored
 lines, and three representations (1: Hanzi; 2: tone-marked pinyin; 3: IPA).
 The source lines were `b1.harbor-change.tier-1` and `p2.platform-change.tier-2`.
-Exact inputs, voice metadata, and generated-file hashes are recorded in
-[inputs.json](../audio_test/inputs.json), [voices.json](../audio_test/voices.json),
-and [manifest.json](../audio_test/manifest.json). Catalog accent labels above are
-provider metadata; inclusion in this table reflects the human's listening judgment.
+Catalog accent labels above are provider metadata; inclusion in this table
+reflects the human's listening judgment.
 
 ## Current assignments
 
@@ -56,8 +54,6 @@ provider metadata; inclusion in this table reflects the human's listening judgme
 | Historical station PA clips (1.2) | Adrian — Chinese Mandarin Narration | `agczkAUlHLowaNnL72Cc` |
 
 Source of truth: `characterDescriptions` in `packages/shared/src/content/index.ts`. The player avatar uses the microphone or typed input and has no synthetic voice. Live NPCs use `eleven_v4_turbo`; the prerecorded setup clip uses `eleven_v4`.
-
-Historical IPA samples remain in `audio_test` as evidence of the rejected experiment.
 
 ## Streamed city character identities
 

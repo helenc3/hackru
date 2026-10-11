@@ -30,7 +30,6 @@ scripts/             wait-for-api.js (used by npm run dev), generate-music.py
 docs/                Launch guide, quests, city generation, approved voices, asset attribution
 proposals/           Interface change records that amended the contracts
 segments/, .build/   Historical Spec 1.2 build packets and completion records
-audio_test/          Historical ElevenLabs voice comparison and latency experiments
 ```
 
 `_prototype/` (untracked, gitignored) is the original hackathon prototype and is not used by the app. npm package names still use the pre-rename scope `@vibequest/{web,server,shared}`.
@@ -61,4 +60,4 @@ While iterating, run only the specs that cover your change (`npx vitest run <fil
 
 ## Historical documents
 
-The repository was built as numbered segments by a four-person team under a Spec 1.2 station campaign, then replaced by the Spec 2.0 streamed-city quests (Segment-010). [SEGMENT_REGISTRY.md](SEGMENT_REGISTRY.md), [BUILD_PROTOCOL.md](BUILD_PROTOCOL.md), [CONTRACT_FREEZE.md](CONTRACT_FREEZE.md), `segments/`, `.build/`, [docs/INTEGRATION_REPORT.md](docs/INTEGRATION_REPORT.md) and `audio_test/` are kept as that history; `python3 validate_kit.py` still checks their links.
+The repository was built as numbered segments by a four-person team under a Spec 1.2 station campaign, then replaced by the Spec 2.0 streamed-city quests (Segment-010). [SEGMENT_REGISTRY.md](SEGMENT_REGISTRY.md), [BUILD_PROTOCOL.md](BUILD_PROTOCOL.md), [CONTRACT_FREEZE.md](CONTRACT_FREEZE.md), `segments/`, `.build/`, and [docs/INTEGRATION_REPORT.md](docs/INTEGRATION_REPORT.md) are kept as that history; `python3 validate_kit.py` still checks their links.

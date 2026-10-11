@@ -3,7 +3,7 @@ import tseslint from 'typescript-eslint';
 import globals from 'globals';
 import reactHooks from 'eslint-plugin-react-hooks';
 export default tseslint.config(
-  { ignores: ['**/dist/**', '**/node_modules/**', 'test-results/**', 'playwright-report/**', '_prototype/**', '.claude/**', '.impeccable/**', 'audio_test/**'] },
+  { ignores: ['**/dist/**', '**/node_modules/**', 'test-results/**', 'playwright-report/**', '_prototype/**', '.claude/**', '.impeccable/**'] },
   js.configs.recommended,
   ...tseslint.configs.recommended,
   { files: ['**/*.{ts,tsx,js}'], languageOptions: { globals: { ...globals.node, ...globals.browser } }, rules: { '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }] } },

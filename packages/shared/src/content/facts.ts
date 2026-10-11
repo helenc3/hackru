@@ -18,6 +18,9 @@ export const groundedReplies = {
   haigangUpdated: '去海港的车改到二号站台。',
   wrongPracticePlatform: '这趟车去机场。',
   clarification: '请再说一遍。',
+  farewell: '再见。',
+  farewellCafe: '好的，再见！',
+  farewellPaid: '谢谢，慢走！',
 } as const;
 
 /** Practice-only: non-Mandarin or unclear input gets the target phrase for the current node instead of a reaction. */

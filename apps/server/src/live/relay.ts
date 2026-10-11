@@ -25,6 +25,7 @@ export interface Bridge { onLiveMessage(message: LiveServerMessage): void; onCli
 
 const MAX_SESSION_MS = 10 * 60_000;
 const REPLY_WAIT_MS = 8_000;
+const FAREWELL_WAIT_MS = 4_000;
 
 /** Pure message bridge: Gemini Live frames in, protocol events out, one engine turn per finished utterance. */
 export function createLiveBridge(options: {
@@ -53,12 +54,26 @@ export function createLiveBridge(options: {
     options.turn(text, spokenReply).then((turn) => {
       if (closed) return;
       options.send({ type: 'turn', turn });
+      if (turn.conversationEnded) {
+        // Let the spoken goodbye finish (next completed model turn), else cap. ponytail: a goodbye already completed before the engine answered waits out the cap.
+        const timer = setTimeout(() => close('farewell'), FAREWELL_WAIT_MS);
+        waiters.push(() => { clearTimeout(timer); close('farewell'); });
+        return;
+      }
       return Promise.resolve(options.note(turn)).then((note) => { if (note && !closed) options.live.sendNote(note); });
     }).catch((error: unknown) => {
       if (closed) return;
       const known = error instanceof EngineRuleError ? { code: error.code, message: error.message, retryable: false } : error instanceof HttpError ? { code: error.code, message: error.message, retryable: error.retryable } : { code: 'TURN_FAILED', message: 'The turn could not be evaluated.', retryable: true };
       options.send({ type: 'error', ...known });
     });
+  }
+
+  function close(reason: string) {
+    if (closed) return;
+    closed = true;
+    completeOutput('');
+    options.send({ type: 'closed', reason });
+    options.live.close();
   }
 
   return {
@@ -89,15 +104,9 @@ export function createLiveBridge(options: {
     onClientText(raw) {
       let parsed: unknown;
       try { parsed = JSON.parse(raw); } catch { return; }
-      if ((parsed as { type?: unknown } | null)?.type === 'stop') this.close('stop');
+      if ((parsed as { type?: unknown } | null)?.type === 'stop') close('stop');
     },
-    close(reason) {
-      if (closed) return;
-      closed = true;
-      completeOutput('');
-      options.send({ type: 'closed', reason });
-      options.live.close();
-    },
+    close,
   };
 }
 

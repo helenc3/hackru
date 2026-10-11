@@ -111,3 +111,23 @@ test('a 4xxx close falls back to the batch recorder without opening the mic', as
   await expect(panel.getByTestId('live-status')).toHaveCount(0);
   expect(await counter(page, '__gum')).toBe(0);
 });
+
+test('a farewell turn followed by the server closing ends the conversation', async ({ page }) => {
+  await fakeAudio(page);
+  await page.routeWebSocket(/\/api\/sessions\/[^/]+\/live/, (ws) => {
+    ws.send(JSON.stringify({ type: 'ready', npcId: 'xiaolin', sampleRate: 24000 }));
+    let sent = false;
+    ws.onMessage((message) => {
+      if (typeof message === 'string' || sent) return;
+      sent = true;
+      ws.send(JSON.stringify({ type: 'playerTranscript', text: '再见。', final: true }));
+      ws.send(JSON.stringify({ type: 'npcTranscript', text: '好的，再见！', final: true }));
+      ws.send(JSON.stringify({ type: 'turn', turn: TurnResponseSchema.parse({ turnId: 'live-bye', state: PublicStateSchema.parse({ ...liveState(), version: 1 }), events: [], npcReply: '好的，再见！', conversationEnded: true }) }));
+      setTimeout(() => ws.send(JSON.stringify({ type: 'closed', reason: 'farewell' })), 300);
+    });
+  });
+  const panel = await openPanel(page);
+  await expect(panel.getByTestId('npc-reply')).toContainText('好的，再见！');
+  await expect(page.getByTestId('dialogue-panel')).toHaveCount(0);
+  expect(await counter(page, '__trackStops')).toBe(1);
+});

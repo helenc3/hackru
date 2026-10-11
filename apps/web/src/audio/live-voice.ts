@@ -7,7 +7,7 @@ import { setAudioActivity } from './audio-bus';
  */
 export type LiveStatus = 'connecting' | 'live' | 'npc-speaking' | 'paused' | 'ended' | 'unavailable' | 'error';
 export type LiveEvent =
-  | { kind: 'status'; status: LiveStatus; message?: string; retryable?: boolean }
+  | { kind: 'status'; status: LiveStatus; message?: string; retryable?: boolean; reason?: string }
   | { kind: 'player' | 'npc'; text: string; final: boolean }
   | { kind: 'turn'; turn: TurnResponse };
 export type LiveHandle = { stop(): void; pause(on: boolean): void };
@@ -113,7 +113,18 @@ export function startLiveVoice(sessionId: string, npcId: string, listener: (even
       case 'npcTranscript': emit({ kind: 'npc', text: String(message.text), final: Boolean(message.final) }); break;
       case 'turn': { const parsed = TurnResponseSchema.safeParse(message.turn); if (parsed.success) emit({ kind: 'turn', turn: parsed.data }); break; }
       case 'error': status('error', { message: String(message.message), retryable: Boolean(message.retryable) }); break;
-      case 'closed': stop(); status('ended'); break;
+      case 'closed': {
+        const reason = String(message.reason ?? '');
+        if (reason !== 'farewell' || playing.size === 0) { stop(); status('ended', { reason }); break; }
+        // A goodbye keeps its queued audio; mic and socket close now, the context after the last buffer ends (capped).
+        stopped = true; ws.close();
+        if (stream) for (const track of stream.getTracks()) track.stop();
+        setAudioActivity('idle');
+        const finish = () => { void ctx?.close().catch(() => undefined); listener({ kind: 'status', status: 'ended', reason }); };
+        const cap = setTimeout(finish, 6_000);
+        for (const node of playing) node.onended = () => { playing.delete(node); if (playing.size === 0) { clearTimeout(cap); finish(); } };
+        break;
+      }
       default: break;
     }
   };

@@ -290,6 +290,7 @@ export function groundedReply(state: InternalState, npcId: NpcId, evaluation: Tu
   if (offTarget(evaluation)) return state.mode === 'boss' ? groundedReplies.clarification : byNode(speakMandarinReplies);
   if (evaluation.intent === 'unknown') return state.mode === 'boss' ? groundedReplies.clarification : byNode(clarifyReplies);
   if (evaluation.intent === 'request_repeat') return [...state.npcState[npcId].history].reverse().find((entry) => entry.role === 'npc')?.text ?? groundedReplies.clarification;
+  if (evaluation.intent === 'farewell') return npcId !== 'xiaolin' ? groundedReplies.farewell : state.flags['p1.receipt'] ? groundedReplies.farewellPaid : groundedReplies.farewellCafe;
   if (state.missionId === 'P1') {
     if (evaluation.intent === 'cancel_order') return '好的。请重新选择茶或水并确认价格，再去售货亭。';
     if (['order_drink', 'accept_substitute', 'confirm_drink_price'].includes(evaluation.intent)) {
@@ -340,8 +341,11 @@ export function applyEvaluation(state: InternalState, npcId: NpcId, raw: TurnEva
       if (!missingDetail && next.missionId === 'B1' && evaluation.intent === 'buy_ticket') evidence(next, 'reading', 0, 'b1.destination-board', next.pendingTurn!.assisted);
     }
   }
+  // Saying goodbye at the counter pays: the same transition and guards as the pay choice, so an unconfirmed price stays unpaid.
+  const conversationEnded = evaluation.intent === 'farewell' && successful ? true : undefined;
+  if (conversationEnded && next.nodeId === 'p1.receipt') transition(next, { type: 'choose', choiceId: 'p1.pay-cafe' }, result.events);
   // A miss in practice surfaces the node's vocabulary once, recorded like a used hint (assisted) without spending one.
-  if (!transitioned && next.mode === 'practice' && !['greeting', 'request_repeat'].includes(evaluation.intent) && Number(next.flags[`${next.nodeId}-hint-level`] ?? 0) < 2) {
+  if (!transitioned && next.mode === 'practice' && !['greeting', 'request_repeat', 'farewell'].includes(evaluation.intent) && Number(next.flags[`${next.nodeId}-hint-level`] ?? 0) < 2) {
     const hint = missionFor(next.missionId).hints.find((entry) => entry.nodeId === next.nodeId && entry.level === 2);
     if (hint) {
       next.flags[`${next.nodeId}-hint-level`] = 2; next.flags['session.assisted'] = true;
@@ -365,7 +369,7 @@ export function applyEvaluation(state: InternalState, npcId: NpcId, raw: TurnEva
   const reply = groundedReply(next, npcId, evaluation);
   npc.history.push({ role: 'player', text: next.pendingTurn!.text }, { role: 'npc', text: reply });
   npc.history = npc.history.slice(-12);
-  return { state: InternalStateSchema.parse(next), events: result.events };
+  return { state: InternalStateSchema.parse(next), events: result.events, ...(conversationEnded ? { conversationEnded } : {}) };
 }
 export function projectPublicState(state: InternalState, nowMs: number): PublicState {
   const next = synchronizeGame(state, nowMs).state;

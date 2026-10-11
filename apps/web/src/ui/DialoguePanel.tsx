@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { NpcIdSchema, type GameAction, type PublicState, type RendererProps, type TurnRequest, type TurnResponse } from '@vibequest/shared';
 import { Recorder } from '../audio/Recorder';
-import { finishConfirmation } from '../audio/audio-bus';
+import { finishConfirmation, useAudioActivity } from '../audio/audio-bus';
 import { startLiveVoice, type LiveStatus } from '../audio/live-voice';
 import '../audio/live.css';
 import { CoachPanel } from './CoachPanel';
@@ -30,6 +30,12 @@ export function DialoguePanel({ state, npcId, pending, turn, choices = [], onAct
   const liveEligible = Boolean(onLiveTurn) && state.mode === 'practice' && state.providerStatus === 'live' && state.inputPreference === 'voice' && state.status === 'active';
   const liveActive = live !== null && !['unavailable', 'ended'].includes(live.status);
   const pauseRef = useRef<((on: boolean) => void) | null>(null);
+  // A goodbye turn closes the panel once its reply has played (live: when the server closes), capped so it never hangs.
+  const [closing, setClosing] = useState(false);
+  const activity = useAudioActivity();
+  const played = useRef(false);
+  useEffect(() => { if (!closing) return; const cap = setTimeout(onClose, 6_000); return () => clearTimeout(cap); }, [closing, onClose]);
+  useEffect(() => { if (!closing) return; if (activity === 'playing') played.current = true; else if (played.current) onClose(); }, [closing, activity, onClose]);
   useEffect(() => {
     if (!liveEligible) { setLive(null); return; }
     setLive({ status: 'connecting' }); setPartial({ player: '', npc: '' });
@@ -37,10 +43,12 @@ export function DialoguePanel({ state, npcId, pending, turn, choices = [], onAct
       if (event.kind === 'status') {
         // A failed evaluation is a notice in the thread; the mic keeps listening. Connection problems replace the status row.
         if (event.status === 'error' && event.retryable) { setThread((lines) => [...lines, { role: 'notice', text: event.message ?? 'That turn could not be evaluated. Say it again.' }]); return; }
+        if (event.status === 'ended' && event.reason === 'farewell') { onClose(); return; }
         setLive({ status: event.status, message: event.message, retryable: event.retryable }); return;
       }
       if (event.kind === 'turn') {
         onLiveTurn?.(npc, event.turn);
+        if (event.turn.conversationEnded) setClosing(true);
         // Practice only (live mode never runs in boss): coaching and penalties stay visible in the thread.
         const extra: Line[] = [...(event.turn.feedback ? [{ role: 'coach', feedback: event.turn.feedback } as Line] : []), ...event.turn.events.map((item) => ({ role: 'notice', text: item.message } as Line))];
         if (extra.length) setThread((lines) => [...lines, ...extra]);
@@ -59,6 +67,7 @@ export function DialoguePanel({ state, npcId, pending, turn, choices = [], onAct
     if (!turn?.turnId || liveActive) return; // live turns already carry their transcripts into the thread
     setThread((lines) => [...lines, ...(outgoing ? [{ role: 'player', text: outgoing } as Line] : []), { role: 'npc', text: turn.npcReply }]);
     setOutgoing(null); setDraft(''); setTranscription(null); setCountdown(null);
+    if (turn.conversationEnded) { if (turn.speechId) setClosing(true); else onClose(); }
   }, [turn?.turnId]); // outgoing is read once per new turn; liveActive is read at turn time
   useEffect(() => {
     const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;

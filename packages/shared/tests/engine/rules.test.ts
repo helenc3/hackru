@@ -109,6 +109,24 @@ describe('mission graph and authoritative rules', () => {
     expect((await evaluated(state, '好的')).flags['p1.price-confirmed']).toBe(true);
     expect((await evaluated(state, '茶九元')).flags['p1.price-confirmed']).toBe(false);
   });
+  it('farewell pays at the counter once the price is confirmed, ends the conversation, and is inert elsewhere and in the boss', async () => {
+    let state = fresh('P1'); state.nodeId = 'p1.order'; state.zoneId = 'cafe'; state.position = { x: -10, z: 4 };
+    const early = applyEvaluation(reservation(state, '再见'), 'xiaolin', await createFixtureDialogueProvider().evaluate(dialogueContext(state, 'xiaolin'), '再见'), 0);
+    expect(early.conversationEnded).toBe(true); expect(early.state.nodeId).toBe('p1.order'); expect(early.events).toEqual([]);
+    expect(early.state.npcState.xiaolin.history.at(-1)?.text).toBe(groundedReplies.farewellCafe);
+    state = await evaluated(state, '我要茶'); state.pendingTurn = null;
+    const unpaid = applyEvaluation(reservation(state, '拜拜'), 'xiaolin', await createFixtureDialogueProvider().evaluate(dialogueContext(state, 'xiaolin'), '拜拜'), 0);
+    expect(unpaid.conversationEnded).toBe(true); expect(unpaid.state.nodeId).toBe('p1.receipt'); expect(unpaid.state.flags['p1.receipt']).toBeUndefined();
+    state = await evaluated(state, '茶十元'); state.pendingTurn = null; expect(state.flags['p1.price-confirmed']).toBe(true);
+    const paid = applyEvaluation(reservation(state, '谢谢，再见。'), 'xiaolin', await createFixtureDialogueProvider().evaluate(dialogueContext(state, 'xiaolin'), '谢谢，再见。'), 0);
+    expect(paid.conversationEnded).toBe(true); expect(paid.state.nodeId).toBe('p1.station-arrival'); expect(paid.state.flags['p1.receipt']).toBe(true);
+    expect(paid.state.npcState.xiaolin.history.at(-1)?.text).toBe(groundedReplies.farewellPaid); expect(paid.state.xp).toBe(0);
+    expect(() => applyAction({ ...paid.state, pendingTurn: null }, { type: 'choose', choiceId: 'p1.pay-cafe' }, 0)).toThrow();
+    const boss = fresh('B1'); boss.zoneId = 'concourse';
+    const bossTurn = applyEvaluation(reservation(boss, '再见', 'laozhou'), 'laozhou', await createFixtureDialogueProvider().evaluate(dialogueContext(boss, 'laozhou'), '再见'), 0);
+    expect(bossTurn.conversationEnded).toBe(true); expect(bossTurn.state.nodeId).toBe(boss.nodeId); expect(bossTurn.state.status).toBe('active'); expect(bossTurn.events).toEqual([]);
+    expect(bossTurn.state.npcState.laozhou.history.at(-1)?.text).toBe(groundedReplies.farewell);
+  });
   it('penalizes English or unclear input in practice without acting on it, and floors XP at zero', () => {
     const state = fresh('P1'); state.nodeId = 'p1.order'; state.zoneId = 'cafe'; state.position = { x: -10, z: 4 }; state.xp = 7;
     const english: TurnEvaluation = { intent: 'order_drink', slots: [{ key: 'drink', value: 'tea' }], evidenceQuote: 'tea', intentGrade: { score: 1, confidence: 1 }, clarity: 1, courtesy: 1, targetLanguageUse: 'no', interaction: 'relevant', replyZh: '好的，一杯茶。', coach: { understood: 'tea', explanation: 'Say it in Mandarin.', improvedExample: '我要一杯茶。' } };

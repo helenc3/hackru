@@ -3,6 +3,9 @@ import { TurnEvaluationSchema, type DialogueProvider, type Intent, type Slot } f
 /** Only documented fixture utterances; never a general language interpreter. */
 const examples: Record<string, { intent: Intent; slots: Slot[] }> = {
   '你好': { intent: 'greeting', slots: [] },
+  '再见': { intent: 'farewell', slots: [] },
+  '拜拜': { intent: 'farewell', slots: [] },
+  '谢谢再见': { intent: 'farewell', slots: [] },
   '我要咖啡': { intent: 'order_drink', slots: [{ key: 'drink', value: 'coffee' }] },
   '请给我一杯咖啡': { intent: 'order_drink', slots: [{ key: 'drink', value: 'coffee' }] },
   '我要茶': { intent: 'order_drink', slots: [{ key: 'drink', value: 'tea' }] },

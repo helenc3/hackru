@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-type Health = { buildId: string; providers: { geminiConfigured: boolean; elevenlabsConfigured: boolean }; features: { fixtures: boolean; validationHarness: boolean }; segments?: { engine?: string } };
+type Health = { buildId: string; providers: { geminiConfigured: boolean; elevenlabsConfigured: boolean }; features: { fixtures: boolean; validationHarness: boolean } };
 
 export function useApiHealth() {
   const [health, setHealth] = useState<Health | null>(null);

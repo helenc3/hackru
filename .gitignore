@@ -34,3 +34,4 @@ test-results/
 playwright-report/
 coverage/
 __pycache__/
+graphify-out/

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { baselineEvaluation, baselineTurnContext, type TurnContext, type TurnEvaluation } from '@vibequest/shared';
-import { clarificationEvaluation, meetsProgressionGate } from '../../../src/providers/gemini/gate.js';
+import { clarificationEvaluation } from '../../../src/providers/gemini/gate.js';
 import { ApiError } from '@google/genai';
 import { createGeminiDialogueProvider, thinkingConfigFor, type GenerateRequest } from '../../../src/providers/gemini/live.js';
 
@@ -94,23 +94,8 @@ describe('live Gemini dialogue provider', () => {
   });
 });
 
-describe('progression gate', () => {
-  it('passes confident relevant Mandarin and mixed input', () => {
-    expect(meetsProgressionGate(baselineEvaluation)).toBe(true);
-    expect(meetsProgressionGate({ ...baselineEvaluation, targetLanguageUse: 'mixed' })).toBe(true);
-  });
-  it.each([
-    ['English-only', { targetLanguageUse: 'no' }],
-    ['low score', { intentGrade: { score: 0.69, confidence: 0.9 } }],
-    ['low confidence', { intentGrade: { score: 0.9, confidence: 0.74 } }],
-    ['no evidence', { evidenceQuote: '' }],
-    ['insult', { interaction: 'insult' }],
-    ['greeting', { intent: 'greeting', slots: [] }],
-  ] as const)('blocks %s', (_label, change) => {
-    expect(meetsProgressionGate({ ...baselineEvaluation, ...change } as TurnEvaluation)).toBe(false);
-  });
-  it('clarification evaluations never progress and model the role phrase', () => {
-    expect(meetsProgressionGate(clarificationEvaluation(baselineTurnContext))).toBe(false);
+describe('clarification evaluation', () => {
+  it('models the role phrase and keeps coaching', () => {
     expect(clarificationEvaluation(guideContext).coach?.improvedExample).toBe('请问，去上海大酒店怎么走？');
     expect(clarificationEvaluation(baselineTurnContext).coach).not.toBeNull();
   });

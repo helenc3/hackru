@@ -77,6 +77,8 @@ test('nothing records at load; a recording becomes a transcript that only Send s
   expect(new Set(phases(api).map((action) => action.operationId)).size).toBe(1);
   expect(api.requests.some((request) => request.path.endsWith('/turns'))).toBe(false);
   await panel.getByRole('button', { name: 'Send Mandarin' }).click();
+  // The opener bubble already satisfies npc-reply; wait for the turn request itself.
+  await expect.poll(() => api.requests.some((request) => request.path.endsWith('/turns'))).toBe(true);
   await expect(panel.getByTestId('npc-reply')).toBeVisible();
   expect(phases(api).map((action) => action.phase)).toEqual(['recording', 'transcribing', 'confirming', 'idle']);
   const turnIndex = api.requests.findIndex((request) => request.path.endsWith('/turns'));

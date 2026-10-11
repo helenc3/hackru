@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { AudioControllerProps } from '@vibequest/shared';
-import { fetchSpeech, setAudioActivity, setInterrupt, useAudioActivity } from './audio-bus';
+import { fetchSpeech, setAudioActivity, setBlockedPlay, setInterrupt, useAudioActivity } from './audio-bus';
 
 type Track = { id: string; url: string };
 
@@ -29,7 +29,10 @@ export function AudioController({ state, onAction, speechId }: AudioControllerPr
     if (playing.current !== track) return Promise.resolve();
     playing.current = null;
     setAudioActivity('idle');
-    return report ? onAction({ type: 'audioPhase', operationId: track.id, phase: 'idle' }).then(() => undefined, () => undefined) : Promise.resolve();
+    if (!report) return Promise.resolve();
+    const idle = () => onAction({ type: 'audioPhase', operationId: track.id, phase: 'idle' });
+    // One retry: a lost idle leaves the server's playback operation open and the next recording refused.
+    return idle().catch(() => new Promise((resolve) => setTimeout(resolve, 1_000)).then(idle)).then(() => undefined, () => undefined);
   }
 
   async function play(track: Track, replay = false) {
@@ -44,6 +47,7 @@ export function AudioController({ state, onAction, speechId }: AudioControllerPr
     if (token !== scope.current) return;
     if (report) announced.current.add(track.id);
     const player = audio();
+    if (last.current && last.current.url !== track.url) URL.revokeObjectURL(last.current.url); // one blob per reply, not per session
     playing.current = track; last.current = track;
     setAudioActivity('playing'); setFailed(null); setBlockedTrack(null);
     player.muted = muted;
@@ -68,6 +72,9 @@ export function AudioController({ state, onAction, speechId }: AudioControllerPr
   }
   // The recorder barges in through the bus; re-register each render so stop() sees current props.
   useEffect(() => { setInterrupt(stop); return () => setInterrupt(null); });
+  const playBlocked = blockedTrack ? () => { const track = blockedTrack; setBlockedTrack(null); void audio().play().catch(() => settle(track, true)); setStatus('Playing reply…'); } : null;
+  // The settings popover is usually closed, so the dialogue offers the same Play control.
+  useEffect(() => { setBlockedPlay(playBlocked); return () => setBlockedPlay(null); });
 
   // New NPC reply: wait for the server's speech job, then play it once.
   useEffect(() => {
@@ -88,7 +95,7 @@ export function AudioController({ state, onAction, speechId }: AudioControllerPr
   useEffect(() => () => {
     scope.current++;
     element.current?.pause();
-    playing.current = null; last.current = null; setAudioActivity('idle');
+    playing.current = null; if (last.current) URL.revokeObjectURL(last.current.url); last.current = null; setAudioActivity('idle');
   }, [attempt]);
   useEffect(() => { if (element.current) element.current.muted = muted; }, [muted]);
 
@@ -97,7 +104,7 @@ export function AudioController({ state, onAction, speechId }: AudioControllerPr
     <div className="audio-status" data-testid="audio-controller" role="group" aria-label="Audio controls">
       <span aria-hidden="true">♫</span>
       <span role="status">{status}</span>
-      {blockedTrack && <button type="button" className="button secondary" onClick={() => { const track = blockedTrack; setBlockedTrack(null); void audio().play().catch(() => settle(track, true)); setStatus('Playing reply…'); }}>Play</button>}
+      {playBlocked && <button type="button" className="button secondary" onClick={playBlocked}>Play</button>}
       <button type="button" className="button secondary" aria-pressed={muted} onClick={() => setMuted((value) => !value)}>{muted ? 'Unmute' : 'Mute'}</button>
       <button type="button" className="button secondary" disabled={!busy} onClick={() => stop()}>Stop</button>
       <button type="button" className="button secondary" disabled={busy || !last.current} onClick={() => { if (last.current) void play(last.current, true); }}>Replay</button>

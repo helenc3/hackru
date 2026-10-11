@@ -41,7 +41,14 @@ export function App() {
   const [results, setResults] = useState<Partial<Record<MissionId, PublicState>>>({});
   const [resultsClosed, setResultsClosed] = useState(false);
   const [review, setReview] = useState<MissionId | null>(null);
-  useEffect(() => { try { setResults(resultsKey ? JSON.parse(localStorage.getItem(resultsKey) ?? '{}') : {}); } catch { setResults({}); } }, [resultsKey]);
+  const validationSession = session.state?.validationMode ?? false;
+  useEffect(() => {
+    try {
+      // Earlier player sessions' results are unreachable once a new one starts; validation sessions leave the player's alone.
+      if (resultsKey && !validationSession) for (const key of Object.keys(localStorage)) if (key.startsWith('vibequest.mission-results.v1:') && key !== resultsKey) localStorage.removeItem(key);
+      setResults(resultsKey ? JSON.parse(localStorage.getItem(resultsKey) ?? '{}') : {});
+    } catch { setResults({}); }
+  }, [resultsKey, validationSession]);
   useEffect(() => {
     const terminal = session.state;
     if (!terminal || terminal.status === 'active' || !resultsKey) return;

@@ -62,6 +62,7 @@ export function startLiveVoice(sessionId: string, npcId: string, anchorId: strin
     if (stopped) { for (const track of stream.getTracks()) track.stop(); return; }
     ctx = new AudioContext();
     await ctx.resume().catch(() => undefined);
+    if (ctx.state === 'suspended') throw new Error('audio-blocked'); // autoplay policy: no gesture yet, so nothing would be heard or captured
     const source = ctx.createMediaStreamSource(stream);
     const rate = ctx.sampleRate;
     if (ctx.audioWorklet) {
@@ -75,6 +76,7 @@ export function startLiveVoice(sessionId: string, npcId: string, anchorId: strin
       node.onaudioprocess = (event) => pushCapture(event.inputBuffer.getChannelData(0).slice(), rate);
       source.connect(node); node.connect(ctx.destination);
     }
+    if (stopped) { void ctx.close().catch(() => undefined); return; }
     setAudioActivity('recording');
     status('live');
   }
@@ -104,8 +106,10 @@ export function startLiveVoice(sessionId: string, npcId: string, anchorId: strin
     const message = JSON.parse(event.data) as { type: string; [key: string]: unknown };
     switch (message.type) {
       case 'ready': ready = true; sampleRate = Number(message.sampleRate) || 24_000; void openMic().catch((error: unknown) => {
+        if (stopped) return; // disposed while opening: a newer instance owns the status now
         const denied = error instanceof DOMException && (error.name === 'NotAllowedError' || error.name === 'SecurityError');
-        stop(); status('unavailable', { message: denied ? 'Microphone access was blocked.' : 'The microphone could not be opened.' });
+        const blocked = error instanceof Error && error.message === 'audio-blocked';
+        stop(); status('unavailable', { message: denied ? 'Microphone access was blocked.' : blocked ? 'Audio is blocked until you click the page. Use the recorder, or reopen the conversation after clicking.' : 'The microphone could not be opened.' });
       }); break;
       case 'audio': play(b64ToInt16(String(message.data)), sampleRate); break;
       case 'interrupted': flush(); break;

@@ -93,7 +93,7 @@ export function CityScene({ city, runtime, position }: { city: CityHandle; runti
     <hemisphereLight args={[candy.lavender, candy.peach, .65]} />
     <directionalLight position={[12, 24, 14]} intensity={2.4} color="#fff1dc" />
     <directionalLight position={[-14, 10, -10]} intensity={.55} color={candy.lavender} />
-    <ClearView runtime={runtime}>
+    <ClearView runtime={runtime} version={`${qx},${qz},${city.revision},${shown.length}`}>
       {shown.map(({ manifest, far }) => <ChunkRenderer key={`${manifest.worldId}|${manifest.coord.cx},${manifest.coord.cz}`} manifest={manifest} centre={centre} far={far} still={still} />)}
     </ClearView>
     <PhotoCamera city={city} />

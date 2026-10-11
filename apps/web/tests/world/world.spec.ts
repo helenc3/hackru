@@ -1,6 +1,8 @@
 ﻿import { expect, test, type Page } from '../../../../tests/support/browser-test';
 
-test.use({ renderProfile: 'full', movementMultiplier: 8 });
+// walk() releases the key one frame after the DOM position crosses the target; movePlayer caps a frame at 0.1 s, so
+// 3× (12 m/s) overshoots by at most 1.2 m and stays inside the 2 m interaction radius even on slow software-GL frames.
+test.use({ renderProfile: 'full', movementMultiplier: 3 });
 import { spawn, type ChildProcess } from 'node:child_process';
 import path from 'node:path';
 import { createServer } from 'node:net';

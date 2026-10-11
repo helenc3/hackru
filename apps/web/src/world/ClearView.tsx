@@ -15,10 +15,14 @@ function fadeGroup(object: Object3D): Object3D | null {
   return null;
 }
 
-/** Fade only opted-in scenery intersecting the camera's view of the player's body. */
-export function ClearView({ runtime, children }: { runtime: React.RefObject<Runtime>; children: ReactNode }) {
+/**
+ * Fade only opted-in scenery intersecting the camera's view of the player's body. Marked groups and their
+ * bounds are gathered once per `version` (chunk load, LOD step), not every frame; scenery does not move.
+ */
+export function ClearView({ runtime, version, children }: { runtime: React.RefObject<Runtime>; version: unknown; children: ReactNode }) {
   const group = useRef<Group>(null);
   const entries = useRef(new Map<Object3D, { fade: number; bounds: Box3 }>());
+  const gathered = useRef<unknown>(Symbol('never'));
   const meshBounds = useRef(new Box3());
   const originals = useRef(new Map<Material, { opacity: number; transparent: boolean; depthWrite: boolean }>());
   const ray = useRef(new Ray());
@@ -41,23 +45,36 @@ export function ClearView({ runtime, children }: { runtime: React.RefObject<Runt
   useFrame(({ camera }, delta) => {
     const root = group.current;
     if (!root) return;
-    root.updateWorldMatrix(true, true);
-    root.traverse((node) => {
-      if (node.userData.clearView !== 'fade') return;
-      let entry = entries.current.get(node);
-      if (!entry) { entry = { fade: 1, bounds: new Box3() }; entries.current.set(node, entry); }
-      // One obstruction decision and animation for the entire marked group.
-      // Explicit solid children do not contribute to its obstruction bounds.
-      entry.bounds.makeEmpty();
-      node.traverse((part) => {
-        const mesh = part as Mesh;
-        if (!mesh.isMesh || fadeGroup(mesh) !== node) return;
-        for (let ancestor = mesh.parent; ancestor && ancestor !== node; ancestor = ancestor.parent) {
-          if ((ancestor as Mesh).isMesh) return;
-        }
-        entry.bounds.union(meshBounds.current.setFromObject(mesh));
+    if (gathered.current !== version) {
+      gathered.current = version;
+      root.updateWorldMatrix(true, true);
+      const seen = new Set<Object3D>();
+      root.traverse((node) => {
+        if (node.userData.clearView !== 'fade') return;
+        seen.add(node);
+        let entry = entries.current.get(node);
+        if (!entry) { entry = { fade: 1, bounds: new Box3() }; entries.current.set(node, entry); }
+        // One obstruction decision and animation for the entire marked group.
+        // Explicit solid children do not contribute to its obstruction bounds.
+        entry.bounds.makeEmpty();
+        node.traverse((part) => {
+          const mesh = part as Mesh;
+          if (!mesh.isMesh || fadeGroup(mesh) !== node) return;
+          for (let ancestor = mesh.parent; ancestor && ancestor !== node; ancestor = ancestor.parent) {
+            if ((ancestor as Mesh).isMesh) return;
+          }
+          entry.bounds.union(meshBounds.current.setFromObject(mesh));
+        });
       });
-      if (entry.bounds.isEmpty() || entry.bounds.max.y < .3) return;
+      // Unloaded chunks: drop their groups and the material originals that kept their geometry alive.
+      for (const [node] of entries.current) {
+        if (seen.has(node)) continue;
+        node.traverse((part) => { const mesh = part as Mesh; if (mesh.isMesh) for (const material of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) originals.current.delete(material); });
+        entries.current.delete(node);
+      }
+    }
+    for (const [node, entry] of entries.current) {
+      if (entry.bounds.isEmpty() || entry.bounds.max.y < .3) continue;
       const p = runtime.current.position;
       let obstructed = false;
       // Sample head, torso and both sides so thin posts and canopy edges fade too.
@@ -94,7 +111,7 @@ export function ClearView({ runtime, children }: { runtime: React.RefObject<Runt
           material.depthWrite = original.depthWrite;
         }
       });
-    });
+    }
   });
   return <group ref={group}>{children}</group>;
 }

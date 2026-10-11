@@ -1,5 +1,5 @@
 import { test, expect } from 'vitest';
-import { chunkKey, createWorldView, generateFallbackChunk, questTarget, seedFromWorldId, type ChunkManifest, type MissionId, type Position } from '@vibequest/shared';
+import { chunkKey, createWorldView, generateFallbackChunk, questTarget, seedFromWorldId, worldLayout, type ChunkManifest, type MissionId, type Position } from '@vibequest/shared';
 import { distance, movePlayer, nextLeg } from '../../src/world/navigation';
 
 const weights = { 'drink-vendor': 1, 'direction-helper': 1, 'hotel-landmark': 1, 'river-viewpoint': 1, 'photo-passerby': 1 };
@@ -32,7 +32,7 @@ function walk(world: ReturnType<typeof city>, start: Position, goal: Position) {
 for (const worldId of ['wayfinding-a', 'wayfinding-b', 'wayfinding-c', 'wayfinding-d']) {
   test(`${worldId}: every quest target is named, reachable from spawn by Walk there`, () => {
     const world = city(worldId);
-    const spawn = { x: 0, z: 0 };
+    const spawn = worldLayout(world.seed).spawn; // the planner's spawn (kept clear by the fallback), not world origin, which may be a built lot
     const target = (missionId: MissionId) => questTarget({ missionId, status: 'active', worldId, position: spawn, photo: null }, world.view)!;
     expect(target('Q1').label).toBe('老王');
     expect(target('Q2').label).toBe('小李');

@@ -247,25 +247,34 @@ function roadRect(road: Road) {
 export const ChunkRenderer = memo(function ChunkRenderer({ manifest, centre, far, still }: { manifest: ChunkManifest; centre: Position; far: boolean; still: boolean }) {
   const origin = useMemo(() => chunkOrigin(manifest.coord), [manifest.coord]);
   const resolved = useMemo(() => manifest.placements.map(resolve), [manifest]);
+  // One detail band per placement ('a' attached, 'x' culled, else LOD 0-2) plus bridge outlines. The layout, and the
+  // bake it triggers, only rebuilds when a band changes, not on every quantized step of `centre`.
+  const bands = resolved.map((item) => {
+    if (item.placement.attachTo) return 'a';
+    const d = Math.hypot(origin.x + item.placement.x - centre.x, origin.z + item.placement.z - centre.z);
+    if (item.entry && d > item.entry.lod.cullDistance) return 'x';
+    return d < LOD_NEAR ? '0' : d < LOD_FAR ? '1' : '2';
+  }).join('') + '|' + manifest.bridges.map((bridge) => Math.hypot(origin.x + (bridge.rect.minX + bridge.rect.maxX) / 2 - centre.x, origin.z + (bridge.rect.minZ + bridge.rect.maxZ) / 2 - centre.z) < LOD_NEAR ? 'n' : 'f').join('');
   const layout = useMemo(() => {
     const byParent = new Map<string, Resolved[]>();
     const roots: { item: Resolved; lod: 0 | 1 | 2 }[] = [];
     const proxies: Resolved[] = [];
-    for (const item of resolved) {
-      if (item.placement.attachTo) {
-        const list = byParent.get(item.placement.attachTo.placementId) ?? [];
-        list.push(item); byParent.set(item.placement.attachTo.placementId, list);
-        continue;
+    const bridgeNear = bands.slice(bands.indexOf('|') + 1);
+    resolved.forEach((item, i) => {
+      const band = bands[i];
+      if (band === 'a') {
+        const list = byParent.get(item.placement.attachTo!.placementId) ?? [];
+        list.push(item); byParent.set(item.placement.attachTo!.placementId, list);
+        return;
       }
-      const d = Math.hypot(origin.x + item.placement.x - centre.x, origin.z + item.placement.z - centre.z);
-      if (item.entry && d > item.entry.lod.cullDistance) continue;
-      const lod = d < LOD_NEAR ? 0 : d < LOD_FAR ? 1 : 2;
+      if (band === 'x') return;
+      const lod = Number(band) as 0 | 1 | 2;
       // Instanced-cost props show full detail only up close; everything distant is a proxy.
       if (far || lod === 2 || (lod === 1 && item.entry?.cost.instanced && !isTree(item))) proxies.push(item);
       else roots.push({ item, lod });
-    }
-    return { byParent, roots, proxies };
-  }, [resolved, origin, centre, far]);
+    });
+    return { byParent, roots, proxies, bridgeNear };
+  }, [resolved, bands, far]);
   const ground = districtGround[manifest.district];
   const placementGroup = ({ item }: { item: Resolved }) => ({ position: [item.placement.x, 0, item.placement.z] as [number, number, number], rotation: [0, item.placement.rotation * DEG, 0] as [number, number, number],
     userData: { clearView: 'solid', placementId: item.placement.id } });
@@ -289,8 +298,8 @@ export const ChunkRenderer = memo(function ChunkRenderer({ manifest, centre, far
         </mesh>)}
         {manifest.roads.map((road) => { const r = roadRect(road); return <mesh key={road.id} rotation={[-Math.PI / 2, 0, 0]} position={[r.x, road.kind === 'avenue' ? -.01 : -.012, r.z]}><planeGeometry args={[r.w, r.d]} /><Toon color={roadColor[road.kind]} outline={false} /></mesh>; })}
         {/* Level walkable decks (CITY_GENERATION §7): collision treats them as walkable over water. */}
-        {manifest.bridges.map((bridge) => <mesh key={bridge.id} position={[(bridge.rect.minX + bridge.rect.maxX) / 2, .06, (bridge.rect.minZ + bridge.rect.maxZ) / 2]} userData={{ clearView: 'solid' }}>
-          <boxGeometry args={[bridge.rect.maxX - bridge.rect.minX, .12, bridge.rect.maxZ - bridge.rect.minZ]} /><Toon color="#c9b79c" thickness={1.6} outline={Math.hypot(origin.x + (bridge.rect.minX + bridge.rect.maxX) / 2 - centre.x, origin.z + (bridge.rect.minZ + bridge.rect.maxZ) / 2 - centre.z) < LOD_NEAR} />
+        {manifest.bridges.map((bridge, i) => <mesh key={bridge.id} position={[(bridge.rect.minX + bridge.rect.maxX) / 2, .06, (bridge.rect.minZ + bridge.rect.maxZ) / 2]} userData={{ clearView: 'solid' }}>
+          <boxGeometry args={[bridge.rect.maxX - bridge.rect.minX, .12, bridge.rect.maxZ - bridge.rect.minZ]} /><Toon color="#c9b79c" thickness={1.6} outline={layout.bridgeNear[i] === 'n'} />
         </mesh>)}
         {layout.roots.filter((root) => !own(root)).map((root) => <group key={root.item.placement.id} {...placementGroup(root)}>
           <Attached item={root.item} byParent={layout.byParent} lod={root.lod} still={still} />

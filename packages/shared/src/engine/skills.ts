@@ -37,7 +37,9 @@ export function selectPracticeTier(state: InternalState, missionId: MissionId): 
   const targets = missionFor(missionId).variants[0]!.targetTracks;
   const observed = targets.map((track) => state.skills[track]);
   const count = observed.reduce((sum, skill) => sum + skill.independentCount, 0);
-  const mean = observed.length ? observed.reduce((sum, skill) => sum + skill.mastery, 0) / observed.length : 0.4;
+  // Reading/listening never receive evidence today, so their frozen 0.4 must not drag the mean: average evidenced tracks only.
+  const evidenced = observed.filter((skill) => skill.independentCount > 0);
+  const mean = evidenced.length ? evidenced.reduce((sum, skill) => sum + skill.mastery, 0) / evidenced.length : 0.4;
   // Summing decimal mastery values can put an exact threshold one ULP below itself.
   const tolerance = Number.EPSILON * observed.length;
   const change = count >= 3 && mean >= 0.65 - tolerance ? 1 : count >= 2 && mean < 0.35 - tolerance ? -1 : 0;

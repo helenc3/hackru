@@ -1,16 +1,4 @@
-import type { Intent, NpcId, TurnContext, TurnEvaluation } from '@vibequest/shared';
-
-const NON_PROGRESSION: readonly Intent[] = ['unknown', 'greeting', 'request_repeat'];
-
-/** Spec §8 threshold for an evaluation that may drive a state transition. Engine guards still apply. */
-export function meetsProgressionGate(e: TurnEvaluation): boolean {
-  return !NON_PROGRESSION.includes(e.intent)
-    && e.interaction === 'relevant'
-    && e.evidenceQuote.trim() !== ''
-    && e.intentGrade.score >= 0.7
-    && e.intentGrade.confidence >= 0.75
-    && (e.targetLanguageUse === 'yes' || e.targetLanguageUse === 'mixed');
-}
+import type { NpcId, TurnContext, TurnEvaluation } from '@vibequest/shared';
 
 const CLARIFY: Record<NpcId, string> = {
   vendor: '啊？你要喝点什么？',

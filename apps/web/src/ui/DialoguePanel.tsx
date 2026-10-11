@@ -3,6 +3,7 @@ import { npcOpeners, pendingGoalAction, type PublicState, type RendererProps, ty
 import { Recorder } from '../audio/Recorder';
 import { finishConfirmation, useAudioActivity } from '../audio/audio-bus';
 import { startLiveVoice, type LiveStatus } from '../audio/live-voice';
+import { useBlockedPlay } from '../audio/audio-bus';
 import '../audio/live.css';
 import { CoachPanel } from './CoachPanel';
 import { NpcActions } from './NpcActions';
@@ -59,6 +60,7 @@ export function DialoguePanel({ state, npc, pending, turn, onAction, onSubmit, o
   // A goodbye turn closes the panel once its reply has played (live: when the server closes), capped so it never hangs.
   const [closing, setClosing] = useState(false);
   const activity = useAudioActivity();
+  const blockedPlay = useBlockedPlay();
   const played = useRef(false);
   // No goodbye audio within 1.5 s (fixtures, muted, failed speech): close right away; otherwise after playback, capped at 8 s.
   useEffect(() => { if (!closing) return; const quiet = setTimeout(() => { if (!played.current) finish(); }, 1_500); const cap = setTimeout(finish, 8_000); return () => { clearTimeout(quiet); clearTimeout(cap); }; }, [closing, finish]);
@@ -141,6 +143,7 @@ export function DialoguePanel({ state, npc, pending, turn, onAction, onSubmit, o
       {partial.npc && <p className="bubble npc partial" lang="zh-Hans">{partial.npc}</p>}
       {partial.player && <p className="bubble player partial" lang="zh-Hans">{partial.player}</p>}
     </div>}
+    {blockedPlay && <div className="conversation-status" role="status">Audio is waiting for a click. <button type="button" className="button secondary" onClick={blockedPlay}>Play reply</button></div>}
     {pending && <div className="conversation-status" role="status">{name} is thinking<span className="thinking-dots" aria-hidden="true"><i /><i /><i /></span></div>}
     {closing && <div className="conversation-status" role="status" data-testid="conversation-closing">Conversation finished</div>}
     {!closing && !goal && liveActive && live && <div className="live-status" role="status" data-testid="live-status" data-status={live.status}>

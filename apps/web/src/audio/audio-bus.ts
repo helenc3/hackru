@@ -26,6 +26,17 @@ export async function finishConfirmation(): Promise<void> {
   if (confirmation === finish) confirmation = null;
 }
 
+/** Autoplay-blocked reply: the dialogue shows a Play control until a click starts it. */
+let blockedPlay: (() => void) | null = null;
+export function setBlockedPlay(next: (() => void) | null): void {
+  if (blockedPlay === next) return;
+  blockedPlay = next;
+  for (const listener of listeners) listener();
+}
+export function useBlockedPlay(): (() => void) | null {
+  return useSyncExternalStore((listener) => { listeners.add(listener); return () => listeners.delete(listener); }, () => blockedPlay);
+}
+
 /** Registered by the AudioController: stops NPC speech so the recorder can barge in. */
 let interrupt: (() => Promise<void>) | null = null;
 export function setInterrupt(next: (() => Promise<void>) | null): void { interrupt = next; }

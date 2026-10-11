@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { CanvasTexture, SRGBColorSpace } from 'three';
 import { text, type ParamValues } from '@vibequest/shared';
 import { candy, INK, Toon } from '../../world/toon';
@@ -22,7 +22,7 @@ function Slab({ w, d, h, color, x = 0, z = 0 }: { w: number; d: number; h: numbe
 
 /** Simplified Chinese label baked to a canvas (system CJK fonts; no font download). */
 function useLabel(label: string, background: string, foreground: string) {
-  return useMemo(() => {
+  const texture = useMemo(() => {
     const canvas = document.createElement('canvas');
     canvas.width = 256; canvas.height = 96;
     const ctx = canvas.getContext('2d')!;
@@ -34,6 +34,8 @@ function useLabel(label: string, background: string, foreground: string) {
     texture.colorSpace = SRGBColorSpace;
     return texture;
   }, [label, background, foreground]);
+  useEffect(() => () => texture.dispose(), [texture]); // R3F disposes materials, not the textures they map
+  return texture;
 }
 function Label({ zh, w, h, at, background, foreground = '#ffffff', back = false }: { zh: string; w: number; h: number; at: [number, number, number]; background: string; foreground?: string; back?: boolean }) {
   const map = useLabel(zh, background, foreground);

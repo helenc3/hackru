@@ -287,7 +287,7 @@ export function attachLiveRelay(server: Server, services: ServerServices, option
         sendAudio: (data) => gemini?.sendRealtimeInput({ audio: { data, mimeType: 'audio/pcm;rate=16000' } }),
         sendNote: (text) => gemini?.sendClientContent({ turns: [{ role: 'user', parts: [{ text }] }], turnComplete: false }),
         close: () => {
-          torn = true; abort.abort(); clearTimeout(timer);
+          torn = true; abort.abort(); clearTimeout(timer); clearInterval(heartbeat);
           try { gemini?.close(); } catch { /* already closed */ }
           gemini = undefined;
           if (active.get(sessionId) === release) active.delete(sessionId); // never touch a newer connection's entry
@@ -306,6 +306,13 @@ export function attachLiveRelay(server: Server, services: ServerServices, option
       note: (turn) => alignmentNote(turn),
     });
     active.set(sessionId, release);
+    // A silently dropped client would otherwise hold the Gemini session until MAX_SESSION_MS.
+    const heartbeat = setInterval(() => {
+      if (typeof ws.ping !== 'function') return;
+      const pongTimer = setTimeout(() => bridge.close('timeout'), 10_000);
+      ws.once('pong', () => clearTimeout(pongTimer));
+      ws.ping();
+    }, 20_000);
     ws.on('message', (data, isBinary) => { if (isBinary) bridge.onClientAudio(Buffer.isBuffer(data) ? data : Buffer.from(data as ArrayBuffer)); else bridge.onClientText(data.toString()); });
     ws.on('close', () => bridge.close('client-closed'));
     ws.on('error', () => bridge.close('client-error'));

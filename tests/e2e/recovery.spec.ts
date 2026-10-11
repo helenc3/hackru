@@ -19,7 +19,7 @@ async function reachVendor(page: Page, request: Parameters<typeof playerState>[1
   const typed = panel.getByRole('button', { name: 'Use typed Mandarin', exact: true });
   // Wait for the panel to settle on voice or typed input before choosing, or the toggle can be missed.
   await expect(panel.getByRole('textbox').or(typed)).toBeVisible();
-  if (await typed.isVisible()) await typed.click();
+  await typed.click(); // the retry set voice input; click auto-waits for the re-render instead of racing it
   await expect(panel.getByRole('textbox')).toBeEnabled();
   return panel;
 }
@@ -84,7 +84,7 @@ test('fixture recovery: stale versions resynchronize and failed audio does not b
 
   });
   const typed = panel.getByRole('button', { name: 'Use typed Mandarin', exact: true });
-  if (await typed.isVisible()) await typed.click();
+  await typed.click(); // the retry set voice input; click auto-waits for the re-render instead of racing it
   await expect(panel.getByRole('textbox')).toBeEnabled();
   await page.locator('summary[aria-label="Settings"]').click();
   const audio = page.getByTestId('audio-controller');

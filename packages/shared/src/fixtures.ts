@@ -11,7 +11,7 @@ const BASELINE_SPAWN = { x: 20, z: 20 } as const;
 
 /** An empty, all-walkable world: presentation/contract fixtures need no city. */
 const emptyWorldView: WorldView = {
-  worldId: 'fixture-world', walkable: () => true, committed: () => true, districtAt: () => 'historic',
+  worldId: 'fixture-world', walkable: () => true, committed: () => true, districtAt: () => 'shopping',
   anchor: () => undefined, anchorsNear: () => [], directionsToHotel: () => null,
 };
 

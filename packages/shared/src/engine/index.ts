@@ -56,7 +56,7 @@ export function createGame(options: CreateGameOptions, nowMs: number): InternalS
   const exploration: ExplorationState = { activeMs: 0, lastActiveAtMs: nowMs, visitedChunkKeys: [chunkKey(chunkOf(parsed.spawn))], lastEncounter: Object.fromEntries(QuestCategorySchema.options.map((category) => [category, { activeMs: 0, visitedChunks: 0 }])) as ExplorationState['lastEncounter'] };
   return InternalStateSchema.parse({
     sessionId: parsed.sessionId, worldId: parsed.worldId, attemptId: parsed.attemptId, missionId: parsed.missionId, validationMode: parsed.validationMode, inputPreference: parsed.inputPreference, providerStatus: parsed.providerStatus,
-    version: 0, nodeId: mission.startNode, mode: 'practice', status: 'active', zoneId: 'historic', position: parsed.spawn, lastMovementAtMs: nowMs, tier: parsed.initialTier,
+    version: 0, nodeId: mission.startNode, mode: 'practice', status: 'active', zoneId: 'shopping', position: parsed.spawn, lastMovementAtMs: nowMs, tier: parsed.initialTier,
     flags: {}, inventory: { hint: 0, cny: STARTING_CNY, drinks: [] }, purchases: [], xp: 0, badges: [], awardedRewardIds: [], unlockedMissionIds: ['Q1'], completedMissionIds: [],
     npcState: Object.fromEntries(npcs.map((npc) => [npc.id, { patience: npc.initialPatience, mood: mood(npc.initialPatience), history: [], anchorId: null, repeatCount: 0, cooldownRemainingMs: 0 }])),
     directions: null, photo: null, exploration,

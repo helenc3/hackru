@@ -19,7 +19,8 @@ test('gallery lists ≥ 60 valid entries across every category and renders a 3×
     await expect(page.locator('[data-testid=gallery-variant]:not([data-status=ok])')).toHaveCount(0);
   }
   const budget = page.getByTestId('gallery-budget');
-  for (const district of ['shopping', 'historic', 'residential', 'waterfront']) {
+  // Only districts the planner still emits (planner.ts LAND_KINDS + the river banks) have a 3×3 sample.
+  for (const district of ['shopping', 'park', 'waterfront']) {
     await page.getByTestId('gallery-district').selectOption(district);
     await expect(page.getByTestId('gallery-neighbourhood')).toHaveAttribute('data-district', district);
     await expect(page.getByTestId('gallery-neighbourhood')).toHaveAttribute('data-chunks', '9');

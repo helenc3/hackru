@@ -6,7 +6,7 @@
     "missionId": "Q1",
     "mode": "practice",
     "status": "active",
-    "zoneId": "historic",
+    "zoneId": "shopping",
     "position": {
       "x": 20,
       "z": 20
@@ -57,7 +57,7 @@
     "missionId": "Q2",
     "mode": "practice",
     "status": "active",
-    "zoneId": "historic",
+    "zoneId": "shopping",
     "position": {
       "x": 20,
       "z": 20
@@ -108,7 +108,7 @@
     "missionId": "Q3",
     "mode": "practice",
     "status": "active",
-    "zoneId": "historic",
+    "zoneId": "shopping",
     "position": {
       "x": 20,
       "z": 20

@@ -20,7 +20,7 @@
     "test:watch": "vitest",
     "build": "npm run build -w @vibequest/shared && npm run build -w @vibequest/web && npm run build -w @vibequest/server",
     "start": "npm run start -w @vibequest/server",
-    "test:e2e": "playwright test",
+    "test:e2e": "playwright test && playwright test -c tests/e2e/playwright.config.ts",
     "check:kit": "python3 validate_kit.py"
   },
   "devDependencies": {

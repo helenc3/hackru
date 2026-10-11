@@ -23,7 +23,7 @@ export function createApp(options: AppOptions = {}): Express {
   app.get('/api/health', (_request, response) => {
     response.json({
       status: 'ok',
-      buildId: 'segment-001',
+      buildId: 'segment-007',
       specVersion: '1.2',
       providers: {
         geminiConfigured: Boolean(config.geminiApiKey),
@@ -35,8 +35,8 @@ export function createApp(options: AppOptions = {}): Express {
       },
       segments: {
         engine: 'implemented',
-        dialogue: 'unimplemented',
-        speech: 'unimplemented',
+        dialogue: config.geminiApiKey ? 'live' : 'unconfigured',
+        speech: config.elevenlabsApiKey ? 'live' : 'unconfigured',
       },
     });
   });
@@ -57,6 +57,8 @@ export function createApp(options: AppOptions = {}): Express {
   if (config.nodeEnv === 'production') {
     const publicDirectory = options.publicDirectory ?? fileURLToPath(new URL('../../web/dist', import.meta.url));
     app.use(express.static(publicDirectory, { index: false }));
+    // A missing clip must not fall through to index.html; the audio error path offers subtitles.
+    app.use('/audio', (_request, _response, next) => next(new HttpError(404, 'NOT_FOUND', 'Unknown audio asset.')));
     app.get('/{*splat}', (_request, response, next) => {
       // A root-relative file keeps hidden checkout ancestors (for example
       // ~/.codex/worktrees) out of sendFile's dotfile URL protection.

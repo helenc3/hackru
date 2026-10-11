@@ -17,6 +17,7 @@ test('boss result reveals honest modality, untested listening and one Station Na
   const api = await installScriptedApi(page, { mission: 'B1', steps: [{ text: '我要一张去海港的票。', patch: { status: 'cleared', badges: ['station-navigator'], debrief: terminalDebrief() } }] });
   await page.goto('/');
   await page.getByRole('button', { name: 'Start Practice', exact: true }).click();
+  await page.getByRole('button', { name: "Let's play", exact: true }).click();
   await expect(page.getByTestId('skill-debrief')).toHaveCount(0);
   await page.getByRole('button', { name: '老周 · Talk', exact: true }).click();
   const panel = page.getByTestId('dialogue-panel');
@@ -40,6 +41,7 @@ test('boss result reveals honest modality, untested listening and one Station Na
 test('failed attempt shows the debrief without a success badge', async ({ page }) => {
   await installScriptedApi(page, { mission: 'B1', steps: [{ text: '我要一张去海港的票。', patch: { status: 'failed', debrief: terminalDebrief() } }] });
   await page.goto('/'); await page.getByRole('button', { name: 'Start Practice', exact: true }).click();
+  await page.getByRole('button', { name: "Let's play", exact: true }).click();
   await page.getByRole('button', { name: '老周 · Talk', exact: true }).click();
   const panel = page.getByTestId('dialogue-panel');
   await panel.getByRole('button', { name: 'Use typed Mandarin', exact: true }).click();

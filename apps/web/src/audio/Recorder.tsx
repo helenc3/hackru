@@ -1,3 +1,4 @@
+import { Button } from '../ui/primitives';
 import { useEffect, useRef, useState } from 'react';
 import type { RecorderProps } from '@vibequest/shared';
 import { AudioApiError, setAudioActivity, setConfirmation, uploadClip, useAudioActivity } from './audio-bus';
@@ -119,10 +120,10 @@ export function Recorder({ state, onAction, onTranscript }: RecorderProps) {
         <p>{recording ? 'Up to 15 seconds. Stop when you finish.' : blocked && activity === 'playing' ? 'Wait for the reply audio to finish.' : 'Record, check the transcript, then Send.'}</p>
       </div>
       {recording
-        ? <><button type="button" onClick={stop}>Stop recording</button><button type="button" onClick={cancel}>Cancel</button></>
-        : <button type="button" onClick={() => void start()} disabled={busy || blocked || status === 'unsupported'}>{problem && status !== 'unsupported' ? 'Re-record' : 'Start recording'}</button>}
+        ? <><Button type="button" onClick={stop}>Stop recording</Button><Button type="button" onClick={cancel}>Cancel</Button></>
+        : <Button type="button" onClick={() => void start()} disabled={busy || blocked || status === 'unsupported'}>{problem && status !== 'unsupported' ? 'Re-record' : 'Start recording'}</Button>}
       {message && <p role="alert" className="recorder-message">{message}</p>}
-      {problem && state.inputPreference === 'voice' && <button type="button" onClick={() => void onAction({ type: 'setInputPreference', preference: 'typed-accessibility' }).catch(() => undefined)}>Type instead</button>}
+      {problem && state.inputPreference === 'voice' && <Button type="button" onClick={() => void onAction({ type: 'setInputPreference', preference: 'typed-accessibility' }).catch(() => undefined)}>Type instead</Button>}
     </div>
   );
 }

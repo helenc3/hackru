@@ -1,0 +1,57 @@
+import { test, expect } from '@playwright/test';
+import { installScriptedApi } from '../../../../fixtures/ui/scripted-api';
+
+test('fullscreen HUD, shared popups and audio controls', async ({ page }) => {
+  await installScriptedApi(page);
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Start Practice', exact: true }).click();
+  const controls = page.getByRole('dialog', { name: 'Controls', exact: true });
+  await expect(controls).toBeVisible();
+  await expect(controls).toContainText('WASD');
+  await controls.getByRole('button', { name: "Let's play" }).click();
+  await expect(controls).toHaveCount(0);
+  const world = await page.getByTestId('world-renderer').boundingBox();
+  const viewport = page.viewportSize()!;
+  expect(world).toMatchObject({ x: 0, y: 0, width: viewport.width, height: viewport.height });
+  await expect(page.locator('.world-caption, .world-note, .session-footer')).toHaveCount(0);
+  await expect(page.locator('.game-topbar')).toContainText('VibeQuest');
+  await expect(page.locator('.game-topbar')).toContainText('XP');
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  const settings = page.getByRole('dialog', { name: 'Settings', exact: true });
+  await expect(settings).toBeVisible();
+  await settings.getByRole('button', { name: 'Controls', exact: true }).click();
+  await expect(controls).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(controls).toHaveCount(0);
+  const mute = page.getByRole('button', { name: 'Mute audio', exact: true });
+  await mute.hover();
+  await expect(page.getByRole('slider', { name: 'music volume', exact: true })).toBeVisible();
+  await page.getByRole('slider', { name: 'music volume', exact: true }).focus();
+  await page.keyboard.press('ArrowLeft');
+  await expect(page.getByRole('slider', { name: 'music volume', exact: true })).toHaveAttribute('aria-valuenow', '99');
+  await page.getByRole('slider', { name: 'speakers volume', exact: true }).focus();
+  await page.keyboard.press('Home');
+  await expect(page.getByRole('slider', { name: 'speakers volume', exact: true })).toHaveAttribute('aria-valuenow', '0');
+  await mute.click();
+  await expect(page.getByRole('button', { name: 'Unmute audio', exact: true })).toHaveAttribute('aria-pressed', 'true');
+});
+
+test('Radix learner choices and provider menu remain keyboard accessible', async ({ page }) => {
+  await installScriptedApi(page, { steps: [{ action: { type: 'inspect', targetId: 'p1.entrance-sign' }, patch: { visibleCues: [{ id: 'p1.entrance-sign', label: '入口告示', text: '请从广场进入。' }] } }] });
+  await page.goto('/');
+  const learner = page.getByRole('radio', { name: 'New learner', exact: true });
+  await learner.focus();
+  await page.keyboard.press('ArrowDown');
+  await expect(page.getByRole('radio', { name: 'Some Mandarin', exact: true })).toBeChecked();
+  const provider = page.getByRole('combobox', { name: 'Conversation provider' });
+  await provider.click();
+  await page.getByRole('option', { name: 'Fixture demonstration · scripted', exact: true }).click();
+  await expect(provider).toContainText('Fixture demonstration');
+  await page.getByRole('button', { name: 'Start Practice', exact: true }).click();
+  await page.getByRole('button', { name: "Let's play", exact: true }).click();
+  await page.getByRole('button', { name: '入口告示 · Read sign' }).click();
+  await expect(page.getByRole('dialog', { name: 'Inspected sign' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog', { name: 'Inspected sign' })).toHaveCount(0);
+  await expect(page.getByTestId('world-renderer')).toBeFocused();
+});

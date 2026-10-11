@@ -5,6 +5,7 @@ async function start(page: import('@playwright/test').Page) {
   await page.goto('/');
   await page.getByRole('button', { name: 'Start Practice', exact: true }).click();
   await expect(page.getByTestId('game-shell')).toBeVisible();
+  await page.getByRole('button', { name: "Let's play", exact: true }).click();
 }
 async function typedPanel(page: import('@playwright/test').Page, npc = '小林') {
   await page.getByRole('button', { name: `${npc} · Talk`, exact: true }).click();
@@ -173,6 +174,7 @@ test('mission restart completes during a pending provider turn and ignores its l
   await panel.getByRole('textbox').fill('我要水。');
   await panel.getByRole('button', { name: 'Send Mandarin' }).click();
   await expect(panel).toContainText('Waiting for the server');
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Restart mission' })).toBeEnabled();
   await page.getByRole('button', { name: 'Restart mission' }).click();
   await expect(page.getByTestId('dialogue-panel')).toHaveCount(0);

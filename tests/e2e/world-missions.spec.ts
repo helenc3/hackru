@@ -66,8 +66,10 @@ const worldState = async (page: Page, request: APIRequestContext): Promise<Publi
 
 async function playP1(page: Page) {
   await page.goto('/');
-  await page.getByLabel('Conversation provider').selectOption('fixture');
+  await page.getByRole('combobox', { name: 'Conversation provider' }).click();
+  await page.getByRole('option', { name: 'Fixture demonstration · scripted', exact: true }).click();
   await page.getByRole('button', { name: 'Start Practice', exact: true }).click();
+  await page.getByRole('button', { name: "Let's play", exact: true }).click();
   await expect(page.getByTestId('world-renderer')).toHaveAttribute('data-position-z', /./);
   await walk(page, 'w', 'z', 6.1, -1);
   await walk(page, 'a', 'x', -9.8, -1);

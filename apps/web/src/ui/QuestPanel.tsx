@@ -1,3 +1,4 @@
+import { Badge } from './primitives';
 import { useEffect, useState } from 'react';
 import type { PublicState } from '@vibequest/shared';
 
@@ -9,10 +10,8 @@ export function QuestPanel({ state }: { state: PublicState }) {
   const seconds = remaining === null ? null : Math.ceil(remaining / 1000);
   const titles = { P1: 'Café detour', P2: 'The platform changed', B1: 'Make the connection' };
   return <aside className="quest-panel" aria-label="Mission objectives" data-testid="quest-panel">
-    <span className="eyebrow">{state.mode === 'boss' ? 'BOSS · INDEPENDENT ATTEMPT' : 'PRACTICE'}</span><h2>{titles[state.missionId]}</h2>
-    <div className="mission-meta"><span>{state.missionId} · Tier {state.tier}</span><span>{state.status}</span></div>
-    {seconds !== null && <div className="mission-clock" role="timer" aria-label="Mission time remaining">{Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, '0')}<span>{timer?.running ? 'Active decision time' : 'Timer paused by server'}</span></div>}
-    <ol className="objective-list">{state.objectives.map((objective) => <li key={objective.id} data-complete={objective.complete}><span aria-hidden="true">{objective.complete ? '✓' : '○'}</span><span>{objective.label}</span></li>)}</ol>
-    <p className="controls-note">WASD / arrows · E to interact<br />Read signs and listen before choosing your route.</p>
+    <div className="current-goal"><strong>{titles[state.missionId]}</strong><span>{state.objectives.find((objective) => !objective.complete)?.label ?? 'Mission complete'}</span></div>
+    <Badge className="mission-state">{state.mode === 'boss' ? 'Boss' : 'Practice'} · {state.status}</Badge>
+    {seconds !== null && <span className="mission-time" role="timer" aria-label="Mission time remaining">{Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, '0')}</span>}
   </aside>;
 }

@@ -91,3 +91,68 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline: var
 
 .game-shell .brand > span.brand-dot, .welcome-screen .brand > span.brand-dot { width: auto; height: auto; margin: 0; display: inline; border: 0; border-radius: 0; box-shadow: none; background: none; color: var(--raspberry); font-size: inherit; }
 .game-topbar > button:last-child { margin-left: 0; }
+
+/* The world fills the viewport; gameplay UI floats above it. */
+.game-shell { position: fixed; inset: 0; overflow: hidden; }
+.game-shell .game-main { position: absolute; inset: 0; max-width: none; padding: 0; }
+.game-layout, .game-world { position: absolute; inset: 0; display: block; }
+.game-world .world-renderer { height: 100%; width: 100%; border: 0; border-radius: 0; box-shadow: none; }
+.game-topbar { position: absolute; z-index: 10; top: 16px; left: 20px; right: 20px; margin: 0; padding: 12px 18px; gap: 22px; border: var(--outline); border-radius: 18px; background: var(--cream); box-shadow: var(--shadow-sticker-sm); }
+.game-topbar .brand { flex-shrink: 0; font-size: 25px; }
+.game-topbar .quest-panel { display: flex; align-items: center; gap: 16px; min-width: 0; flex: 1; padding: 0; border: 0; box-shadow: none; background: none; }
+.current-goal { display: grid; gap: 4px; min-width: 0; }
+.current-goal strong { font-size: 14px; }
+.current-goal > span { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mission-state { white-space: nowrap; color: var(--text-muted); text-transform: capitalize; }
+.mission-time { font-size: 20px; font-variant-numeric: tabular-nums; }
+.topbar-tools, .game-menus { display: flex; align-items: center; gap: 10px; }
+.game-topbar .inventory-bar { margin: 0; padding: 0; border: 0; box-shadow: none; flex-wrap: nowrap; gap: 8px; white-space: nowrap; }
+.icon-button { display: grid; place-items: center; width: 38px; height: 38px; border: 2px solid var(--ink); border-radius: 12px; background: var(--cream); color: var(--ink); font-size: 23px; cursor: pointer; }
+.icon-button:hover { background: var(--lemon); }
+.menu-backdrop { position: fixed; inset: 0; z-index: 40; background: #21152b70; backdrop-filter: blur(4px); }
+.game-popup, .audio-menu { background: var(--cream); border: var(--outline); border-radius: var(--radius-lg); box-shadow: var(--shadow-sticker); color: var(--ink); }
+.game-popup { position: fixed; z-index: 41; top: 50%; left: 50%; transform: translate(-50%, -50%); width: min(460px, calc(100vw - 40px)); max-height: 85dvh; overflow: auto; padding: 28px; }
+.game-popup h2 { margin: 0 40px 10px 0; font-size: 25px; }
+.game-popup > p { color: var(--text-muted); font-size: 13px; line-height: 1.6; }
+.popup-close { position: absolute; top: 16px; right: 16px; }
+.settings-actions { display: grid; gap: 12px; margin-top: 24px; }
+.controls-list { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 26px 0; font-size: 13px; line-height: 1.5; }
+.controls-list dt { font-weight: 800; }
+.controls-list dd { margin: 0; }
+.audio-menu { z-index: 42; width: 260px; padding: 20px; }
+.volume-control + .volume-control { margin-top: 16px; }
+.volume-control label { display: flex; justify-content: space-between; font-size: 13px; font-weight: 700; }
+.volume-slider { position: relative; display: flex; align-items: center; height: 28px; width: 100%; touch-action: none; }
+.volume-track { position: relative; flex: 1; height: 6px; border-radius: 6px; background: var(--lavender); }
+.volume-range { position: absolute; height: 100%; background: var(--plum); border-radius: 6px; }
+.volume-thumb { display: block; width: 18px; height: 18px; border: 2px solid var(--ink); border-radius: 50%; background: var(--lemon); }
+.volume-thumb:focus-visible, .icon-button:focus-visible { outline: var(--focus); outline-offset: 3px; }
+.game-shell .environment-banner { position: absolute; top: 100px; left: 20px; z-index: 9; max-width: calc(100% - 40px); padding: 6px 12px; border: 2px solid var(--ink); border-radius: 10px; font-size: 10px; }
+.game-world .audio-status { position: absolute; bottom: 18px; right: 20px; padding: 8px 12px; border-radius: 12px; background: var(--cream); z-index: 5; }
+.game-world .audio-status > span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+.game-world .audio-status button:disabled { display: none; }
+.game-world .interaction-dock { position: absolute; bottom: 72px; right: 20px; max-width: 420px; z-index: 4; }
+.game-world .choice-dock { position: absolute; bottom: 130px; right: 20px; max-width: 420px; z-index: 4; }
+.game-world .sign-overlay { position: absolute; top: 140px; left: 20px; max-width: 480px; z-index: 12; }
+.game-main > .result-panel, .game-main > .recovery-panel, .game-main > .coach-panel, .game-main > .action-notice { position: absolute; z-index: 21; top: 120px; left: 50%; transform: translateX(-50%); width: min(600px, calc(100% - 40px)); max-height: calc(100dvh - 150px); overflow: auto; background: var(--cream); padding: 24px; }
+.district-nearby { bottom: 24px; }
+@media (max-width: 1100px) { .game-topbar { gap: 12px; left: 10px; right: 10px; padding: 10px; flex-wrap: wrap; } .topbar-tools { margin-left: auto; } .mission-state { font-size: 10px; } .game-topbar .inventory-bar .button { padding: 6px; font-size: 10px; } }
+.game-shell .dialogue-panel { top: 110px; max-height: calc(100dvh - 130px); }
+.world-action-stack { position: absolute; right: 20px; bottom: 72px; z-index: 4; display: grid; gap: 10px; max-width: 420px; max-height: calc(100dvh - 220px); overflow-y: auto; padding: 4px; }
+.game-world .world-action-stack .interaction-dock, .game-world .world-action-stack .choice-dock { position: static; margin: 0; }
+
+/* Radix handles interaction; the existing game skin supplies presentation. */
+.radix-themes { --default-font-family: 'Noto Sans SC', 'PingFang SC', sans-serif; }
+.rt-Button.button { height: auto; min-height: 36px; }
+.rt-IconButton.icon-button { padding: 0; }
+.learner-options { display: flex; gap: 24px; }
+.start-panel fieldset { display: block; }
+.rt-Card.start-panel, .rt-Card.recovery-panel, .rt-Card.skill-debrief { overflow: visible; }
+.rt-Card::before, .rt-Card::after { display: none; }
+.rt-TextAreaRoot { border: var(--outline); border-radius: 12px; background: white; box-shadow: none; }
+.dialogue-panel .rt-TextAreaInput { border: 0; box-shadow: none; width: 100%; font-size: 18px; line-height: 1.7; padding: 11px; }
+.game-popup.radix-themes, .audio-menu.radix-themes, .dialogue-panel.radix-themes, .sign-overlay.radix-themes, .result-panel.radix-themes { min-height: 0; }
+.dialogue-panel { top: 110px; max-height: calc(100dvh - 130px); }
+.sign-overlay { position: fixed; top: 140px; left: 20px; width: min(480px, calc(100vw - 40px)); max-height: calc(100dvh - 170px); overflow: auto; z-index: 22; }
+.result-panel { position: fixed; z-index: 24; top: 120px; left: 50%; transform: translateX(-50%); width: min(600px, calc(100% - 40px)); max-height: calc(100dvh - 150px); overflow: auto; }
+.result-panel.radix-themes { animation: none; }

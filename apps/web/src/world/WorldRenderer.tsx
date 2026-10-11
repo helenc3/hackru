@@ -1,3 +1,4 @@
+import { Button } from '../ui/primitives';
 import { Component, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { type Position, type RendererProps } from '@vibequest/shared';
@@ -22,7 +23,7 @@ function CompatibilityRecovery() {
     <span className="compatibility-icon" aria-hidden="true">◇</span>
     <h3>The district needs WebGL</h3>
     <p>Enable hardware acceleration in a current desktop browser, then reload. Your session stays in the app.</p>
-    <button className="button secondary" onClick={() => window.location.reload()}>Reload preview</button>
+    <Button className="button secondary" onClick={() => window.location.reload()}>Reload preview</Button>
     <small>Compatibility recovery does not start a game or advance a mission.</small>
   </div>;
 }
@@ -135,10 +136,8 @@ export function WorldRenderer({ state, onAction, onTalk }: RendererProps) {
     </Canvas></CanvasBoundary> : <CompatibilityRecovery />}
     {hasWebGl && <>
       <div className="district-labels" aria-hidden="true">{landmarks.map((mark, i) => <span key={mark.label} ref={(node) => { labels.current[i] = node; }} className="district-landmark" lang="zh-Hans">{mark.label}</span>)}</div>
-      <div className="world-caption"><span className="live-dot" />The district<span>Third-person navigation</span></div>
-      <div className="district-nearby" aria-label="Nearby interactions">{nearby.map((target, i) => <button key={target.id} disabled={busy || state.status !== 'active'} onClick={() => void interact(target.id)} data-target-id={target.id}><span lang="zh-Hans">{target.label}</span>{i === 0 ? ' · E' : ''}</button>)}</div>
-      <div className="world-note">Click the district · WASD / arrows to walk · Drag to turn · E to interact</div>
-      {error && <div className="district-error" role="alert">{error}<button onClick={() => { setError(''); root.current?.focus(); }}>Dismiss</button></div>}
+      <div className="district-nearby" aria-label="Nearby interactions">{nearby.map((target, i) => <Button key={target.id} disabled={busy || state.status !== 'active'} onClick={() => void interact(target.id)} data-target-id={target.id}><span lang="zh-Hans">{target.label}</span>{i === 0 ? ' · E' : ''}</Button>)}</div>
+      {error && <div className="district-error" role="alert">{error}<Button onClick={() => { setError(''); root.current?.focus(); }}>Dismiss</Button></div>}
     </>}
   </section>;
 }

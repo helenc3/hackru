@@ -4,7 +4,7 @@ Spec version 2.0 · Suggested owner A (integration) with parallel agents · Invo
 
 ## Context available to a fresh account
 
-VibeQuest is a single-player desktop Mandarin Chinese simulation. Spec 2.0 replaces the station campaign (P1/P2/B1) with three exploration quests — buy a drink, ask for directions to 上海大酒店, and get a photo taken at 黄浦江 — in a Shanghai-style city streamed in 40 × 40 chunks as the player walks. Microphone input → ElevenLabs STT → AI interpretation/dialogue → ElevenLabs NPC speech remains required core functionality, with typed/subtitle accessibility in the same world. Deterministic code owns facts, routes, landmarks, purchases, photos, and completion; Claude may only compose neighborhoods from an approved, versioned component catalog behind a feature flag, and a seeded fallback generator always works. This packet requires no chat history.
+Speak Your Way is a single-player desktop Mandarin Chinese simulation. Spec 2.0 replaces the station campaign (P1/P2/B1) with three exploration quests — buy a drink, ask for directions to 上海大酒店, and get a photo taken at 黄浦江 — in a Shanghai-style city streamed in 40 × 40 chunks as the player walks. Microphone input → ElevenLabs STT → AI interpretation/dialogue → ElevenLabs NPC speech remains required core functionality, with typed/subtitle accessibility in the same world. Deterministic code owns facts, routes, landmarks, purchases, photos, and completion; Claude may only compose neighborhoods from an approved, versioned component catalog behind a feature flag, and a seeded fallback generator always works. This packet requires no chat history.
 
 ## Mandatory reads
 

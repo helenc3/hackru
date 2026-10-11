@@ -1,6 +1,6 @@
 # Art Style Prompt: "Toon Spike × Powerpuff Girls × Genshin"
 
-Restyle VibeQuest's visuals with a new art direction: **"Toon Spike × Powerpuff Girls × Genshin."** This changes only how things look. Do not touch gameplay, the frozen contracts, `sceneManifest` colliders/positions, mission logic, or test IDs.
+Restyle Speak Your Way's visuals with a new art direction: **"Toon Spike × Powerpuff Girls × Genshin."** This changes only how things look. Do not touch gameplay, the frozen contracts, `sceneManifest` colliders/positions, mission logic, or test IDs.
 
 ## Art direction
 

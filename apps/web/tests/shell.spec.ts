@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 
 test('implemented engine starts an authoritative production session', async ({ page }) => {
   await page.goto('/');
-  await expect(page).toHaveTitle('VibeQuest · Mandarin in motion');
+  await expect(page).toHaveTitle('Speak Your Way · Mandarin in motion');
   await expect(page.getByTestId('start-panel')).toBeVisible();
   await page.getByRole('button', { name: 'Start exploring' }).click();
   await expect(page.getByTestId('world-renderer')).toBeVisible();

@@ -1,4 +1,4 @@
-# VibeQuest build kit
+# Speak Your Way build kit
 
 This repository contains the portable specification and Segment-000 foundation for a four-person HackRU team. The foundation includes shared contracts, a static Mandarin world preview, explicit unfinished feature slots, server route stubs, and quality checks. Gameplay and live voice are built by the following segments. Every participating account must open a checkout of this repository and have its own GitHub authentication; accounts do not inherit this chat or access to another account's local files.
 

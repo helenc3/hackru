@@ -84,7 +84,7 @@ export function App() {
   if (!session.state) {
     return <div className="game-shell welcome-shell" data-testid="welcome-shell">
       <div className="game-world world-preview" aria-hidden="true" inert><WorldRenderer state={previewState} onAction={previewAction} onTalk={previewTalk} preview /></div>
-      <main className="welcome-screen"><a className="brand" href="/">VibeQuest<span className="brand-dot">.</span></a>{starter}</main>
+      <main className="welcome-screen"><a className="brand" href="/">Speak Your Way<span className="brand-dot">.</span></a>{starter}</main>
     </div>;
   }
 
@@ -92,7 +92,7 @@ export function App() {
   const guide = state.directions ? state.interactables.find((item) => item.id === state.directions?.fromAnchorId && item.kind === 'npc') : undefined;
 
   return <div className="game-shell" data-testid="game-shell" data-dialogue-open={Boolean(npc)}>
-    <header className="game-topbar"><a className="brand" href="#world">VibeQuest<span className="brand-dot">.</span></a><span>Quest {state.missionId.slice(1)} · {state.zoneId}</span>{state.validationMode ? <span className="environment-banner">Developer validation · all XP, loot and badges are simulated. Progress stays separate from player sessions.</span> : state.providerStatus !== 'live' ? <span className="environment-banner">{state.providerStatus === 'fixture' ? 'Fixture demonstration · scripted responses' : 'Voice or AI service is degraded · retry or use the same-world fallback.'}</span> : null}<div className="topbar-controls">
+    <header className="game-topbar"><a className="brand" href="#world">Speak Your Way<span className="brand-dot">.</span></a><span>Quest {state.missionId.slice(1)} · {state.zoneId}</span>{state.validationMode ? <span className="environment-banner">Developer validation · all XP, loot and badges are simulated. Progress stays separate from player sessions.</span> : state.providerStatus !== 'live' ? <span className="environment-banner">{state.providerStatus === 'fixture' ? 'Fixture demonstration · scripted responses' : 'Voice or AI service is degraded · retry or use the same-world fallback.'}</span> : null}<div className="topbar-controls">
       <LookupPanel />
       <ReviewPanel />
       {!state.validationMode && <BackgroundMusic active={state.status === 'active'} conversation={Boolean(npc)} />}

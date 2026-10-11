@@ -1,4 +1,4 @@
-# VibeQuest — HackRU implementation specification
+# Speak Your Way — HackRU implementation specification
 
 Version 2.0 · Revised October 11, 2026 (1.2 prepared October 10, 2026) · Planning baseline: 24 elapsed hours
 
@@ -10,7 +10,7 @@ This is the implementation contract for four people, three attending their first
 
 **Pitch:** Navigate a foreign city by understanding its people, signs, and announcements. AI characters react to how you communicate, and the next practice mission targets what you struggled with.
 
-Working name: **VibeQuest**. Target language: **Mandarin Chinese**, with **Simplified Chinese** world text and standard Mandarin audio. Instruction language: English. Audience: beginner to early-intermediate learners. Desktop browser, one player, one session. Author short reviewed Mandarin cues, Unicode text, and a font with Chinese glyph coverage. Practice may reveal tone-marked pinyin and English meanings on demand; these are scaffolds, not a separate gameplay mode. Do not add a language selector.
+Working name: **Speak Your Way**. Target language: **Mandarin Chinese**, with **Simplified Chinese** world text and standard Mandarin audio. Instruction language: English. Audience: beginner to early-intermediate learners. Desktop browser, one player, one session. Author short reviewed Mandarin cues, Unicode text, and a font with Chinese glyph coverage. Practice may reveal tone-marked pinyin and English meanings on demand; these are scaffolds, not a separate gameplay mode. Do not add a language selector.
 
 Build a Shanghai-inspired third-person city that streams in 40 × 40-unit chunks as the player walks (section 17): dense level streets, lane houses, apartment compounds, shops and cafés, offices, parks, creeks, and a Huangpu River waterfront. It is recognizable, not a literal map, and makes no claim of geographic accuracy. A seeded regional planner fixes districts, avenues, and water; Claude may compose local neighborhoods from an approved component library behind a feature flag, and a seeded fallback generator builds every chunk when Claude is off, slow, or invalid.
 

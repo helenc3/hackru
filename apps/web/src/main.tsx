@@ -4,7 +4,7 @@ import { App } from './app/App';
 import './app/styles.css';
 
 const root = document.getElementById('root');
-if (!root) throw new Error('VibeQuest root element is missing.');
+if (!root) throw new Error('Speak Your Way root element is missing.');
 
 // Read-only component gallery for visual review; lazy so it stays out of the game's load path.
 const Gallery = window.location.pathname === '/__gallery'

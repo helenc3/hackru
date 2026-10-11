@@ -7,12 +7,12 @@ const config = loadConfig();
 const services = createServices(config);
 const app = createApp({ config, services });
 const server = app.listen(config.port, config.host, () => {
-  console.info(`VibeQuest server listening at http://${config.host}:${config.port}`);
+  console.info(`Speak Your Way server listening at http://${config.host}:${config.port}`);
 });
 attachLiveRelay(server, services);
 
 server.on('error', () => {
-  console.error('VibeQuest server could not start. Check the configured port.');
+  console.error('Speak Your Way server could not start. Check the configured port.');
   process.exitCode = 1;
 });
 

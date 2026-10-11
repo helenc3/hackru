@@ -145,7 +145,7 @@ describe('single-origin production serving', () => {
     // filesystem ancestors as requested dotfiles.
     publicDirectory = join(fixtureRoot, '.checkout', 'web', 'dist');
     await mkdir(join(publicDirectory, 'assets'), { recursive: true });
-    await writeFile(join(publicDirectory, 'index.html'), '<!doctype html><title>VibeQuest 世界</title>');
+    await writeFile(join(publicDirectory, 'index.html'), '<!doctype html><title>Speak Your Way 世界</title>');
     await writeFile(join(publicDirectory, 'assets', 'shell.js'), 'console.info("shell fixture");');
   });
 
@@ -158,7 +158,7 @@ describe('single-origin production serving', () => {
     for (const path of ['/', '/world', '/world/cafe']) {
       const response = await request(app).get(path).expect(200);
       expect(response.headers['content-type']).toContain('text/html');
-      expect(response.text).toContain('VibeQuest 世界');
+      expect(response.text).toContain('Speak Your Way 世界');
     }
     const asset = await request(app).get('/assets/shell.js').expect(200);
     expect(asset.text).toBe('console.info("shell fixture");');

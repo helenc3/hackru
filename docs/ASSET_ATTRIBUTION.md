@@ -2,7 +2,7 @@
 
 The district uses original boxes, planes, low-poly capsules and spheres generated
 with the repository's Three.js primitives. No downloaded models, textures,
-or fonts are included. Downloaded audio is documented below. The palette and placement are authored for VibeQuest.
+or fonts are included. Downloaded audio is documented below. The palette and placement are authored for Speak Your Way.
 Chinese text uses installed system fonts: Noto Sans SC, PingFang SC, Microsoft
 YaHei, then sans-serif. No font files are redistributed and there is no network
 font dependency. Three.js, React and React Three Fiber retain their package

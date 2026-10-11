@@ -1,4 +1,4 @@
-# VibeQuest agent entry point
+# Speak Your Way agent entry point
 
 These instructions apply when this build kit is installed at the implementation repository root. The human team has chosen numbered, independently invokable build segments. A request such as `Build Segment-003` means: implement that segment, run its acceptance checks and repository checks, commit/push its branch, create a pull request, and merge it when green and permitted by repository rules. Do not stop at a plan or ask again for routine in-scope implementation or merge authorization.
 

@@ -12,7 +12,7 @@ export function StartPanel({ validation, fixtures, pending, resumeId, savedWorld
   const { microphone, audio, checking, recordingUrl, microphonePlayer, audioPlayer, checkMicrophone, checkAudio, setAudio } = useDeviceCheck();
 
   return <section className="start-panel" aria-labelledby="start-title" data-testid="start-panel">
-    <div><span className="eyebrow">YOUR MANDARIN ADVENTURE</span><h2 id="start-title">Explore Shanghai in Mandarin.</h2><p>Buy a drink, ask the way to the Grand Hotel, and get your photo taken by the Huangpu River.</p></div>
+    <div><span className="eyebrow">YOUR MANDARIN ADVENTURE</span><h2 id="start-title">Explore Shanghai in Mandarin.</h2><p>Buy a drink from Lao Wang, ask Xiao Li the way to the Grand Hotel, and get your photo taken by the Huangpu River.</p></div>
     <div className="intro-columns"><div className="intro-setup">
     <fieldset disabled={pending}><legend>How much Mandarin have you used?</legend>
       <label><input type="radio" name="tier" checked={tier === 0} onChange={() => setTier(0)} />New learner</label>

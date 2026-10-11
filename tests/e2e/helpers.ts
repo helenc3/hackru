@@ -116,7 +116,15 @@ export async function harness(request: APIRequestContext) {
     const coords = [[0, 0], [-1, 0], [1, 0], [0, -1], [0, 1]].map(([dx, dz]) => ({ cx: cx + dx!, cz: cz + dz! }));
     const chunks = await request.post(`${HARNESS}/api/sessions/${state.sessionId}/chunks`, { data: { coords, urgent: true } });
     expect(chunks.status()).toBe(200);
-    await act({ type: 'move', position });
+    // Planned points can sit inside a seeded prop; step to the nearest walkable point within 3 m.
+    for (const radius of [0, 0.75, 1.5, 2.25, 3]) {
+      for (const angle of radius ? [0, 1, 2, 3, 4, 5, 6, 7] : [0]) {
+        const candidate = { x: position.x + radius * Math.cos(angle * Math.PI / 4), z: position.z + radius * Math.sin(angle * Math.PI / 4) };
+        const response = await raw('actions', { actionId: `h-${++n}`, expectedVersion: state.version, action: { type: 'move', position: candidate } });
+        if (response.status() === 200) { state = (await response.json()).state; return; }
+      }
+    }
+    throw new Error(`No walkable point within 3 m of ${JSON.stringify(position)}`);
   };
   const anchor = (predicate: (target: PublicState['interactables'][number]) => boolean) => {
     const found = state.interactables.find(predicate);

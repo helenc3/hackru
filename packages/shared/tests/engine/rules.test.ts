@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { applyAction, applyEvaluation, createGame, dialogueContext, isClosingLine, projectPublicState } from '../../src/engine/index.js';
+import { applyAction, applyEvaluation, createGame, dialogueContext, isClosingLine, npcActions, projectPublicState, turnActions } from '../../src/engine/index.js';
 import { groundedReplies } from '../../src/content/facts.js';
 import { createFixtureDialogueProvider, parseFixturePrice } from '../../src/engine/fixture-dialogue.js';
 import { missionFor } from '../../src/content/missions.js';
@@ -27,72 +27,78 @@ async function say(state: InternalState, text: string, npcId: NpcId = 'vendor', 
   return { ...result, reply: result.state.npcState[npcId].history.at(-1)!.text };
 }
 const act = (state: InternalState, action: Parameters<typeof applyAction>[1], at = NOW) => applyAction(state, action, at, fakeWorld).state;
-async function confirmedTea(state: InternalState) {
-  return (await say((await say(state, '我要茶')).state, '茶十元')).state;
+async function orderedTea(state: InternalState) {
+  return (await say(state, '我要茶')).state;
 }
 
 describe('Q1 buy a drink', () => {
-  it('mirrors the café flow: coffee sold out, substitute, confirm price, explicit pay', async () => {
+  it('is one goal: coffee is sold out in dialogue, the priced drink enables Pay, the first purchase completes it', async () => {
     let state = game();
+    expect(projectPublicState(state, NOW, fakeWorld).objectives).toEqual([{ id: 'q1.buy', label: 'Buy a drink from 老王 (Lao Wang).', complete: false }]);
     const coffee = await say(state, '我要咖啡');
     expect(coffee.reply).toBe(groundedReplies.coffeeUnavailable);
-    expect(coffee.state.nodeId).toBe('q1.substitute');
+    expect(coffee.state.nodeId).toBe('q1.buy');
+    expect(turnActions(coffee.state, 'a.vendor', false)).toEqual([]); // no pay for coffee
     const tea = await say(coffee.state, '那就茶吧');
     expect(tea.reply).toBe(groundedReplies.teaPrice);
-    state = (await say(tea.state, '茶十元')).state;
-    expect(state.flags['q1.price-confirmed']).toBe(true);
+    state = tea.state;
+    expect(turnActions(state, 'a.vendor', false)).toEqual([{ kind: 'pay', anchorId: 'a.vendor', drink: 'tea', priceCny: 10 }]);
     const projected = projectPublicState(state, NOW, fakeWorld);
     expect(projected.inventory.cny).toBe(20);
+    expect(projected.npcActions).toEqual([{ anchorId: 'a.vendor', action: { kind: 'pay', anchorId: 'a.vendor', drink: 'tea', priceCny: 10 } }]);
     expect(projected.interactables.find((entry) => entry.id === 'a.vendor')).toMatchObject({ kind: 'npc', role: 'vendor', choiceId: 'q1.pay' });
     expect(projected.interactables.find((entry) => entry.id === 'a.vendor.pay')).toMatchObject({ kind: 'choice', choiceId: 'q1.pay', position: { x: 0, z: 2 } });
-    const paid = act(state, { type: 'choose', choiceId: 'q1.pay', anchorId: 'a.vendor.pay' });
+    const paid = act(state, { type: 'choose', choiceId: 'q1.pay', anchorId: 'a.vendor' });
     expect(paid).toMatchObject({ status: 'cleared', inventory: { cny: 10, drinks: ['tea'] }, xp: 100, unlockedMissionIds: ['Q1', 'Q2', 'Q3'], completedMissionIds: ['Q1'] });
     expect(paid.purchases).toHaveLength(1);
+    expect(projectPublicState(paid, NOW, fakeWorld).objectives).toEqual([{ id: 'q1.buy', label: 'Buy a drink from 老王 (Lao Wang).', complete: true }]);
+    expect(turnActions(paid, 'a.vendor', false)).toEqual([{ kind: 'end-conversation' }]); // pay disappears after the purchase
   });
   it('accepts natural requests like 我要水 without perfect politeness', async () => {
     const water = await say(game(), '我要水。');
     expect(water.reply).toBe(groundedReplies.waterPrice);
     expect(water.state.flags['q1.drink']).toBe('water');
   });
-  it('requires the confirmed price and the same vendor before paying', async () => {
-    const ordered = (await say(game(), '我要茶')).state;
-    expect(() => act(ordered, { type: 'choose', choiceId: 'q1.pay', anchorId: 'a.vendor' })).toThrow('Confirm the drink');
-    const confirmed = await confirmedTea(game());
+  it('requires a priced drink and the same vendor before paying', async () => {
+    expect(() => act(game(), { type: 'choose', choiceId: 'q1.pay', anchorId: 'a.vendor' })).toThrow('Ask the vendor');
+    expect(npcActions(game())).toEqual([]);
+    const confirmed = await orderedTea(game());
     confirmed.position = { x: 30, z: 1 };
     expect(() => act(confirmed, { type: 'choose', choiceId: 'q1.pay', anchorId: 'a.vendor2' })).toThrow('vendor who took your order');
     confirmed.position = { x: 10, z: 1 };
     expect(() => act(confirmed, { type: 'choose', choiceId: 'q1.pay', anchorId: 'a.vendor' })).toThrow('Move closer');
   });
   it('rejects insufficient funds without changing state, and repeat purchases never re-grant the reward', async () => {
-    let state = act(await confirmedTea(game()), { type: 'choose', choiceId: 'q1.pay', anchorId: 'a.vendor' });
+    let state = act(await orderedTea(game()), { type: 'choose', choiceId: 'q1.pay', anchorId: 'a.vendor' });
     state = act(state, { type: 'retryMission' });
-    state = (await say((await say(state, '我要水')).state, '水五元')).state;
+    state = (await say(state, '我要水')).state;
     state = act(state, { type: 'choose', choiceId: 'q1.pay', anchorId: 'a.vendor' });
     expect(state).toMatchObject({ status: 'cleared', xp: 100, inventory: { cny: 5, drinks: ['tea', 'water'] } });
     expect(state.purchases).toHaveLength(2);
-    const broke = await confirmedTea(act(state, { type: 'retryMission' }));
+    const broke = await orderedTea(act(state, { type: 'retryMission' }));
     expect(() => act(broke, { type: 'choose', choiceId: 'q1.pay', anchorId: 'a.vendor' })).toThrow('Not enough money');
     expect(broke.inventory.cny).toBe(5);
     const bye = await say(broke, '谢谢，再见');
     expect(bye.state.status).toBe('active');
     expect(bye.state.inventory.cny).toBe(5);
   });
-  it('pays on a goodbye after the price is confirmed', async () => {
-    const bye = await say(await confirmedTea(game()), '谢谢，再见');
-    expect(bye.reply).toBe(groundedReplies.farewellPaid);
+  it('a goodbye never pays; it offers End conversation next to Pay', async () => {
+    const bye = await say(await orderedTea(game()), '谢谢，再见');
     expect(bye.conversationEnded).toBe(true);
-    expect(bye.state).toMatchObject({ status: 'cleared', inventory: { cny: 10 } });
+    expect(bye.state).toMatchObject({ status: 'active', inventory: { cny: 20 } });
+    expect(turnActions(bye.state, 'a.vendor', true)).toEqual([{ kind: 'pay', anchorId: 'a.vendor', drink: 'tea', priceCny: 10 }, { kind: 'end-conversation' }]);
   });
   it('clarifies ambiguous requests and cancels without progress', async () => {
     const state = game();
     const evaluation = TurnEvaluationSchema.parse({ intent: 'order_drink', slots: [], evidenceQuote: '我要', intentGrade: { score: 0.9, confidence: 0.9 }, clarity: 0.8, courtesy: 0.8, targetLanguageUse: 'yes', interaction: 'relevant', replyZh: '好的', coach: null });
     const result = applyEvaluation(reserve(state, '我要', 'vendor', 'a.vendor'), 'vendor', 'a.vendor', evaluation, NOW, fakeWorld);
-    expect(result.state.nodeId).toBe('q1.order');
+    expect(result.state.nodeId).toBe('q1.buy');
     expect(result.state.npcState.vendor.history.at(-1)!.text).toBe(groundedReplies.missingDrinkPrice);
     const unclear = await say(state, '我想去月球。');
-    expect(unclear.state.nodeId).toBe('q1.order');
+    expect(unclear.state.nodeId).toBe('q1.buy');
     const cancelled = await say((await say(state, '我要茶')).state, '我不要了');
-    expect(cancelled.state.nodeId).toBe('q1.order');
+    expect(cancelled.state.nodeId).toBe('q1.buy');
+    expect(npcActions(cancelled.state)).toEqual([]); // cancelling withdraws the Pay button
     expect(cancelled.reply).toBe(groundedReplies.cancelOrder);
   });
   it('greets with 你想喝什么 and repeats the last line on request', async () => {
@@ -118,6 +124,8 @@ describe('Q2 directions to 上海大酒店', () => {
     expect(result.state.directions).toEqual(route);
     expect(result.reply).toBe(route.textZh);
     expect(result.events.some((event) => event.kind === 'directions')).toBe(true);
+    expect(result.state.missionId).toBe('Q2');
+    expect(turnActions(result.state, 'a.guide', false)).toEqual([{ kind: 'show-directions' }, { kind: 'end-conversation' }]);
   });
   it('does not complete or invent a route when the world has none', async () => {
     const result = await say(game('Q2', { x: 10, z: 11 }), '请问，去上海大酒店怎么走？', 'guide', 'a.guide2');
@@ -144,7 +152,8 @@ describe('Q3 photo at the Huangpu River', () => {
     const result = await accepted();
     expect(result.reply).toBe(groundedReplies.photoAccepted);
     expect(result.state.photo).toMatchObject({ status: 'accepted', passerbyAnchorId: 'a.passerby', viewpointAnchorId: 'a.view', spot });
-    expect(result.state.nodeId).toBe('q3.pose');
+    expect(result.state.nodeId).toBe('q3.photo');
+    expect(turnActions(result.state, 'a.passerby', false)).toEqual([{ kind: 'go-to-photo-spot', spot }]);
     const projected = projectPublicState(result.state, NOW, fakeWorld);
     expect(projected.interactables.find((entry) => entry.id === 'a.view')).toMatchObject({ kind: 'photo-spot', choiceId: 'q3.start-photo', position: spot });
   });
@@ -168,7 +177,7 @@ describe('Q3 photo at the Huangpu River', () => {
     expect(() => act(moved, { type: 'photoCapture', photoRequestId: photoId, outcome: 'captured', imageDigest: 'abcdef0123456789' }, end)).toThrow('left the photo spot');
     state = act(state, { type: 'photoCapture', photoRequestId: photoId, outcome: 'failed' }, end);
     expect(state.photo).toMatchObject({ status: 'accepted', attempts: 1 });
-    expect(state.nodeId).toBe('q3.pose');
+    expect(state.nodeId).toBe('q3.photo');
     state = act(state, { type: 'choose', choiceId: 'q3.start-photo', anchorId: 'a.view' }, end);
     const late = end + PHOTO_RULES.countdownMs + PHOTO_RULES.captureWindowMs + 1;
     expect(() => act(state, { type: 'photoCapture', photoRequestId: photoId, outcome: 'captured', imageDigest: 'abcdef0123456789' }, late)).toThrow('expired');

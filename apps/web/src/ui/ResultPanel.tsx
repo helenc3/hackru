@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { cues, missions, type MissionId, type PublicState, type RendererProps } from '@vibequest/shared';
 import { SkillDebrief } from './SkillDebrief';
 
-export const missionTitles: Record<MissionId, string> = { Q1: 'Buy a drink', Q2: 'Directions to the Grand Hotel', Q3: 'A photo by the Huangpu' };
+export const missionTitles: Record<MissionId, string> = { Q1: 'Buy a drink from Lao Wang', Q2: 'Ask Xiao Li the way', Q3: 'A photo by the Huangpu' };
 
 /** Study list from authored content only: cue text plus the "X means Y" glosses inside the mission hints. */
 export function vocabFor(missionId: MissionId): { zh: string; en: string; kind: 'reading' | 'listening' | 'conversation' }[] {

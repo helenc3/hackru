@@ -50,7 +50,7 @@ describe('seeded fallback chunks', () => {
         const m = generateFallbackChunk(worldId, seed, coord, context(), plan);
         expect(m.placements.every((p) => ids.has(p.assetId))).toBe(true);
         for (const required of plan.requiredAnchors) expect(m.anchors.map((a) => a.id), `${worldId} ${coord.cx},${coord.cz}`).toContain(required.anchorId);
-        if (inSpawnBox(coord) && coord.cx === 0 && coord.cz === 0) expect(m.anchors.find((a) => a.capability === 'drink-vendor')?.nameKey).toBe('xiaolin');
+        if (inSpawnBox(coord) && coord.cx === 0 && coord.cz === 0) expect(m.anchors.find((a) => a.capability === 'drink-vendor')?.nameKey).toBe('laowang');
       }
     }
   });

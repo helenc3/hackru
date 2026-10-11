@@ -2,6 +2,7 @@ import { Component, useEffect, useMemo, useRef, useState, type ReactNode } from 
 import { Canvas, useThree } from '@react-three/fiber';
 import { VISIBLE_RADIUS_CHUNKS, chunkOf, chunkOrigin, text, type ChunkManifest, type Position, type RendererProps } from '@vibequest/shared';
 import { distance, nearbyTargets, targetAction, walkingPath } from './navigation';
+import { registerWalkHandler } from './walk-request';
 import { DEFAULT_PITCH, dragOrbit } from './camera';
 import { Cue } from './decor';
 import { DestinationMarker } from './DestinationMarker';
@@ -95,6 +96,13 @@ export function WorldRenderer({ state, onAction, onTalk, preview = false, manife
     r.keys.clear(); r.path = []; r.busy = false; r.syncing = false; syncPromise.current = Promise.resolve();
     setPosition({ ...r.position }); setBusy(false);
   }, [sessionKey]);
+  // UI buttons (e.g. "Go to photo spot") walk the player like a ground click.
+  const view = useRef(city.view); view.current = city.view;
+  useEffect(() => preview ? undefined : registerWalkHandler((target) => {
+    const r = runtime.current;
+    root.current?.focus();
+    r.keys.clear(); r.path = walkingPath(view.current, r.position, target);
+  }), [preview]);
   useEffect(() => {
     const clear = () => { runtime.current.keys.clear(); runtime.current.path = []; runtime.current.active = false; drag.current = null; };
     window.addEventListener('blur', clear);

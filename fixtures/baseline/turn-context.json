@@ -4,7 +4,7 @@
   "tier": 1,
   "npcId": "vendor",
   "anchorId": "fixture-anchor.vendor",
-  "nameZh": "小林",
+  "nameZh": "老王",
   "persona": "Warm, encouraging drink vendor; Mandarin Chinese.",
   "patience": 5,
   "allowedIntents": [

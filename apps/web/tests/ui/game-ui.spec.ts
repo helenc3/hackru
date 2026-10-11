@@ -6,7 +6,7 @@ async function start(page: import('@playwright/test').Page) {
   await page.getByRole('button', { name: 'Start exploring', exact: true }).click();
   await expect(page.getByTestId('game-shell')).toBeVisible();
 }
-async function typedPanel(page: import('@playwright/test').Page, npc = '小林') {
+async function typedPanel(page: import('@playwright/test').Page, npc = '老王') {
   await page.getByRole('button', { name: `${npc} · Talk`, exact: true }).click();
   const panel = page.getByTestId('dialogue-panel');
   await expect(panel).toBeVisible();
@@ -70,35 +70,49 @@ test('Chinese IME Enter waits for composition to finish and the focused panel co
   expect(api.requests.filter((request) => request.path.endsWith('/turns'))).toHaveLength(1);
 });
 
-test('turns carry the NPC role and anchor; paying is an explicit vendor action', async ({ page }) => {
+test('turns carry the NPC role and anchor; the server-enabled Pay button completes Q1', async ({ page }) => {
+  const pay = { kind: 'pay' as const, anchorId: 'ui.vendor', drink: 'water' as const, priceCny: 5 };
   const api = await installScriptedApi(page, { steps: [
-    { text: '我要水。', reply: '一杯水五元。请确认：水五元，对吗？' },
-    { action: { type: 'choose', choiceId: 'q1.pay', anchorId: 'ui.vendor' }, patch: { inventory: { hint: 1, cny: 15, drinks: ['water'] }, completedMissionIds: ['Q1'] }, event: 'Bought water for ¥5.' },
+    { text: '我要水。', reply: '好的，一杯水，五元。', patch: { npcActions: [{ anchorId: 'ui.vendor', action: pay }] } },
+    { action: { type: 'choose', choiceId: 'q1.pay', anchorId: 'ui.vendor' }, patch: { status: 'cleared', inventory: { hint: 1, cny: 15, drinks: ['water'] }, npcActions: [], completedMissionIds: ['Q1'], objectives: [{ id: 'q1.goal', label: 'Buy a drink from 老王 (Lao Wang).', complete: true }] }, event: 'Paid ¥5 for water.' },
   ] });
   await start(page); const panel = await typedPanel(page);
   await expect(page.getByTestId('wallet')).toContainText('¥20');
+  await expect(panel.getByTestId('pay-button')).toHaveCount(0); // no Pay until the vendor has priced a drink
   await panel.getByRole('textbox').fill('我要水。'); await panel.getByRole('button', { name: 'Send Mandarin' }).click();
-  await expect(panel.getByTestId('npc-reply')).toContainText('水五元');
+  await expect(panel.getByTestId('npc-reply')).toContainText('五元');
   const turn = api.requests.find((request) => request.path.endsWith('/turns'))?.body as { npcId: string; anchorId: string };
   expect(turn).toMatchObject({ npcId: 'vendor', anchorId: 'ui.vendor' });
+  await expect(panel.getByTestId('pay-button')).toHaveText(/Pay ¥5 for 水 water/);
   await panel.getByTestId('pay-button').click();
   await expect(page.getByTestId('wallet')).toContainText('¥15');
   await expect(page.getByTestId('drinks')).toContainText('水');
-  await expect(page.getByTestId('mission-progress').getByRole('checkbox', { name: 'Buy a drink cleared' })).toBeChecked();
+  await expect(page.getByTestId('mission-progress').getByRole('checkbox', { name: 'Buy a drink from Lao Wang cleared' })).toBeChecked();
   expect(api.failures).toEqual([]); expect(api.remaining()).toBe(0);
+});
+
+test('Pay is disabled when money is short', async ({ page }) => {
+  const pay = { kind: 'pay' as const, anchorId: 'ui.vendor', drink: 'tea' as const, priceCny: 10 };
+  const api = await installScriptedApi(page, { steps: [{ text: '我要茶。', reply: '好的，一杯茶，十元。', patch: { npcActions: [{ anchorId: 'ui.vendor', action: pay }] } }] });
+  api.patch({ inventory: { hint: 1, cny: 5, drinks: [] } });
+  await start(page); const panel = await typedPanel(page);
+  await panel.getByRole('textbox').fill('我要茶。'); await panel.getByRole('button', { name: 'Send Mandarin' }).click();
+  await expect(panel.getByTestId('pay-button')).toBeDisabled();
+  await expect(panel.getByTestId('pay-button')).toContainText('only ¥5 left');
+  expect(api.failures).toEqual([]);
 });
 
 test('verified hotel directions show Mandarin steps with English and reopen the guide to repeat', async ({ page }) => {
   const directions = { routeId: 'route-1', fromAnchorId: 'ui.guide', hotelAnchorId: 'hotel.grand', textZh: '沿着南京路往东走，上海大酒店在右边。', steps: [{ textZh: '沿着南京路往东走', english: 'Walk east along Nanjing Road' }, { textZh: '上海大酒店在右边', english: 'The hotel is on the right' }] };
-  const api = await installScriptedApi(page, { mission: 'Q2', steps: [{ text: '请问，去上海大酒店怎么走？', reply: directions.textZh, patch: { directions } }] });
-  await start(page); const panel = await typedPanel(page, '阿陈');
+  const api = await installScriptedApi(page, { mission: 'Q2', steps: [{ text: '请问，去上海大酒店怎么走？', reply: directions.textZh, patch: { directions, npcActions: [{ anchorId: 'ui.guide', action: { kind: 'show-directions' } }] } }] });
+  await start(page); const panel = await typedPanel(page, '小李');
   await panel.getByRole('textbox').fill('请问，去上海大酒店怎么走？'); await panel.getByRole('button', { name: 'Send Mandarin' }).click();
   await expect(panel.getByTestId('npc-reply')).toContainText('南京路');
-  await panel.getByRole('button', { name: 'Close conversation' }).click();
+  await panel.getByTestId('show-directions').click();
   const card = page.getByTestId('directions-card');
   await expect(card).toContainText('Walk east along Nanjing Road');
   await card.getByRole('button', { name: 'Ask them to repeat' }).click();
-  await expect(page.getByTestId('dialogue-panel')).toContainText('阿陈');
+  await expect(page.getByTestId('dialogue-panel')).toContainText('小李');
   expect(api.failures).toEqual([]);
 });
 
@@ -201,7 +215,7 @@ test('quest restart completes during a pending provider turn and ignores its lat
   await expect(page.getByRole('button', { name: 'Restart quest' })).toBeEnabled();
   await page.getByRole('button', { name: 'Restart quest' }).click();
   await expect(page.getByTestId('dialogue-panel')).toHaveCount(0);
-  await expect(page.getByRole('button', { name: '小林 · Talk', exact: true })).toBeEnabled();
+  await expect(page.getByRole('button', { name: '老王 · Talk', exact: true })).toBeEnabled();
   release();
   const fresh = await typedPanel(page);
   await fresh.getByRole('textbox').fill('我要茶。');
@@ -272,7 +286,7 @@ test('a goodbye turn closes the conversation by itself', async ({ page }) => {
   await start(page); const panel = await typedPanel(page);
   await panel.getByRole('textbox').fill('再见。'); await panel.getByRole('button', { name: 'Send Mandarin' }).click();
   await expect(page.getByTestId('dialogue-panel')).toHaveCount(0);
-  await expect(page.getByRole('button', { name: '小林 · Talk', exact: true })).toBeEnabled();
+  await expect(page.getByRole('button', { name: '老王 · Talk', exact: true })).toBeEnabled();
 });
 
 test('quest results card closes, reopens from the progress list, and offers Play again', async ({ page }) => {
@@ -301,12 +315,12 @@ test('quest results card closes, reopens from the progress list, and offers Play
   await result.getByRole('button', { name: 'Close results' }).click();
   await expect(result).toHaveCount(0);
   const progress = page.getByTestId('mission-progress');
-  await expect(progress.getByRole('checkbox', { name: 'Buy a drink cleared' })).toBeChecked();
-  await progress.getByRole('button', { name: 'Review Buy a drink' }).click();
+  await expect(progress.getByRole('checkbox', { name: 'Buy a drink from Lao Wang cleared' })).toBeChecked();
+  await progress.getByRole('button', { name: 'Review Buy a drink from Lao Wang' }).click();
   await expect(result).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(result).toHaveCount(0);
-  await progress.getByRole('button', { name: 'Review Buy a drink' }).click();
+  await progress.getByRole('button', { name: 'Review Buy a drink from Lao Wang' }).click();
   await result.getByRole('button', { name: 'Play again' }).click();
   await expect(result).toHaveCount(0);
   const replay = api.requests.find((request) => request.path.endsWith('/actions') && (request.body as { action: { type: string } }).action.type === 'startMission');
@@ -324,7 +338,7 @@ test('a goodbye ends the conversation and shows the summary card with the exchan
   await expect(card).toContainText('CONVERSATION COMPLETE');
   await expect(page.getByTestId('dialogue-panel')).toHaveCount(0);
   await expect(card.locator('.chat-thread')).toContainText('好的，再见！');
-  await expect(card.getByRole('list', { name: 'Quest summary' }).getByRole('checkbox')).toHaveCount(2);
+  await expect(card.getByRole('list', { name: 'Quest summary' }).getByRole('checkbox')).toHaveCount(1); // one goal per quest
   // A goodbye is final: the card offers no way back into the conversation.
   await expect(card.getByRole('button', { name: 'Talk again' })).toHaveCount(0);
   await card.getByRole('button', { name: 'Back to the world' }).click();

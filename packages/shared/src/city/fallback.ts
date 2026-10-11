@@ -8,6 +8,8 @@ import { sealManifest } from './hash.js';
 import { planChunk, SIDEWALK, worldLayout, type PlannedChunk } from './planner.js';
 import { createRng } from './rng.js';
 import { overlaps, repairManifest, roadRect, rotateRect, validateManifest } from './validate.js';
+/** npc-name keys reserved for the planner's quest givers (spawn vendor 老王, guide 小李). */
+const QUEST_GIVERS = ['laowang', 'xiaoli'];
 
 // Seeded fallback composer (CITY_GENERATION §4, §6, §9). Uses only approved catalog entries, keeps
 // every planner-owned field verbatim, and places required quest anchors exactly where the plan says.
@@ -58,6 +60,8 @@ export function generateFallbackChunk(worldId: string, seed: string, coord: Chun
   let serial = 0;
   const approved = (entry: CatalogEntry | undefined): entry is CatalogEntry => Boolean(entry && entry.review === 'approved');
   const entries = (filter: (entry: CatalogEntry) => boolean) => CATALOG.filter((entry) => approved(entry) && filter(entry));
+  /** Names other than the quest givers, so 老王 and 小李 stay unique. */
+  const extraNames = () => Object.keys(TEXT_CATALOG['npc-name']).filter((k) => !QUEST_GIVERS.includes(k));
 
   if (cx === 0 && cz === 0) { const s = worldLayout(seed).spawn; keep.push(square(s.x, s.z, 1.5)); }
 
@@ -71,7 +75,7 @@ export function generateFallbackChunk(worldId: string, seed: string, coord: Chun
         case 'enum': out[key] = pick(spec.values)!; break;
         case 'boolean': out[key] = rng() < 0.5; break;
         case 'text': {
-          const keys = Object.keys(TEXT_CATALOG[spec.catalog]).filter((k) => spec.catalog !== 'npc-name' || k !== 'xiaolin');
+          const keys = Object.keys(TEXT_CATALOG[spec.catalog]).filter((k) => spec.catalog !== 'npc-name' || !QUEST_GIVERS.includes(k));
           out[key] = spec.catalog === 'menu' ? 'drinks' : pick(keys) ?? spec.default; break;
         }
       }
@@ -211,7 +215,7 @@ export function generateFallbackChunk(worldId: string, seed: string, coord: Chun
     return false;
   }
   /** Sidewalk NPC (guide/passerby) standing 1.2 m from its stand point, facing it. */
-  function figureAt(standX: number, standZ: number, capability: 'direction-helper' | 'photo-passerby', id: string, toward: { dx: number; dz: number } | null, required: boolean): boolean {
+  function figureAt(standX: number, standZ: number, capability: 'direction-helper' | 'photo-passerby', id: string, toward: { dx: number; dz: number } | null, required: boolean, fixedName?: string): boolean {
     const role = capability === 'direction-helper' ? 'guide' : 'passerby';
     let dir = toward;
     if (!dir) { const { face } = frontage(standX, standZ); dir = { dx: -FACE[face].dx, dz: -FACE[face].dz }; }
@@ -219,7 +223,7 @@ export function generateFallbackChunk(worldId: string, seed: string, coord: Chun
     const facing: Face = dir.dx > 0 ? 'w' : dir.dx < 0 ? 'e' : dir.dz > 0 ? 'n' : 's';
     const figures = entries((e) => e.capabilities.includes(capability) && e.placement !== 'socket');
     for (const entry of figures) {
-      const nameKey = pick(Object.keys(TEXT_CATALOG['npc-name']).filter((k) => k !== 'xiaolin'))!;
+      const nameKey = fixedName ?? pick(extraNames())!;
       const placementId = place(entry, randomParams(entry, 'nameKey' in entry.params ? { nameKey } : {}), fx, fz, FACE[facing].rot, { onRoad: true, required });
       if (!placementId) continue;
       addAnchor({ id, placementId, capability, kind: 'npc', role, nameKey, x: round(standX), z: round(standZ) });
@@ -256,8 +260,8 @@ export function generateFallbackChunk(worldId: string, seed: string, coord: Chun
   for (const required of plan.requiredAnchors) {
     const near = required.near ?? { x: CHUNK_SIZE / 2, z: CHUNK_SIZE / 2 };
     switch (required.capability) {
-      case 'drink-vendor': vendorAt(near.x, near.z, required.anchorId, cx === 0 && cz === 0 ? 'xiaolin' : pick(Object.keys(TEXT_CATALOG['npc-name']))!, true); break;
-      case 'direction-helper': figureAt(near.x, near.z, 'direction-helper', required.anchorId, null, true); break;
+      case 'drink-vendor': vendorAt(near.x, near.z, required.anchorId, required.nameKey ?? pick(extraNames())!, true); break;
+      case 'direction-helper': figureAt(near.x, near.z, 'direction-helper', required.anchorId, null, true, required.nameKey); break;
       case 'river-viewpoint': viewpointAt(near.x, near.z, required.anchorId, true); break;
       case 'photo-passerby': {
         const river = plan.water.find((w) => w.kind === 'river');
@@ -345,7 +349,7 @@ export function generateFallbackChunk(worldId: string, seed: string, coord: Chun
       const along = span[0]! + rng() * (span[1]! - span[0]!);
       const front = frontLine(lot.rect, face);
       const stand = behind(face, front, along, -SIDEWALK / 2);
-      vendorAt(stand.x, stand.z, anchorId('vendor'), pick(Object.keys(TEXT_CATALOG['npc-name']).filter((k) => k !== 'xiaolin'))!, false);
+      vendorAt(stand.x, stand.z, anchorId('vendor'), pick(extraNames())!, false);
     }
   }
   if (!requiredKinds.has('direction-helper') && district !== 'industrial' && facing.length && rng() < Math.min(1, 0.3 * weight('direction-helper'))) {

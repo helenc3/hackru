@@ -157,7 +157,7 @@ export interface ChunkPlan {
   /** Level bridges where planner roads cross planner water. */
   bridges: Bridge[];
   /** Anchors that must exist in this chunk (deterministic quest guarantees: hotel, spawn vendor/helper, river viewpoint/passerby). */
-  requiredAnchors: { capability: Capability; anchorId: string; near?: { x: number; z: number } }[];
+  requiredAnchors: { capability: Capability; anchorId: string; near?: { x: number; z: number }; /** Quest-giver name (npc-name catalog key), e.g. 老王 / 小李. */ nameKey?: string }[];
   /** Neighbouring districts for gradual transitions. */
   neighbours: Record<Edge, DistrictKind | 'water'>;
 }

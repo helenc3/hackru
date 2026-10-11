@@ -19,16 +19,16 @@ export function drinkSteps(): Step[] {
   return [
     { action: { type: 'inspect', targetId: 'ui.menu' }, patch: { visibleCues: [{ id: 'q1.menu', label: '菜单', text: '茶 十元\n水 五元\n咖啡 卖完了' }] } },
     { text: '我要咖啡。', reply: '咖啡卖完了。我们有茶和水。', feedback: true },
-    { text: '那我要水，五元，对吗？', reply: '对，一杯水五元。', feedback: true },
-    { action: { type: 'choose', choiceId: 'q1.pay', anchorId: 'ui.vendor' }, patch: done('Q1', 100, { inventory: { hint: 1, cny: 15, drinks: ['water'] } }), event: 'Bought water for ¥5.' },
+    { text: '我要水。', reply: '好的，一杯水，五元。', feedback: true, patch: { npcActions: [{ anchorId: 'ui.vendor', action: { kind: 'pay', anchorId: 'ui.vendor', drink: 'water', priceCny: 5 } }] } },
+    { action: { type: 'choose', choiceId: 'q1.pay', anchorId: 'ui.vendor' }, patch: done('Q1', 100, { inventory: { hint: 1, cny: 15, drinks: ['water'] }, npcActions: [] }), event: 'Bought water for ¥5.' },
   ];
 }
 export function hotelSteps(): Step[] {
-  return [{ text: '请问，去上海大酒店怎么走？', reply: directions.textZh, feedback: true, patch: { ...done('Q2', 200), directions } }];
+  return [{ text: '请问，去上海大酒店怎么走？', reply: directions.textZh, feedback: true, patch: { ...done('Q2', 200), directions, npcActions: [{ anchorId: 'ui.guide', action: { kind: 'show-directions' } }] } }];
 }
 export function photoSteps(): Step[] {
   return [
-    { text: '可以帮我在这里拍张照吗？', reply: '好的！站在那边。', feedback: true, patch: { photo } },
+    { text: '可以帮我在这里拍张照吗？', reply: '好的！站在那边。', feedback: true, patch: { photo, npcActions: [{ anchorId: 'ui.passerby', action: { kind: 'go-to-photo-spot', spot: photo.spot } }] } },
     { action: { type: 'choose', choiceId: 'q3.start-photo', anchorId: 'ui.viewpoint' }, patch: { photo: { ...photo, status: 'countdown', countdownEndsAtMs: Date.now() + 500 } } },
     // Matches either outcome: this tape checks the acknowledgment round trip, not the canvas capture.
     { action: { type: 'photoCapture', photoRequestId: 'photo-ui' }, patch: done('Q3', 300, { photo: { ...photo, status: 'captured', attempts: 1 }, badges: ['shanghai-explorer'] }) },

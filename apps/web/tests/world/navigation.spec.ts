@@ -42,7 +42,7 @@ test('nearby targets use anchor IDs with bounded range and the shared action sha
   const at = (x: number, z: number) => ({ x, z });
   const state: Pick<PublicState, 'interactables'> = { interactables: [
     { id: 'a.menu', kind: 'sign', label: '菜单', position: at(20, 6), cueId: 'q1.menu' },
-    { id: 'a.vendor', kind: 'npc', role: 'vendor', label: '小林', position: at(21, 6) },
+    { id: 'a.vendor', kind: 'npc', role: 'vendor', label: '老王', position: at(21, 6) },
     { id: 'a.pay', kind: 'choice', label: '付款', position: at(22, 6), choiceId: 'q1.pay' },
     { id: 'a.spot', kind: 'photo-spot', label: '拍照点', position: at(10, 10) },
     { id: 'a.hotel', kind: 'landmark', label: '上海大酒店', position: at(20, 6) },

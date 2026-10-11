@@ -10,9 +10,9 @@ export const authoredFacts = {
 export const groundedReplies = {
   vendorOpener: '你好！你想喝什么？',
   coffeeUnavailable: '咖啡卖完了。我们有茶和水。',
-  teaPrice: '一杯茶十元。请确认：茶十元，对吗？',
-  waterPrice: '一杯水五元。请确认：水五元，对吗？',
-  missingDrinkPrice: '请确认饮料和价格。您可以说：茶十元，或者水五元。',
+  teaPrice: '好的，一杯茶，十元。',
+  waterPrice: '好的，一杯水，五元。',
+  missingDrinkPrice: '您想喝茶还是水？茶十元，水五元。',
   priceConfirmed: '好的，请付款。',
   cancelOrder: '好的。您想喝茶还是水？',
   guideOpener: '你好！需要帮忙吗？',
@@ -30,26 +30,18 @@ export const groundedReplies = {
 /** Opening line per role, spoken when a conversation starts. */
 export const npcOpeners = { vendor: groundedReplies.vendorOpener, guide: groundedReplies.guideOpener, passerby: groundedReplies.passerbyOpener } as const;
 
-/** Non-Mandarin or off-target input gets the node's target phrase instead of a reaction. */
+/** Non-Mandarin or off-target input gets the quest's target phrase instead of a reaction. */
 export const speakMandarinReplies: Record<string, string> = {
-  'q1.order': '请说中文。您可以说：我要一杯茶。',
-  'q1.substitute': '请用中文说：那就茶吧。',
-  'q1.receipt.tea': '请用中文确认：茶十元。',
-  'q1.receipt.water': '请用中文确认：水五元。',
-  'q1.receipt': '请用中文确认：茶十元，或者水五元。',
+  'q1.buy': '请说中文。您可以说：我要一杯水。',
   'q2.ask': '请说中文。您可以说：请问，去上海大酒店怎么走？',
-  'q3.ask': '请说中文。您可以说：可以帮我在这里拍张照吗？',
+  'q3.photo': '请说中文。您可以说：可以帮我在这里拍张照吗？',
   default: '请用中文再说一遍。',
 };
 
-/** An unclear but Mandarin turn gets a clarifying question that carries the node's key words. */
+/** An unclear but Mandarin turn gets a clarifying question that carries the quest's key words. */
 export const clarifyReplies: Record<string, string> = {
-  'q1.order': '我没听懂。您要茶还是水？',
-  'q1.substitute': '我没听懂。您要茶还是水？',
-  'q1.receipt.tea': '我没听懂。茶十元，对吗？',
-  'q1.receipt.water': '我没听懂。水五元，对吗？',
-  'q1.receipt': '我没听懂。茶十元，水五元。您要哪个？',
+  'q1.buy': '我没听懂。您要茶还是水？',
   'q2.ask': '我没听懂。您要去哪儿？',
-  'q3.ask': '我没听懂。您需要我帮什么忙？',
+  'q3.photo': '我没听懂。您需要我帮什么忙？',
   default: '我没听懂。请再说一遍。',
 };

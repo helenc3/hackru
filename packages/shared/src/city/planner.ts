@@ -201,10 +201,10 @@ function requiredFor(seed: string, coord: ChunkCoord, layout: WorldLayout): Chun
   const { cx, cz } = coord;
   const id = (name: string) => `c${cx}.${cz}:${name}`;
   const out: ChunkPlan['requiredAnchors'] = [];
-  if (cx === 0 && cz === 0) out.push({ capability: 'drink-vendor', anchorId: id('vendor-1'), near: { x: layout.spawn.x + 5, z: layout.spawn.z } });
+  if (cx === 0 && cz === 0) out.push({ capability: 'drink-vendor', anchorId: id('vendor-1'), near: { x: layout.spawn.x + 5, z: layout.spawn.z }, nameKey: 'laowang' });
   if (cx === 1 && cz === 0) {
     const oz = rowLine(seed, 0, layout), ox = colLine(seed, 1, layout);
-    out.push({ capability: 'direction-helper', anchorId: id('guide-1'), near: { x: ox < 20 ? 30 : 10, z: oz - ROAD_WIDTH.avenue / 2 - 0.8 } });
+    out.push({ capability: 'direction-helper', anchorId: id('guide-1'), near: { x: ox < 20 ? 30 : 10, z: oz - ROAD_WIDTH.avenue / 2 - 0.8 }, nameKey: 'xiaoli' });
   }
   if (cx === layout.hotel.coord.cx && cz === layout.hotel.coord.cz) out.push({ capability: 'hotel-landmark', anchorId: layout.hotel.anchorId, near: { ...layout.hotel.local } });
   // Guaranteed riverside photo opportunities on the west bank every third row, including row 0.

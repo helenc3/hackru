@@ -118,8 +118,8 @@ export const anchorsEntries: readonly CatalogEntry[] = [
     clearance: { front: 0, side: 0.5 }, capabilities: ['river-viewpoint'],
     lod: { levels: 2, cullDistance: 150 }, cost: { triangles: 1_000, drawCalls: 10, instanced: false }, review: 'approved',
   },
-  npc('vendor', ['drink-vendor'], 'Drink vendor figure; stands in a counter npc socket.', 'xiaolin'),
-  npc('guide', ['direction-helper'], 'Local resident who gives directions; stands on a sidewalk, often beside an info board.', 'laowang'),
+  npc('vendor', ['drink-vendor'], 'Drink vendor figure; stands in a counter npc socket.', 'laowang'),
+  npc('guide', ['direction-helper'], 'Local resident who gives directions; stands on a sidewalk, often beside an info board.', 'xiaoli'),
   npc('passerby', ['photo-passerby'], 'Friendly passer-by who will take a photo for the player; strolls near viewpoints.', 'xiaomei'),
   {
     id: 'an.sign.menu', version: 1, component: 'MenuSign', category: 'anchor',

@@ -115,7 +115,7 @@ export function createLiveBridge(options: {
 
 /** What each role steers toward; the engine, not this text, decides progress. */
 const ROLE_GOALS: Record<NpcId, string> = {
-  vendor: 'You sell drinks. Goal: the customer names a drink, confirms its price, then pays. Coffee is sold out; offer tea or water. After greetings or unclear speech, ask what they would like to drink.',
+  vendor: 'You sell drinks. Goal: the customer names a drink, you state its price, then they pay with the on-screen Pay button. Coffee is sold out; offer tea or water. After greetings or unclear speech, ask what they would like to drink.',
   guide: 'You are a local who knows the way. If asked how to reach 上海大酒店, say the hotelRoute fact word for word. If there is no hotelRoute fact, or they ask about another place, say you are not sure of the way. Never invent roads, turns or distances.',
   passerby: 'You are a friendly passer-by by the Huangpu River. If the learner asks you to take their photo, agree and ask them to stand at the photo spot with the river behind them; the game runs the countdown. Do not claim the photo was taken.',
 };

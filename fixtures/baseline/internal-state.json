@@ -4,7 +4,7 @@
   "version": 0,
   "missionId": "Q1",
   "attemptId": "fixture-attempt-001",
-  "nodeId": "q1.order",
+  "nodeId": "q1.buy",
   "mode": "practice",
   "status": "active",
   "zoneId": "historic",

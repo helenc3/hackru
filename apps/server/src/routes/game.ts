@@ -1,6 +1,6 @@
 import {
   ActionRequestSchema, CreateSessionRequestSchema, TurnRequestSchema, TurnResponseSchema, createGame, applyAction, applyEvaluation, isClosingLine, projectPublicState,
-  synchronizeGame, dialogueContext, groundedReply, createFixtureDialogueProvider, EngineRuleError, validateEvaluationForContext,
+  synchronizeGame, dialogueContext, turnActions, groundedReply, createFixtureDialogueProvider, EngineRuleError, validateEvaluationForContext,
   type PublicState, type TurnRequest, type TurnContext, type TurnResponse, type ActionResponse, type WorldView,
 } from '@vibequest/shared';
 import { randomUUID } from 'node:crypto';
@@ -188,7 +188,8 @@ async function evaluate(services: ServerServices, body: TurnRequest, pending: Pe
         registerSpeechJob(session, { id: speechId, sessionId: session.id, attemptId: pending.attemptId, turnId: body.turnId, replyZh, voiceKey: body.npcId, operationId: speechId, status: 'pending' });
         speech = { npcReply: replyZh, speechId };
       }
-      const outcome: TurnResponse = TurnResponseSchema.parse({ turnId: body.turnId, state: projectPublicState(session.state, nowMs, world), events: engine.events, ...speech, ...(engine.conversationEnded || (evaluation.intent !== 'request_repeat' && isClosingLine(spoken)) ? { conversationEnded: true } : {}), ...(evaluation.coach ? { feedback: evaluation.coach } : {}), vibe: { intent: evaluation.intentGrade.score, clarity: evaluation.clarity, courtesy: evaluation.courtesy } });
+      const ended = Boolean(engine.conversationEnded || (evaluation.intent !== 'request_repeat' && isClosingLine(spoken)));
+      const outcome: TurnResponse = TurnResponseSchema.parse({ turnId: body.turnId, state: projectPublicState(session.state, nowMs, world), events: engine.events, ...speech, actions: turnActions(session.state, body.anchorId, ended), ...(ended ? { conversationEnded: true } : {}), ...(evaluation.coach ? { feedback: evaluation.coach } : {}), vibe: { intent: evaluation.intentGrade.score, clarity: evaluation.clarity, courtesy: evaluation.courtesy } });
       session.pendingRequests.delete(body.turnId);
       session.completedRequests.set(body.turnId, { payload: pending.payload, response: outcome });
       pending.resolve(outcome);

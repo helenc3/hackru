@@ -36,7 +36,7 @@ const counter = (page: Page, name: string) => page.evaluate((key) => Number((win
 async function openPanel(page: Page) {
   await page.goto('/');
   await page.getByRole('button', { name: 'Start exploring', exact: true }).click();
-  await page.getByRole('button', { name: '小林 · Talk', exact: true }).click();
+  await page.getByRole('button', { name: '老王 · Talk', exact: true }).click();
   return page.getByTestId('dialogue-panel');
 }
 function phases(api: Awaited<ReturnType<typeof installScriptedApi>>) {
@@ -232,7 +232,7 @@ test('deferred turn: retry never waits for Gemini, the old reply stays silent, a
 
   // A failed turn in the new attempt recovers with the same turn ID and a refreshed version.
   const fresh = page.getByTestId('dialogue-panel');
-  if (!(await fresh.isVisible())) await page.getByRole('button', { name: '小林 · Talk', exact: true }).click();
+  if (!(await fresh.isVisible())) await page.getByRole('button', { name: '老王 · Talk', exact: true }).click();
   if (await fresh.getByRole('button', { name: 'Use typed Mandarin' }).isVisible()) await fresh.getByRole('button', { name: 'Use typed Mandarin' }).click();
   await fresh.getByRole('textbox').fill('请给我一杯茶。');
   await fresh.getByRole('button', { name: 'Send Mandarin' }).click();

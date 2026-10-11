@@ -8,7 +8,7 @@
       "tier": 1,
       "npcId": "vendor",
       "anchorId": "an.vendor.0-0",
-      "nameZh": "小林",
+      "nameZh": "老王",
       "persona": "Warm café owner; short Mandarin about the available drinks and prices.",
       "patience": 5,
       "allowedIntents": [
@@ -64,7 +64,7 @@
       "tier": 1,
       "npcId": "vendor",
       "anchorId": "an.vendor.0-0",
-      "nameZh": "小林",
+      "nameZh": "老王",
       "persona": "Warm café owner; short Mandarin about the available drinks and prices.",
       "patience": 5,
       "allowedIntents": [
@@ -120,7 +120,7 @@
       "tier": 1,
       "npcId": "vendor",
       "anchorId": "an.vendor.0-0",
-      "nameZh": "小林",
+      "nameZh": "老王",
       "persona": "Warm café owner; short Mandarin about the available drinks and prices.",
       "patience": 5,
       "allowedIntents": [
@@ -176,7 +176,7 @@
       "tier": 1,
       "npcId": "vendor",
       "anchorId": "an.vendor.0-0",
-      "nameZh": "小林",
+      "nameZh": "老王",
       "persona": "Warm café owner; short Mandarin about the available drinks and prices.",
       "patience": 5,
       "allowedIntents": [
@@ -232,7 +232,7 @@
       "tier": 1,
       "npcId": "vendor",
       "anchorId": "an.vendor.0-0",
-      "nameZh": "小林",
+      "nameZh": "老王",
       "persona": "Warm café owner; short Mandarin about the available drinks and prices.",
       "patience": 5,
       "allowedIntents": [
@@ -292,7 +292,7 @@
       "tier": 1,
       "npcId": "vendor",
       "anchorId": "an.vendor.0-0",
-      "nameZh": "小林",
+      "nameZh": "老王",
       "persona": "Warm café owner; short Mandarin about the available drinks and prices.",
       "patience": 5,
       "allowedIntents": [
@@ -343,7 +343,7 @@
       "tier": 1,
       "npcId": "vendor",
       "anchorId": "an.vendor.0-0",
-      "nameZh": "小林",
+      "nameZh": "老王",
       "persona": "Warm café owner; short Mandarin about the available drinks and prices.",
       "patience": 5,
       "allowedIntents": [
@@ -399,7 +399,7 @@
       "tier": 1,
       "npcId": "vendor",
       "anchorId": "an.vendor.0-0",
-      "nameZh": "小林",
+      "nameZh": "老王",
       "persona": "Warm café owner; short Mandarin about the available drinks and prices.",
       "patience": 5,
       "allowedIntents": [

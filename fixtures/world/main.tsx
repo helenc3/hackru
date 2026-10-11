@@ -13,10 +13,10 @@ const manifests = streaming ? undefined : fixtureCity();
 const at = (x: number, z: number) => ({ x, z });
 const baseline: PublicState = {
   sessionId: 'fixture-session', worldId: streaming ? 'stream-world' : FIXTURE_WORLD, version: 0, missionId: 'Q1', mode: 'practice', status: 'active', zoneId: 'park', position: at(20, 10), tier: 0,
-  objectives: [{ id: 'q1.order', label: 'Buy a drink.', complete: false }],
+  objectives: [{ id: 'q1.buy', label: 'Buy a drink from 老王 (Lao Wang).', complete: false }],
   interactables: [
     { id: 'fixture.menu', kind: 'sign', label: '菜单', position: at(20, 6), cueId: 'q1.menu' },
-    { id: 'fixture.vendor', kind: 'npc', role: 'vendor', label: '小林', position: at(16, 4) },
+    { id: 'fixture.vendor', kind: 'npc', role: 'vendor', label: '老王', position: at(16, 4) },
     { id: 'fixture.pay', kind: 'choice', label: '付款', position: at(12, 4), choiceId: 'q1.pay' },
   ],
   visibleCues: [{ id: 'q1.menu', label: '菜单', text: '茶 十元 水 五元' }], npcMood: { vendor: 'warm', guide: 'warm', passerby: 'warm' },

@@ -6,25 +6,25 @@ import { harness } from './helpers';
 test('Q1: ambiguous requests clarify, repeat purchases spend money but never re-grant the reward, and funds run out', async ({ request }) => {
   const h = await harness(request);
   await h.goto(h.state.position);
-  const vendor = h.anchor((entry) => entry.role === 'vendor' && entry.label === '小林');
-  await h.goto({ x: vendor.position.x - 1.2, z: vendor.position.z });
+  const vendor = h.anchor((entry) => entry.role === 'vendor' && entry.label === '老王');
+  await h.goto(vendor.position);
   const unclear = await h.talk(vendor.id, 'vendor', '嗯……那个');
   expect(unclear.npcReply).toMatch(/[茶水]/); // the clarification names the available drinks
-  await h.act({ type: 'choose', choiceId: 'q1.pay', anchorId: vendor.id }, 422); // nothing confirmed yet
-  for (const line of ['我要水。', '对']) await h.talk(vendor.id, 'vendor', line);
+  await h.act({ type: 'choose', choiceId: 'q1.pay', anchorId: vendor.id }, 422); // no drink ordered yet
+  await h.talk(vendor.id, 'vendor', '我要水。');
   await h.act({ type: 'choose', choiceId: 'q1.pay', anchorId: vendor.id });
   expect(h.state).toMatchObject({ status: 'cleared', inventory: { cny: 15, drinks: ['water'] } });
   const rewarded = { xp: h.state.xp, badges: h.state.badges };
 
   for (const [drink, cny] of [['茶', 5], ['水', 0]] as const) {
     await h.act({ type: 'startMission', missionId: 'Q1' }); // play again
-    for (const line of [`我要${drink}。`, '对']) await h.talk(vendor.id, 'vendor', line);
+    await h.talk(vendor.id, 'vendor', `我要${drink}。`);
     await h.act({ type: 'choose', choiceId: 'q1.pay', anchorId: vendor.id });
     expect(h.state.inventory.cny).toBe(cny);
     expect({ xp: h.state.xp, badges: h.state.badges }).toEqual(rewarded);
   }
   await h.act({ type: 'startMission', missionId: 'Q1' });
-  for (const line of ['我要水。', '对']) await h.talk(vendor.id, 'vendor', line);
+  await h.talk(vendor.id, 'vendor', '我要水。');
   const broke = await h.act({ type: 'choose', choiceId: 'q1.pay', anchorId: vendor.id }, 422);
   expect(broke.error.code).toBe('ACTION_FORBIDDEN');
   expect(h.state).toMatchObject({ status: 'active', inventory: { cny: 0 } });

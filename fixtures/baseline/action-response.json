@@ -14,18 +14,8 @@
     "tier": 1,
     "objectives": [
       {
-        "id": "q1.order",
-        "label": "Find a drink vendor and ask for a drink.",
-        "complete": false
-      },
-      {
-        "id": "q1.substitute",
-        "label": "Coffee is sold out: choose tea or water.",
-        "complete": false
-      },
-      {
-        "id": "q1.receipt",
-        "label": "Confirm the drink and price, then pay.",
+        "id": "q1.buy",
+        "label": "Buy a drink from 老王 (Lao Wang).",
         "complete": false
       }
     ],
@@ -50,6 +40,7 @@
     "completedMissionIds": [],
     "directions": null,
     "photo": null,
+    "npcActions": [],
     "timer": null,
     "capabilities": {
       "coach": true,

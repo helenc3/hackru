@@ -9,10 +9,10 @@ import { harness, HARNESS, interact, playerState, serverState, sessionId, startW
 const ROOT = fileURLToPath(new URL('../..', import.meta.url));
 const RESTART_PORT = Number(process.env.E2E_RESTART_PORT ?? 4480);
 
-/** 小林 stands 5 m east of spawn. */
+/** 老王 stands 5 m east of spawn. */
 async function reachVendor(page: Page, request: Parameters<typeof playerState>[1]) {
   const state = await playerState(page, request);
-  const vendor = state.interactables.find((entry) => entry.role === 'vendor' && entry.label === '小林')!;
+  const vendor = state.interactables.find((entry) => entry.role === 'vendor' && entry.label === '老王')!;
   await walkRoute(page, [{ x: vendor.position.x - 1.2, z: state.position.z }]);
   await interact(page, vendor.id);
   const panel = page.getByTestId('dialogue-panel');
@@ -56,7 +56,7 @@ test('fixture reply audio failure degrades to the Mandarin subtitle without bloc
   const panel = await reachVendor(page, request);
   await page.locator('summary[aria-label="Settings"]').click();
   const audio = page.getByTestId('audio-controller');
-  for (const [index, line] of ['我要咖啡。', '那就茶吧。', '茶十元。'].entries()) {
+  for (const [index, line] of ['我要咖啡。', '那就茶吧。'].entries()) {
     const before = await panel.getByTestId('npc-reply').innerText();
     await panel.getByRole('textbox').fill(line);
     await panel.getByRole('button', { name: 'Send Mandarin' }).click();
@@ -121,8 +121,8 @@ test('server restart expires the stored session and a fresh start reopens the sa
 test('replayed action and turn IDs are idempotent, reused IDs conflict, and one reward is granted', async ({ request }) => {
   const h = await harness(request);
   await h.goto(h.state.position);
-  const vendor = h.anchor((entry) => entry.role === 'vendor' && entry.label === '小林');
-  await h.goto({ x: vendor.position.x - 1.2, z: vendor.position.z });
+  const vendor = h.anchor((entry) => entry.role === 'vendor' && entry.label === '老王');
+  await h.goto(vendor.position); // an anchor stand point is validated as reachable
 
   // Turn replay: the identical response, no second evaluation.
   const turn = { turnId: 't-1', npcId: 'vendor', anchorId: vendor.id, input: { text: '我要咖啡。', source: 'typed' } };
@@ -135,7 +135,7 @@ test('replayed action and turn IDs are idempotent, reused IDs conflict, and one 
   expect((await conflict.json()).error.code).toBe('ID_CONFLICT');
   expect((await (await request.get(`${HARNESS}/api/sessions/${h.state.sessionId}`)).json()).state.version).toBe(h.state.version);
 
-  for (const text of ['那就茶吧。', '茶十元。']) await h.talk(vendor.id, 'vendor', text);
+  await h.talk(vendor.id, 'vendor', '那就茶吧。');
   const xpBefore = h.state.xp;
   const pay = { type: 'choose', choiceId: 'q1.pay', anchorId: vendor.id } as const;
   const clear = await h.act(pay, 200, 'a-clear');

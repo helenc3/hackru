@@ -1,6 +1,6 @@
 import {
   AUDIO_PHASE_MAX_MS, CreateGameOptionsSchema, GameActionSchema, InternalStateSchema, PHOTO_RULES, PublicStateSchema, QuestCategorySchema, TurnEvaluationSchema, WORLD_RULES,
-  type CreateGameOptions, type EngineResult, type EvidenceRecord, type ExplorationState, type GameAction, type InternalState, type NpcId, type Position, type PublicInteractable, type PublicState, type QuestCategory, type TurnContext, type TurnEvaluation,
+  type CreateGameOptions, type EngineResult, type EvidenceRecord, type ExplorationState, type GameAction, type InternalState, type NpcAction, type NpcId, type Position, type PublicInteractable, type PublicState, type QuestCategory, type TurnContext, type TurnEvaluation,
 } from '../contracts.js';
 import { authoredFacts, clarifyReplies, cues, DRINK_PRICES, groundedReplies, npcOpeners, npcs, speakMandarinReplies, STARTING_CNY } from '../content/index.js';
 import { missionFor, missionSnapshot, NEXT_MISSION } from '../content/missions.js';
@@ -127,12 +127,16 @@ function explore(state: InternalState, world: WorldView, nowMs: number): void {
   state.exploration = recordEncounters(exploration, categories);
 }
 
-/** Why the vendor cannot be paid now, or null. Shared by the explicit pay choice and a goodbye at the counter. */
-function paymentProblem(state: InternalState, anchor: WorldAnchor): string | null {
-  if (state.nodeId !== 'q1.receipt' || state.flags['q1.price-confirmed'] !== true) return 'Confirm the drink and price before paying.';
-  if (anchor.capability !== 'drink-vendor' || anchor.id !== state.npcState.vendor.anchorId) return 'Pay the vendor who took your order.';
+/** The available drink the vendor has priced for this attempt, or null. */
+function orderedDrink(state: InternalState): 'tea' | 'water' | null {
   const drink = state.flags['q1.drink'];
-  if (drink !== 'tea' && drink !== 'water') return 'Choose a drink first.';
+  return state.missionId === 'Q1' && state.status === 'active' && state.nodeId === 'q1.buy' && (drink === 'tea' || drink === 'water') && state.npcState.vendor.anchorId ? drink : null;
+}
+/** Why the vendor cannot be paid now, or null. */
+function paymentProblem(state: InternalState, anchor: WorldAnchor): string | null {
+  const drink = orderedDrink(state);
+  if (!drink) return 'Ask the vendor for tea or water first.';
+  if (anchor.capability !== 'drink-vendor' || anchor.id !== state.npcState.vendor.anchorId) return 'Pay the vendor who took your order.';
   if (state.inventory.cny < DRINK_PRICES[drink]) return `Not enough money: ¥${DRINK_PRICES[drink]} needed, ¥${state.inventory.cny} left.`;
   if (state.inventory.drinks.length >= 20 || state.purchases.length >= 50) return 'You cannot carry more drinks.';
   return null;
@@ -303,7 +307,7 @@ export function groundedReply(state: InternalState, npcId: NpcId, evaluation: Tu
     if (evaluation.intent === 'cancel_order') return groundedReplies.cancelOrder;
     if (['order_drink', 'accept_substitute', 'confirm_drink_price'].includes(evaluation.intent)) {
       if (slot('drink') === 'coffee') return groundedReplies.coffeeUnavailable;
-      if (evaluation.intent === 'confirm_drink_price' && state.flags['q1.price-confirmed']) return groundedReplies.priceConfirmed;
+      if (evaluation.intent === 'confirm_drink_price' && orderedDrink(state)) return groundedReplies.priceConfirmed;
       return slot('drink') === 'tea' ? groundedReplies.teaPrice : slot('drink') === 'water' ? groundedReplies.waterPrice : groundedReplies.missingDrinkPrice;
     }
   }
@@ -348,7 +352,6 @@ export function applyEvaluation(state: InternalState, npcId: NpcId, anchorId: st
   npc.anchorId = anchorId;
   if (npc.patience === 0) npc.patience = 1;
   const successful = evaluation.interaction === 'relevant' && evaluation.targetLanguageUse === 'yes' && evaluation.intentGrade.score >= 0.7 && evaluation.intentGrade.confidence >= 0.75;
-  if (evaluation.intent === 'confirm_drink_price') next.flags['q1.price-confirmed'] = false;
   let transitioned = false;
   if (successful) {
     const before = next.nodeId;
@@ -369,11 +372,6 @@ export function applyEvaluation(state: InternalState, npcId: NpcId, anchorId: st
     }
   }
   const conversationEnded = evaluation.intent === 'farewell' && successful;
-  // Saying goodbye at the counter after confirming the price pays, under the same checks as the pay choice.
-  if (conversationEnded && npcId === 'vendor' && !paymentProblem(next, anchor)) {
-    pay(next, anchor, nowMs, result.events);
-    transition(next, { type: 'choose', choiceId: 'q1.pay', anchorId }, result.events);
-  }
   // A miss surfaces the node's vocabulary once, recorded like a used hint (assisted) without spending one.
   if (!transitioned && next.status === 'active' && !['greeting', 'request_repeat', 'farewell'].includes(evaluation.intent) && Number(next.flags[`${next.nodeId}-hint-level`] ?? 0) < 2) {
     const hint = missionFor(next.missionId).hints.find((entry) => entry.nodeId === next.nodeId && entry.level === 2);
@@ -405,7 +403,7 @@ function interactable(state: InternalState, anchor: WorldAnchor): PublicInteract
   const base = { id: anchor.id, label: label(anchor), position: anchor.position };
   if (anchor.kind === 'npc') {
     if (!anchor.role || !mission.npcRoles.includes(anchor.role)) return null;
-    const payable = state.status === 'active' && state.nodeId === 'q1.receipt' && state.flags['q1.price-confirmed'] === true && anchor.id === state.npcState.vendor.anchorId;
+    const payable = Boolean(orderedDrink(state)) && anchor.id === state.npcState.vendor.anchorId;
     return { ...base, kind: 'npc', role: anchor.role, ...(payable ? { choiceId: 'q1.pay' as const } : {}) };
   }
   if (anchor.kind === 'sign') return anchor.cueId && cues.find((cue) => cue.id === anchor.cueId)?.missionId === state.missionId ? { ...base, kind: 'sign', cueId: anchor.cueId } : null;
@@ -414,6 +412,23 @@ function interactable(state: InternalState, anchor: WorldAnchor): PublicInteract
     return state.photo?.viewpointAnchorId === anchor.id && state.photo.status !== 'captured' ? { ...base, kind: 'photo-spot', position: state.photo.spot, choiceId: 'q3.start-photo' } : { ...base, kind: 'landmark' };
   }
   return null;
+}
+/** Buttons each NPC conversation offers now. Pure function of engine state; the model never grants them. */
+export function npcActions(state: InternalState): PublicState['npcActions'] {
+  const out: PublicState['npcActions'] = [];
+  const drink = orderedDrink(state);
+  if (drink) out.push({ anchorId: state.npcState.vendor.anchorId!, action: { kind: 'pay', anchorId: state.npcState.vendor.anchorId!, drink, priceCny: DRINK_PRICES[drink] } });
+  if (state.directions) out.push({ anchorId: state.directions.fromAnchorId, action: { kind: 'show-directions' } });
+  if (state.photo && (state.photo.status === 'accepted' || state.photo.status === 'countdown')) out.push({ anchorId: state.photo.passerbyAnchorId, action: { kind: 'go-to-photo-spot', spot: state.photo.spot } });
+  // A finished quest closes its NPC's conversation.
+  if (state.status === 'cleared') for (const role of missionFor(state.missionId).npcRoles) { const anchorId = state.npcState[role].anchorId; if (anchorId) out.push({ anchorId, action: { kind: 'end-conversation' } }); }
+  return out.slice(0, 8);
+}
+/** The actions for one conversation after a turn; a goodbye always offers to end it. */
+export function turnActions(state: InternalState, anchorId: string, conversationEnded: boolean): NpcAction[] {
+  const actions = npcActions(state).filter((entry) => entry.anchorId === anchorId).map((entry) => entry.action);
+  if (conversationEnded && !actions.some((action) => action.kind === 'end-conversation')) actions.push({ kind: 'end-conversation' });
+  return actions.slice(0, 4);
 }
 export function projectPublicState(state: InternalState, nowMs: number, world: WorldView): PublicState {
   const next = synchronizeGame(state, nowMs).state;
@@ -433,7 +448,7 @@ export function projectPublicState(state: InternalState, nowMs: number, world: W
     visibleCues: cues.filter((cue) => next.inspectedTargetIds.includes(cue.id)).map((cue) => ({ id: cue.id, label: cue.label, text: cue.textZh })),
     npcMood: Object.fromEntries(npcs.map((npc) => [npc.id, next.npcState[npc.id].mood])), inventory: next.inventory, purchases: next.purchases,
     xp: next.xp, badges: next.badges, unlockedMissionIds: next.unlockedMissionIds, completedMissionIds: next.completedMissionIds,
-    directions: next.directions, photo: next.photo, timer: null,
+    directions: next.directions, photo: next.photo, npcActions: npcActions(next), timer: null,
     capabilities: { coach: true, hints: true, freeze: false }, validationMode: next.validationMode, inputPreference: next.inputPreference, providerStatus: next.providerStatus,
     ...(next.debrief ? { debrief: next.debrief } : {}),
   });

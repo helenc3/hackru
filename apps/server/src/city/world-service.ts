@@ -62,7 +62,9 @@ export function createWorldService(options: WorldServiceOptions = {}): WorldServ
     const candidate = ChunkManifestSchema.safeParse(sealManifest({
       worldId: target.info.worldId, coord, district: plan.district, catalogVersion: CATALOG_VERSION, generatorVersion: GENERATOR_VERSION, seed: target.info.seed,
       source: 'claude', questContext, connectors: plan.connectors, water: plan.water, bridges: plan.bridges,
-      roads: [...plan.roads, ...draft.roads], placements: draft.placements, anchors: draft.anchors, missingCapabilities: draft.missingCapabilities,
+      roads: [...plan.roads, ...draft.roads], placements: draft.placements, missingCapabilities: draft.missingCapabilities,
+      // Quest givers keep their planned names (老王, 小李) whoever composes the chunk.
+      anchors: draft.anchors.map((anchor) => { const nameKey = plan.requiredAnchors.find((entry) => entry.anchorId === anchor.id)?.nameKey; return nameKey ? { ...anchor, nameKey } : anchor; }),
     }));
     if (!candidate.success) return candidate.error.issues.slice(0, 5).map((issue) => `schema:${issue.path.join('.')}`);
     const result = validateManifest(candidate.data, plan);

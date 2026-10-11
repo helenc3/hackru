@@ -23,7 +23,7 @@ async function drink(page: Page) {
   await expect(page.getByRole('dialog', { name: 'Inspected sign' })).toContainText('咖啡 卖完了');
   await page.getByRole('button', { name: 'Close sign' }).click();
   await open(page, 'npc/vendor · ui.vendor');
-  await say(page, '我要咖啡。'); await say(page, '那我要水，五元，对吗？');
+  await say(page, '我要咖啡。'); await say(page, '我要水。');
   await page.getByTestId('pay-button').click();
   await expect(page.getByTestId('result-panel')).toContainText('Nicely done.');
 }

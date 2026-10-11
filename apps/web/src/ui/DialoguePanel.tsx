@@ -5,6 +5,7 @@ import { finishConfirmation, useAudioActivity } from '../audio/audio-bus';
 import { startLiveVoice, type LiveStatus } from '../audio/live-voice';
 import '../audio/live.css';
 import { CoachPanel } from './CoachPanel';
+import { NpcActions } from './NpcActions';
 import { roleNames, type ConversationSummary, type NpcTarget, type ThreadLine as Line } from './ConversationCard';
 
 const AUTO_SEND_SECONDS = 4;
@@ -137,8 +138,7 @@ export function DialoguePanel({ state, npc, pending, turn, onAction, onSubmit, o
         }} />
       <div className="input-footer"><span>{countdown !== null ? <strong className="countdown">Sending in {countdown}…</strong> : transcription ? 'Edit if that is not what you said.' : 'Typed input does not count as spoken evidence.'}</span><button className="button primary" type="submit" disabled={pending || !draft.trim()}>Send Mandarin</button></div>
     </form>}
-    {/* Payment is an explicit world action; the server rejects it until a drink and price are confirmed. */}
-    {npc.role === 'vendor' && <div className="chat-actions" aria-label="Actions"><button className="button secondary" disabled={pending} data-testid="pay-button" onClick={() => void onAction({ type: 'choose', choiceId: 'q1.pay', anchorId: npc.anchorId }).catch(() => undefined)}><span lang="zh-Hans">付款</span> · Pay (¥{state.inventory.cny} left)</button></div>}
+    <NpcActions state={state} anchorId={npc.anchorId} extra={turn?.actions} pending={pending} onAction={onAction} onClose={() => onClose()} onEnd={finish} />
     </>}
     <CoachPanel state={state} turn={turn} />
   </section>;

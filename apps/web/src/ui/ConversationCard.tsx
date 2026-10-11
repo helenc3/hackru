@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
-import type { NpcId, PublicState, TurnResponse } from '@vibequest/shared';
+import type { NpcId, PublicState, RendererProps, TurnResponse } from '@vibequest/shared';
 import { CoachPanel } from './CoachPanel';
+import { NpcActions } from './NpcActions';
 
 /** The NPC anchor being talked to: role drives dialogue rules, name comes from the reviewed name list via the anchor label. */
 export type NpcTarget = { anchorId: string; role: NpcId; name: string };
@@ -9,7 +10,7 @@ export type ThreadLine = { role: 'player' | 'npc' | 'notice'; text: string } | {
 export type ConversationSummary = { npc: NpcTarget; thread: ThreadLine[] };
 
 /** Shown once a goodbye ends a conversation: the exchange, practice feedback, and objective progress. */
-export function ConversationCard({ summary, turn, state, pending, onClose }: { summary: ConversationSummary; turn: TurnResponse | null; state: PublicState; pending: boolean; onClose: () => void }) {
+export function ConversationCard({ summary, turn, state, pending, onAction, onClose }: { summary: ConversationSummary; turn: TurnResponse | null; state: PublicState; pending: boolean; onAction: RendererProps['onAction']; onClose: () => void }) {
   const close = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     close.current?.focus();
@@ -27,6 +28,8 @@ export function ConversationCard({ summary, turn, state, pending, onClose }: { s
     <CoachPanel state={state} turn={turn} />
     <h3>Quest progress</h3>
     <ul className="result-objectives" aria-label="Quest summary">{state.objectives.map((objective) => <li key={objective.id}><input type="checkbox" checked={objective.complete} readOnly tabIndex={-1} aria-label={objective.label} /><span>{objective.label}</span></li>)}</ul>
+    {/* Whatever the NPC still offers (e.g. Pay after saying goodbye before paying) stays one click away. */}
+    <NpcActions state={state} anchorId={summary.npc.anchorId} pending={pending} onAction={onAction} onClose={onClose} onEnd={onClose} />
     <div className="result-actions">
       <button className="button primary" disabled={pending} onClick={onClose}>Back to the world</button>
     </div>

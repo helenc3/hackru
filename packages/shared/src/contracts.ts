@@ -117,6 +117,14 @@ export const PhotoRequestSchema = z.strictObject({ id: identifier, passerbyAncho
 export type PhotoRequest = z.infer<typeof PhotoRequestSchema>;
 export const PHOTO_RULES = { spotRadius: 1.5, countdownMs: 3_000, captureWindowMs: 15_000 } as const;
 
+/** UI affordances the server enables for an NPC conversation. Derived deterministically from engine state; the model never grants them. */
+export const NpcActionSchema = z.discriminatedUnion('kind', [
+  z.strictObject({ kind: z.literal('pay'), anchorId: identifier, drink: DrinkSchema.exclude(['coffee']), priceCny: z.number().int().min(0).max(1000) }),
+  z.strictObject({ kind: z.literal('end-conversation') }),
+  z.strictObject({ kind: z.literal('show-directions') }),
+  z.strictObject({ kind: z.literal('go-to-photo-spot'), spot: PositionSchema }),
+]);
+export type NpcAction = z.infer<typeof NpcActionSchema>;
 export const PublicStateSchema = z.strictObject({
   sessionId: identifier, worldId: identifier, version: count, missionId: MissionIdSchema, mode: ModeSchema,
   status: StatusSchema, zoneId: ZoneIdSchema, position: PositionSchema, tier: TierSchema,
@@ -127,6 +135,8 @@ export const PublicStateSchema = z.strictObject({
   npcMood: z.record(NpcIdSchema, MoodSchema), inventory: InventorySchema, purchases: z.array(PurchaseRecordSchema).max(50),
   xp: count, badges: z.array(identifier).max(10), unlockedMissionIds: z.array(MissionIdSchema).min(1).max(3), completedMissionIds: z.array(MissionIdSchema).max(3),
   directions: DirectionsSchema.nullable(), photo: PhotoRequestSchema.nullable(),
+  /** Current per-NPC actions, so a reopened conversation shows the same buttons as the last turn. */
+  npcActions: z.array(z.strictObject({ anchorId: identifier, action: NpcActionSchema })).max(8),
   timer: z.null(),
   capabilities: z.strictObject({ coach: z.boolean(), hints: z.boolean(), freeze: z.literal(false) }),
   validationMode: z.boolean(), inputPreference: InputPreferenceSchema, providerStatus: ProviderStatusSchema,
@@ -146,7 +156,7 @@ export const ActionResponseSchema = z.strictObject({ state: PublicStateSchema, e
 export type ActionResponse = z.infer<typeof ActionResponseSchema>;
 export const StateResponseSchema = z.strictObject({ state: PublicStateSchema });
 export type StateResponse = z.infer<typeof StateResponseSchema>;
-export const TurnResponseSchema = z.strictObject({ turnId: identifier, state: PublicStateSchema, events: z.array(GameEventSchema).max(20), npcReply: z.string().min(1).max(240), speechId: identifier.optional(), feedback: CoachFeedbackSchema.optional(), vibe: z.strictObject({ intent: unit, clarity: unit, courtesy: unit }).optional(), conversationEnded: z.literal(true).optional() });
+export const TurnResponseSchema = z.strictObject({ turnId: identifier, state: PublicStateSchema, events: z.array(GameEventSchema).max(20), npcReply: z.string().min(1).max(240), actions: z.array(NpcActionSchema).max(4).optional(), speechId: identifier.optional(), feedback: CoachFeedbackSchema.optional(), vibe: z.strictObject({ intent: unit, clarity: unit, courtesy: unit }).optional(), conversationEnded: z.literal(true).optional() });
 export type TurnResponse = z.infer<typeof TurnResponseSchema>;
 
 export const SlotSchema = z.discriminatedUnion('key', [

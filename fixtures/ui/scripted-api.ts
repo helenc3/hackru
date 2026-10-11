@@ -4,23 +4,22 @@ import {
   generateFallbackChunk, seedFromWorldId, type GameAction, type MissionId, type PublicState,
 } from '@vibequest/shared';
 
+/** `patch.npcActions` sets the buttons in state; a turn's response carries the ones for the NPC it addressed (plus End conversation when `end`). */
 export type Step = { action?: Partial<GameAction>; text?: string; patch?: Partial<PublicState>; reply?: string; feedback?: boolean; event?: string; end?: boolean };
-const roles = { Q1: ['vendor', '小林'], Q2: ['guide', '阿陈'], Q3: ['passerby', '小美'] } as const;
+const roles = { Q1: ['vendor', '老王'], Q2: ['guide', '小李'], Q3: ['passerby', '小美'] } as const;
 const spawn = { x: 20, z: 20 };
+const goals = { Q1: 'Buy a drink from 老王 (Lao Wang).', Q2: 'Ask 小李 (Xiao Li) how to get to 上海大酒店 (Shanghai Grand Hotel).', Q3: 'Ask a passer-by at the Huangpu River (黄浦江) to take your photo.' } as const;
 /** Anchors sit at the player's position so dock buttons appear without walking. */
 export const fixtureState = (missionId: MissionId, validation = false): PublicState => PublicStateSchema.parse({
   sessionId: `ui-${validation ? 'validation' : 'player'}-${missionId}`, worldId: 'ui-world', version: 0, missionId, mode: 'practice', status: 'active', zoneId: 'shopping', position: spawn, tier: 0,
-  objectives: [
-    { id: `${missionId.toLowerCase()}.communication`, label: 'Ask in Mandarin.', complete: false },
-    { id: `${missionId.toLowerCase()}.action`, label: 'Act on the answer in the world.', complete: false },
-  ],
+  objectives: [{ id: `${missionId.toLowerCase()}.goal`, label: goals[missionId], complete: false }],
   interactables: [
     { id: `ui.${roles[missionId][0]}`, kind: 'npc', role: roles[missionId][0], label: roles[missionId][1], position: spawn },
     { id: 'ui.menu', kind: 'sign', label: '菜单', position: spawn, cueId: 'q1.menu' },
   ],
   visibleCues: [], npcMood: { vendor: 'warm', guide: 'warm', passerby: 'warm' }, inventory: { hint: 1, cny: 20, drinks: [] }, purchases: [],
   xp: 0, badges: [], unlockedMissionIds: ['Q1', 'Q2', 'Q3'].slice(0, ['Q1', 'Q2', 'Q3'].indexOf(missionId) + 1), completedMissionIds: [],
-  directions: null, photo: null, timer: null, capabilities: { coach: true, hints: true, freeze: false },
+  directions: null, photo: null, npcActions: [], timer: null, capabilities: { coach: true, hints: true, freeze: false },
   validationMode: validation, inputPreference: 'voice', providerStatus: 'fixture',
 });
 const weights = { 'drink-vendor': 1, 'direction-helper': 1, 'hotel-landmark': 1, 'river-viewpoint': 1, 'photo-passerby': 1 };
@@ -78,7 +77,7 @@ export async function installScriptedApi(page: Page, options: { mission?: Missio
       const next = steps.shift();
       expect(next?.text).toBe(input.input.text);
       state = PublicStateSchema.parse({ ...state, ...next?.patch, version: state.version + 1 });
-      const response = TurnResponseSchema.parse({ turnId: input.turnId, state, events: [], npcReply: next?.reply ?? '好的。', ...(next?.end ? { conversationEnded: true } : {}), ...(next?.feedback ? { feedback: { understood: 'Your request was understood.', explanation: 'A short, clear Mandarin request works here.', improvedExample: '请给我一杯水，谢谢。' }, vibe: { intent: .9, clarity: .8, courtesy: .8 } } : {}) });
+      const response = TurnResponseSchema.parse({ turnId: input.turnId, state, events: [], npcReply: next?.reply ?? '好的。', actions: [...state.npcActions.filter((entry) => entry.anchorId === input.anchorId).map((entry) => entry.action), ...(next?.end ? [{ kind: 'end-conversation' as const }] : [])], ...(next?.end ? { conversationEnded: true } : {}), ...(next?.feedback ? { feedback: { understood: 'Your request was understood.', explanation: 'A short, clear Mandarin request works here.', improvedExample: '请给我一杯水，谢谢。' }, vibe: { intent: .9, clarity: .8, courtesy: .8 } } : {}) });
       sent.set(input.turnId, response);
       return json(route, response);
     }

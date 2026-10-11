@@ -27,18 +27,21 @@ test('the streamer batches, bounds concurrency, dedupes, marks urgent work and r
   expect(calls.every((call) => call.coords.length <= 6)).toBe(true);
   expect(calls[0]!.coords[0]).toEqual({ cx: 0, cz: 0 });
   expect(calls[0]!.urgent).toBe(true); // the player stands in an uncommitted chunk
+  expect(calls[0]!.coords.every((coord) => distanceToChunk(near, coord) <= 8)).toBe(true); // urgent chunks travel alone
+  expect(calls[1]!.urgent).toBe(false); // farther chunks still get the generation deadline
   streamer.update({ x: 20.5, z: 20 }, 50); // same chunk within the tick: no new requests
   expect(calls).toHaveLength(2);
-  calls[0]!.resolve([calls[0]!.coords[5]!]); // one stays pending
-  calls[1]!.resolve([]);
+  const waiting = calls[1]!.coords.at(-1)!;
+  calls[0]!.resolve([]);
+  calls[1]!.resolve([waiting]); // one stays pending
   await new Promise((resolve) => setTimeout(resolve, 0));
-  expect(committed).toHaveLength(11);
+  expect(committed).toHaveLength(calls[0]!.coords.length + calls[1]!.coords.length - 1);
   streamer.update(near, 100);
   const third = calls[2]!;
-  expect(third.coords.map(chunkKey)).not.toContain(chunkKey(calls[0]!.coords[5]!)); // pending waits for its retry delay
+  expect(third.coords.map(chunkKey)).not.toContain(chunkKey(waiting)); // pending waits for its retry delay
   expect(third.coords.some((coord) => committed.includes(chunkKey(coord)))).toBe(false);
   third.resolve([]);
   await new Promise((resolve) => setTimeout(resolve, 0));
   streamer.update(near, 1_200);
-  expect(calls.at(-1)!.coords.map(chunkKey)).toContain(chunkKey(calls[0]!.coords[5]!));
+  expect(calls.at(-1)!.coords.map(chunkKey)).toContain(chunkKey(waiting));
 });

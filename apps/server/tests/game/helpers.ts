@@ -18,7 +18,7 @@ const anchor = (id: string, capability: Anchor['capability'], kind: Anchor['kind
 
 /** A flat test street around spawn: vendor + menu at spawn, a guide, the river viewpoint with a passer-by, and a lone passer-by far from water. */
 export const ANCHORS = {
-  vendor: anchor('an.vendor.spawn', 'drink-vendor', 'npc', 1, 0, { role: 'vendor', nameKey: 'xiaolin' }),
+  vendor: anchor('an.vendor.spawn', 'drink-vendor', 'npc', 1, 0, { role: 'vendor', nameKey: 'laowang' }),
   farVendor: anchor('an.vendor.far', 'drink-vendor', 'npc', 40, 0, { role: 'vendor', nameKey: 'laowang' }),
   menu: anchor('an.sign.menu', 'readable-sign', 'sign', 0, 1, { cueId: 'q1.menu' }),
   guide: anchor('an.helper.street', 'direction-helper', 'npc', 6, 0, { role: 'guide', nameKey: 'laowang' }),
@@ -99,13 +99,15 @@ export async function campaign(providerMode: 'fixture' | 'live' = 'fixture', val
 }
 export type Campaign = Awaited<ReturnType<typeof campaign>>;
 
-/** Q1 at the spawn vendor: coffee is sold out, accept tea, confirm, pay. */
+/** Q1 at 老王: coffee is sold out (dialogue only); naming tea enables the Pay action, and paying completes the quest. */
 export async function q1(game: Campaign) {
   const coffee = await game.talk('我要咖啡。');
   expect(coffee.body.npcReply).toBe('咖啡卖完了。我们有茶和水。');
-  await game.talk('那就茶吧。');
-  await game.talk('茶十元。');
-  await game.pay();
+  expect(coffee.body.actions).toEqual([]);
+  const tea = await game.talk('那就茶吧。');
+  expect(tea.body.actions).toEqual([{ kind: 'pay', anchorId: ANCHORS.vendor.id, drink: 'tea', priceCny: 10 }]);
+  expect(game.state.npcActions).toEqual([{ anchorId: ANCHORS.vendor.id, action: tea.body.actions[0] }]);
+  await game.pay(tea.body.actions[0].anchorId);
   expect(game.state).toMatchObject({ missionId: 'Q1', status: 'cleared', inventory: { cny: 10, drinks: ['tea'] } });
   expect(game.state.purchases).toHaveLength(1);
 }
@@ -115,6 +117,7 @@ export async function q2(game: Campaign) {
   await game.walkTo(ANCHORS.guide.position);
   const turn = await game.talk('请问，去上海大酒店怎么走？', 'guide');
   expect(turn.body.npcReply).toBe(ROUTE.textZh);
+  expect(turn.body.actions).toEqual([{ kind: 'show-directions' }, { kind: 'end-conversation' }]);
   expect(game.state.directions).toMatchObject({ routeId: ROUTE.routeId, hotelAnchorId: 'hotel.grand' });
   expect(game.state.status).toBe('cleared');
 }
@@ -122,8 +125,9 @@ export async function q2(game: Campaign) {
 export async function q3(game: Campaign) {
   await game.act({ type: 'startMission', missionId: 'Q3' });
   await game.walkTo(ANCHORS.passerby.position);
-  await game.talk('可以帮我在这里拍张照吗？', 'passerby');
+  const ask = await game.talk('可以帮我在这里拍张照吗？', 'passerby');
   expect(game.state.photo).toMatchObject({ status: 'accepted', passerbyAnchorId: ANCHORS.passerby.id, viewpointAnchorId: ANCHORS.viewpoint.id });
+  expect(ask.body.actions).toEqual([{ kind: 'go-to-photo-spot', spot: game.state.photo!.spot }]);
   await game.walkTo(game.state.photo!.spot);
   await game.startPhoto();
   expect(game.state.photo?.status).toBe('countdown');

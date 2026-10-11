@@ -14,18 +14,8 @@
     "tier": 1,
     "objectives": [
       {
-        "id": "q1.order",
-        "label": "Find a drink vendor and ask for a drink.",
-        "complete": false
-      },
-      {
-        "id": "q1.substitute",
-        "label": "Coffee is sold out: choose tea or water.",
-        "complete": false
-      },
-      {
-        "id": "q1.receipt",
-        "label": "Confirm the drink and price, then pay.",
+        "id": "q1.buy",
+        "label": "Buy a drink from 老王 (Lao Wang).",
         "complete": false
       }
     ],
@@ -50,6 +40,7 @@
     "completedMissionIds": [],
     "directions": null,
     "photo": null,
+    "npcActions": [],
     "timer": null,
     "capabilities": {
       "coach": true,
@@ -76,7 +67,7 @@
     "objectives": [
       {
         "id": "q2.ask",
-        "label": "Ask a local how to get to Shanghai Grand Hotel (上海大酒店).",
+        "label": "Ask 小李 (Xiao Li) how to get to 上海大酒店 (Shanghai Grand Hotel).",
         "complete": false
       }
     ],
@@ -101,6 +92,7 @@
     "completedMissionIds": [],
     "directions": null,
     "photo": null,
+    "npcActions": [],
     "timer": null,
     "capabilities": {
       "coach": true,
@@ -126,18 +118,8 @@
     "tier": 1,
     "objectives": [
       {
-        "id": "q3.ask",
-        "label": "By the Huangpu River (黄浦江), ask a passerby to take your photo.",
-        "complete": false
-      },
-      {
-        "id": "q3.pose",
-        "label": "Stand at the photo spot with the river behind you.",
-        "complete": false
-      },
-      {
-        "id": "q3.capture",
-        "label": "Hold still for the countdown.",
+        "id": "q3.photo",
+        "label": "Ask a passer-by at the Huangpu River (黄浦江) to take your photo.",
         "complete": false
       }
     ],
@@ -162,6 +144,7 @@
     "completedMissionIds": [],
     "directions": null,
     "photo": null,
+    "npcActions": [],
     "timer": null,
     "capabilities": {
       "coach": true,

@@ -148,7 +148,7 @@ function Neighbourhood() {
     <label>District kit <select value={district} onChange={(event) => setDistrict(event.target.value as DistrictKind)} data-testid="gallery-district">{DistrictKindSchema.options.map((kind) => <option key={kind}>{kind}</option>)}</select></label>
     {sample ? <p>Centre chunk {chunkKey(sample.centre)} · {sample.manifests.reduce((n, m) => n + m.placements.length, 0)} placements · catalog estimate ~{estimate} tris</p> : <p data-testid="gallery-no-sample">No planned {district} chunk within 12 chunks.</p>}
     <dl ref={output} className="gallery-budget" data-testid="gallery-budget"><dt>Triangles</dt><dd data-k="tris">…</dd><dt>Draw calls</dt><dd data-k="calls">…</dd></dl>
-    {sample && <Canvas className="gallery-neighbourhood-canvas" camera={{ position: [centre.x + 55, 70, centre.z + 75], fov: 50, far: 600 }} onCreated={({ camera }) => camera.lookAt(centre.x, 0, centre.z)}>
+    {sample && <Canvas key={chunkKey(sample.centre)} className="gallery-neighbourhood-canvas" camera={{ position: [centre.x + 55, 70, centre.z + 75], fov: 50, far: 600 }} onCreated={({ camera }) => camera.lookAt(centre.x, 0, centre.z)}>
       <color attach="background" args={['#ffd1a8']} /><Lights />
       {sample.manifests.map((manifest) => <ChunkRenderer key={chunkKey(manifest.coord)} manifest={manifest} centre={centre} far={false} still={false} />)}
       <Stats output={output} />

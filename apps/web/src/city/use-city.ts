@@ -4,7 +4,7 @@ import {
   type ChunkManifest, type Position, type QuestCategory, type PublicState, type WorldView,
 } from '@vibequest/shared';
 import { createCityClient, type CityClient } from './city-client';
-import { loadChunks, saveChunks } from './chunk-cache';
+import { loadChunks, rememberWorld, saveChunks } from './chunk-cache';
 import { ChunkStreamer } from './streamer';
 
 export type CityStatus = 'restoring' | 'streaming' | 'error';
@@ -39,8 +39,9 @@ function previewChunks(): ChunkManifest[] {
  * (server-validated; existing commits win), then request the rest around the player. With `state`
  * null: a local preview city. With `options.manifests`: a static city (tests/fixtures), no network.
  */
-export function useCity(state: Pick<PublicState, 'sessionId' | 'worldId'> | null, options: { client?: CityClient; manifests?: readonly ChunkManifest[] } = {}): CityHandle {
+export function useCity(state: Pick<PublicState, 'sessionId' | 'worldId' | 'validationMode'> | null, options: { client?: CityClient; manifests?: readonly ChunkManifest[] } = {}): CityHandle {
   const sessionId = state?.sessionId ?? null;
+  const validation = state?.validationMode ?? false;
   const worldId = options.manifests?.[0]?.worldId ?? state?.worldId ?? PREVIEW_WORLD;
   const store = useRef(new Map<string, ChunkManifest>());
   const streamer = useRef<ChunkStreamer | null>(null);
@@ -69,6 +70,7 @@ export function useCity(state: Pick<PublicState, 'sessionId' | 'worldId'> | null
       setStatus('streaming');
       return () => { live = false; };
     }
+    if (!validation) rememberWorld(worldId); // validation sessions never claim the player's city
     setStatus('restoring');
     const stream = new ChunkStreamer((coords, urgent) => client.chunks(sessionId, coords, urgent), (manifests) => commit(manifests, true), (reason) => { if (live) setError(reason instanceof Error ? reason.message : 'City streaming failed.'); });
     streamer.current = stream;
@@ -87,7 +89,7 @@ export function useCity(state: Pick<PublicState, 'sessionId' | 'worldId'> | null
       if (live) setStatus('streaming');
     })();
     return () => { live = false; stream.stop(); if (streamer.current === stream) streamer.current = null; };
-  }, [client, sessionId, worldId, staticManifests]);
+  }, [client, sessionId, worldId, staticManifests, validation]);
 
   // ponytail: the view is rebuilt per commit (≤ a few per second); make it incremental if profiling says so.
   const view = useMemo(() => createWorldView(worldId, seedFromWorldId(worldId), store.current), [worldId, revision]);

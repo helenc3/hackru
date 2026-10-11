@@ -81,7 +81,7 @@ describe('evidence-based adaptation', () => {
     return applyEvaluation(state, 'vendor', 'a.vendor', { ...baselineEvaluation, ...evaluation }, 0, fakeWorld).state;
   };
   it('records a confident incorrect request once and cannot farm a corrected confirmation', () => {
-    let state = fresh(); state.nodeId = 'q1.receipt'; state.flags['q1.drink'] = 'tea';
+    let state = fresh(); state.nodeId = 'q1.buy'; state.flags['q1.drink'] = 'tea';
     state = vendorTurn(state, 'wrong', { intent: 'confirm_drink_price', slots: [{ key: 'drink', value: 'tea' }, { key: 'priceCny', value: 9 }], coach: null });
     state = vendorTurn(state, 'corrected', { intent: 'confirm_drink_price', slots: [{ key: 'drink', value: 'tea' }, { key: 'priceCny', value: 10 }], coach: null });
     const result = finish(state);

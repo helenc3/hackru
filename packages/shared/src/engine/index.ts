@@ -283,6 +283,9 @@ function completeDrinkConfirmation(state: InternalState, evaluation: TurnEvaluat
   if (!slots.some((entry) => entry.key === 'priceCny')) slots.push({ key: 'priceCny', value: chosen === 'tea' ? 10 : 5 });
   return { ...evaluation, slots };
 }
+/** An NPC line that closes the exchange ("thanks, come again", "bye"): the conversation ends after it, whoever said goodbye first. */
+const CLOSING_LINE = /再见|拜拜|慢走|欢迎(?:您)?(?:再来|下次|常来)|下次(?:再来|见)|回头见|一路(?:顺风|平安)|路上小心/;
+export function isClosingLine(text: string | undefined): boolean { return Boolean(text && CLOSING_LINE.test(text)); }
 export function groundedReply(state: InternalState, npcId: NpcId, evaluation: TurnEvaluation): string {
   const slot = (key: string) => evaluation.slots.find((entry) => entry.key === key)?.value;
   if (evaluation.interaction === 'insult') return '请礼貌一点。';
@@ -367,9 +370,11 @@ export function applyEvaluation(state: InternalState, npcId: NpcId, raw: TurnEva
   if (npc.patience === 0) npc.cooldownRemainingMs = 10_000;
   npc.mood = mood(npc.patience);
   const reply = groundedReply(next, npcId, evaluation);
+  // The NPC closing the exchange ("谢谢，欢迎再来！") ends it too; a requested repeat of an earlier goodbye does not.
+  const npcClosed = evaluation.intent !== 'request_repeat' && isClosingLine(reply);
   npc.history.push({ role: 'player', text: next.pendingTurn!.text }, { role: 'npc', text: reply });
   npc.history = npc.history.slice(-12);
-  return { state: InternalStateSchema.parse(next), events: result.events, ...(conversationEnded ? { conversationEnded } : {}) };
+  return { state: InternalStateSchema.parse(next), events: result.events, ...(conversationEnded || npcClosed ? { conversationEnded: true as const } : {}) };
 }
 export function projectPublicState(state: InternalState, nowMs: number): PublicState {
   const next = synchronizeGame(state, nowMs).state;

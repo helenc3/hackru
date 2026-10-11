@@ -48,4 +48,20 @@ describe('live bridge', () => {
     bridge.onLiveMessage(message({ data: 'QUJD' }));
     expect(events.at(-1)).toEqual({ type: 'closed', reason: 'stop' });
   });
+
+  it('closes right after a goodbye that finished speaking before the engine answered', async () => {
+    const events: ServerEvent[] = [];
+    const live = { closed: false, sendAudio: () => undefined, sendNote: () => undefined, close: () => { live.closed = true; } };
+    let resolveTurn: (turn: TurnResponse) => void = () => undefined;
+    const bridge = createLiveBridge({ send: (event) => events.push(event), live, turn: () => new Promise<TurnResponse>((resolve) => { resolveTurn = resolve; }), note: () => undefined });
+    bridge.onLiveMessage(message({ serverContent: { inputTranscription: { text: '再见' } } }));
+    bridge.onLiveMessage(message({ data: 'QUJD', serverContent: { outputTranscription: { text: '再见！' } } })); // turn starts on the first audio frame
+    bridge.onLiveMessage(message({ serverContent: { turnComplete: true } })); // goodbye finished before the engine answered
+    expect(live.closed).toBe(false);
+    resolveTurn({ ...turnResponse([]), conversationEnded: true });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(live.closed).toBe(true);
+    expect(events.at(-1)).toEqual({ type: 'closed', reason: 'farewell' });
+    expect(events.filter((event) => event.type === 'turn')).toHaveLength(1);
+  });
 });

@@ -6,6 +6,7 @@ import { distance, movePlayer, zoneAt } from './navigation';
 import { Player, type Gait } from './characters';
 import { initialPosition, type Runtime } from './runtime';
 import { useAudioActivity } from '../audio/audio-bus';
+import { DEFAULT_PITCH, orbitDistance } from './camera';
 
 export const landmarks = [
   { label: '广场', x: 0, z: 11 }, { label: '咖啡店', x: -10, z: 7.8 },
@@ -50,10 +51,16 @@ export function Motion({ runtime, root, labels, state, tick, sync }: {
       return point ? { x: point.x, z: point.z } : null;
     };
     if (blocked) r.path = [];
+    const k = r.keys;
+    const right = blocked ? 0 : Number(k.has('KeyD') || k.has('ArrowRight')) - Number(k.has('KeyA') || k.has('ArrowLeft'));
+    const forward = blocked ? 0 : Number(k.has('KeyW') || k.has('ArrowUp')) - Number(k.has('KeyS') || k.has('ArrowDown'));
+    const keyed = Boolean(right || forward);
+    if (keyed) r.path = [];
     const waypoint = r.path?.[0];
-    const moving = Boolean(waypoint);
+    const moving = keyed || Boolean(waypoint);
     const previous = r.position;
-    if (waypoint) {
+    if (keyed) r.position = movePlayer(r.position, right, forward, r.yaw, delta);
+    else if (waypoint) {
       const remaining = distance(r.position, waypoint);
       const seconds = Math.min(delta, remaining / sceneManifest.movementSpeed);
       r.position = movePlayer(r.position, waypoint.x - r.position.x, r.position.z - waypoint.z, 0, seconds);
@@ -82,8 +89,8 @@ export function Motion({ runtime, root, labels, state, tick, sync }: {
         void clip.play().catch(() => undefined);
       }
     }
-    const pitch = r.pitch ?? Math.atan2(7.8, 9);
-    const orbit = Math.hypot(7.8, 9);
+    const pitch = r.pitch ?? DEFAULT_PITCH;
+    const orbit = orbitDistance(pitch);
     camera.position.set(r.position.x + Math.sin(r.yaw) * orbit * Math.cos(pitch), .7 + orbit * Math.sin(pitch), r.position.z + Math.cos(r.yaw) * orbit * Math.cos(pitch));
     camera.lookAt(r.position.x, .7, r.position.z);
     camera.updateMatrixWorld();

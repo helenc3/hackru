@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
-import { NpcIdSchema, sceneManifest, type GameAction } from '@vibequest/shared';
+import { NpcIdSchema, createBaselineState, sceneManifest, type GameAction, type MissionId, type PublicState, type TurnResponse } from '@vibequest/shared';
 import { WorldRenderer } from '../world/WorldRenderer';
 import { AudioController } from '../audio/AudioController';
 import { BackgroundMusic } from '../audio/BackgroundMusic';
@@ -11,6 +11,7 @@ import { ResultPanel } from '../ui/ResultPanel';
 import { RecoveryPanel } from '../ui/RecoveryPanel';
 import { CoachPanel } from '../ui/CoachPanel';
 import { WorldInteractions } from '../ui/WorldInteractions';
+import { ConversationCard, type ConversationSummary } from '../ui/ConversationCard';
 import { useApiHealth } from './use-api-health';
 import { useSession } from './use-session';
 import './game.css';
@@ -18,6 +19,10 @@ import './game.css';
 const ValidationHarness = import.meta.env.DEV && import.meta.env.VITE_ENABLE_VALIDATION_HARNESS === 'true'
   ? lazy(() => import('../validation/ValidationHarness').then((module) => ({ default: module.ValidationHarness }))) : null;
 const validationRequested = window.location.pathname === '/__validation';
+// The welcome screen floats over a blurred, non-interactive preview of the plaza so players see the world before entering.
+const previewState = createBaselineState('P1');
+const previewAction = async () => undefined;
+const previewTalk = () => undefined;
 
 export function App() {
   const { health, healthProblem, retryHealth } = useApiHealth();
@@ -30,6 +35,23 @@ export function App() {
   const signClose = useRef<HTMLButtonElement>(null);
   // The server resets position on a new attempt; remounting the world resets the client avatar to match.
   const [attempt, setAttempt] = useState(0);
+  // Latest terminal result per mission, kept client-side for review; the server never re-sends an earlier debrief.
+  const resultsKey = session.state ? `vibequest.mission-results.v1:${session.state.sessionId}` : null;
+  const [results, setResults] = useState<Partial<Record<MissionId, PublicState>>>({});
+  const [resultsClosed, setResultsClosed] = useState(false);
+  const [review, setReview] = useState<MissionId | null>(null);
+  useEffect(() => { try { setResults(resultsKey ? JSON.parse(localStorage.getItem(resultsKey) ?? '{}') : {}); } catch { setResults({}); } }, [resultsKey]);
+  useEffect(() => {
+    const terminal = session.state;
+    if (!terminal || terminal.status === 'active' || !resultsKey) return;
+    setResults((previous) => { const next = { ...previous, [terminal.missionId]: terminal }; try { localStorage.setItem(resultsKey, JSON.stringify(next)); } catch { /* storage optional */ } return next; });
+  }, [session.state, resultsKey]);
+  const closeResults = useCallback(() => {
+    setResultsClosed(true); setReview(null);
+    requestAnimationFrame(() => document.querySelector<HTMLElement>('[data-testid="world-renderer"]')?.focus());
+  }, []);
+  const openReview = useCallback((missionId: MissionId) => { setSign(null); setNpc(null); setConversation(null); setReview(missionId); }, []);
+  const leave = useCallback(() => { try { if (resultsKey) localStorage.removeItem(resultsKey); } catch { /* storage optional */ } setNpc(null); session.abandon(); }, [resultsKey, session.abandon]);
   const closeSignPanel = useCallback(() => {
     setSign(null);
     requestAnimationFrame(() => document.querySelector<HTMLElement>('[data-testid="world-renderer"]')?.focus());
@@ -45,8 +67,18 @@ export function App() {
   }, [sign, closeSignPanel]);
 
 
-  useEffect(() => { setNpc(null); setSign(null); setPaused(false); }, [session.state?.sessionId, session.state?.missionId, session.state?.status]);
-  const closeConversation = useCallback(() => setNpc(null), []);
+  useEffect(() => { setNpc(null); setSign(null); setPaused(false); setResultsClosed(false); setReview(null); setConversation(null); }, [session.state?.sessionId, session.state?.missionId, session.state?.status]);
+  const [conversation, setConversation] = useState<(ConversationSummary & { turn: TurnResponse | null }) | null>(null);
+  const latestTurn = useRef(session.turn); latestTurn.current = session.turn;
+  const closeConversation = useCallback((ended?: ConversationSummary) => {
+    setNpc(null);
+    if (ended) setConversation({ ...ended, turn: latestTurn.current });
+    else requestAnimationFrame(() => document.querySelector<HTMLElement>('[data-testid="world-renderer"]')?.focus());
+  }, []);
+  const closeConversationCard = useCallback(() => {
+    setConversation(null);
+    requestAnimationFrame(() => document.querySelector<HTMLElement>('[data-testid="world-renderer"]')?.focus());
+  }, []);
 
   const onAction = useCallback(async (action: GameAction) => {
     await session.onAction(action);
@@ -58,7 +90,7 @@ export function App() {
 
   const onTalk = useCallback((id: string) => {
     const parsed = NpcIdSchema.safeParse(id);
-    if (parsed.success && session.state?.status === 'active' && session.state.interactables.some((item) => item.id === id && item.kind === 'npc')) { setNpc(parsed.data); setSign(null); }
+    if (parsed.success && session.state?.status === 'active' && session.state.interactables.some((item) => item.id === id && item.kind === 'npc')) { setNpc(parsed.data); setSign(null); setConversation(null); }
   }, [session.state]);
 
   if (validationRequested && health && !validation) return <main className="validation-denied"><h1>Internal validation is unavailable.</h1><p>This entry requires a development build and server validation configuration.</p><a href="/">Return to the game</a></main>;
@@ -68,7 +100,10 @@ export function App() {
   </>;
 
   if (!session.state) {
-    return <main className="welcome-screen"><a className="brand" href="/">VibeQuest<span className="brand-dot">.</span></a><span className="language-chip"><span lang="zh-Hans">中文</span>Mandarin Chinese</span><h1>Every street has a story.</h1>{starter}<p className="welcome-footer">One neighborhood. Three missions. Mandarin leads the way.</p></main>;
+    return <div className="game-shell welcome-shell" data-testid="welcome-shell">
+      <div className="game-world world-preview" aria-hidden="true" inert><WorldRenderer state={previewState} onAction={previewAction} onTalk={previewTalk} preview /></div>
+      <main className="welcome-screen"><a className="brand" href="/">VibeQuest<span className="brand-dot">.</span></a>{starter}</main>
+    </div>;
   }
 
   const state = session.state;
@@ -98,17 +133,18 @@ export function App() {
       {state.status === 'active' && <button className="button secondary" disabled={session.pending && !session.turnPending} onClick={() => void onAction({ type: 'retryMission' }).catch(() => undefined)}>Restart mission</button>}</div></header>
     <main className="game-main">
       <div className="game-world" id="world"><WorldRenderer key={attempt} state={state} onAction={onAction} onTalk={onTalk} /></div>
-      <QuestPanel state={state} />
+      <QuestPanel state={state} results={results} onReview={openReview} />
       <div className="hud-bottom-left">
         <WorldInteractions state={state} pending={session.pending} onAction={onAction} onTalk={onTalk} onShowSubtitles={setSign} />
         <InventoryBar state={state} pending={session.pending} paused={paused} onAction={onAction} onPause={() => void onAction({ type: paused ? 'resumePractice' : 'pausePractice' }).catch(() => undefined)} />
       </div>
       {selectedCue?.text && <section className="sign-overlay" role="dialog" aria-label="Inspected sign"><button ref={signClose} className="button secondary" onClick={closeSignPanel} aria-label="Close sign">Close</button><h3 lang="zh-Hans">{selectedCue.label}</h3><p lang="zh-Hans">{selectedCue.text}</p></section>}
-      <RecoveryPanel problem={session.problem} pending={session.pending} state={state} onRetry={session.retry} onRefresh={session.refresh} onNew={session.abandon} onDismiss={session.dismiss} />
+      <RecoveryPanel problem={session.problem} pending={session.pending} state={state} onRetry={session.retry} onRefresh={session.refresh} onNew={leave} onDismiss={session.dismiss} />
       {session.events.length > 0 && <section className="event-feed" aria-label="Mission updates" aria-live="polite">{session.events.slice(-3).map((event) => <p key={event.id}>{event.message}</p>)}</section>}
       {paused && !npc && state.status === 'active' && <CoachPanel state={state} turn={session.turn} />}
       {npc && state.status === 'active' && <DialoguePanel key={`${state.sessionId}:${state.missionId}:${npc}`} state={state} npcId={npc} pending={session.pending} turn={session.turnNpc === npc ? session.turn : null} choices={npcChoices} onAction={onAction} onSubmit={session.submit} onLiveTurn={session.applyTurn} onClose={closeConversation} />}
-      <ResultPanel state={state} pending={session.pending} onAction={onAction} onExit={session.abandon} />
+      {conversation && !npc && state.status === 'active' && <ConversationCard summary={conversation} turn={conversation.turn} state={state} pending={session.pending} onClose={closeConversationCard} />}
+      {(review ? results[review] : resultsClosed ? null : state.status !== 'active' ? state : null) && <ResultPanel state={(review && results[review]) ?? state} live={state} pending={session.pending} onAction={onAction} onExit={leave} onClose={closeResults} />}
       {validation && state.validationMode && ValidationHarness && <Suspense fallback={<p>Loading internal validator…</p>}><ValidationHarness state={state} onAction={onAction} onTalk={onTalk} /></Suspense>}
     </main>
   </div>;

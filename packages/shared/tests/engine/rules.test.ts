@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { createGame, applyAction, applyEvaluation, projectPublicState, synchronizeGame, dialogueContext, groundedReply } from '../../src/engine/index.js';
+import { createGame, applyAction, applyEvaluation, projectPublicState, synchronizeGame, dialogueContext, groundedReply, isClosingLine } from '../../src/engine/index.js';
 import { groundedReplies } from '../../src/content/facts.js';
 import { createFixtureDialogueProvider, parseFixturePrice } from '../../src/engine/fixture-dialogue.js';
 import { missionFor } from '../../src/content/missions.js';
@@ -126,6 +126,18 @@ describe('mission graph and authoritative rules', () => {
     const bossTurn = applyEvaluation(reservation(boss, '再见', 'laozhou'), 'laozhou', await createFixtureDialogueProvider().evaluate(dialogueContext(boss, 'laozhou'), '再见'), 0);
     expect(bossTurn.conversationEnded).toBe(true); expect(bossTurn.state.nodeId).toBe(boss.nodeId); expect(bossTurn.state.status).toBe('active'); expect(bossTurn.events).toEqual([]);
     expect(bossTurn.state.npcState.laozhou.history.at(-1)?.text).toBe(groundedReplies.farewell);
+  });
+  it('recognizes NPC closing lines without matching ordinary replies', () => {
+    for (const line of ['谢谢，慢走！', '好的，再见！', '谢谢，欢迎再来！', '欢迎下次光临。', '拜拜～', '下次见！', '一路顺风。']) expect(isClosingLine(line)).toBe(true);
+    for (const line of ['好的，请付款。', '茶十元。', '您要茶还是水？', '再来一杯吗？', '欢迎光临！', '谢谢！', '']) expect(isClosingLine(line)).toBe(false);
+  });
+  it('ends the conversation when the NPC closes it, but not when a goodbye is merely repeated', async () => {
+    const state = fresh('P1'); state.nodeId = 'p1.order'; state.zoneId = 'cafe'; state.position = { x: -10, z: 4 };
+    const greeting = await createFixtureDialogueProvider().evaluate(dialogueContext(state, 'xiaolin'), '你好');
+    const closed = applyEvaluation(reservation(state, '你好'), 'xiaolin', { ...greeting, replyZh: '谢谢，欢迎再来！' }, 0);
+    expect(closed.state.npcState.xiaolin.history.at(-1)?.text).toBe('谢谢，欢迎再来！'); expect(closed.conversationEnded).toBe(true);
+    const open = applyEvaluation(reservation(state, '你好'), 'xiaolin', { ...greeting, replyZh: '你好！您要喝什么？' }, 0);
+    expect(open.conversationEnded).toBeUndefined();
   });
   it('penalizes English or unclear input in practice without acting on it, and floors XP at zero', () => {
     const state = fresh('P1'); state.nodeId = 'p1.order'; state.zoneId = 'cafe'; state.position = { x: -10, z: 4 }; state.xp = 7;

@@ -11,7 +11,8 @@ export function StartPanel({ validation, fixtures, pending, resumeId, onStart, o
   const { microphone, audio, checking, recordingUrl, microphonePlayer, audioPlayer, checkMicrophone, checkAudio, setAudio } = useDeviceCheck();
 
   return <section className="start-panel" aria-labelledby="start-title" data-testid="start-panel">
-    <div><span className="eyebrow">YOUR MANDARIN ADVENTURE</span><h2 id="start-title">Find your way through conversation.</h2><p>Read the neighborhood, speak to the locals, and act on what you understand.</p></div>
+    <div><h2 id="start-title">Find your way through conversation.</h2><p>Read the neighborhood, speak to the locals, and act on what you understand.</p></div>
+    <div className="intro-columns"><div className="intro-setup">
     <fieldset disabled={pending}><legend>How much Mandarin have you used?</legend>
       <label><input type="radio" name="tier" checked={tier === 0} onChange={() => setTier(0)} />New learner</label>
       <label><input type="radio" name="tier" checked={tier === 1} onChange={() => setTier(1)} />Some Mandarin</label>
@@ -21,6 +22,9 @@ export function StartPanel({ validation, fixtures, pending, resumeId, onStart, o
     {recordingUrl && <audio ref={microphonePlayer} controls autoPlay src={recordingUrl} aria-label="Your microphone test recording" />}
     <audio ref={audioPlayer} src="/audio/rutgers-university-zh.mp3" preload="auto" onError={() => setAudio('The audio check clip could not load. Please reload and try again.')} />
     <div className="setup-row"><button className="button secondary" disabled={checking || pending} onClick={() => void checkAudio()}>Check audio</button><p role="status">{audio}</p></div>
+    </div><section className="intro-controls" aria-labelledby="intro-controls-title"><h3 id="intro-controls-title">Controls</h3><p>Explore the district and follow your current goal.</p>
+      <dl className="controls-list"><dt>WASD / Arrow keys</dt><dd>Walk</dd><dt>Click the world</dt><dd>Walk there</dd><dt>Drag sideways</dt><dd>Orbit the camera</dd><dt>Drag up / down</dt><dd>Tilt and zoom the camera</dd><dt>E</dt><dd>Interact with the nearest target</dd><dt>Esc</dt><dd>Close a sign or conversation</dd></dl>
+    </section></div>
     <div className="start-actions"><button className="button primary" disabled={pending} onClick={() => void onStart({ initialTier: tier, providerMode: validation ? 'fixture' : provider, validationMode: validation, inputPreference: 'voice' }).catch(() => undefined)}>{pending ? 'Connecting…' : validation ? 'Start validation session' : 'Start Practice'}<span aria-hidden="true">↗</span></button>
       {resumeId && <button className="button secondary" disabled={pending} onClick={() => void onContinue().catch(() => undefined)}>Continue Session</button>}
     </div>

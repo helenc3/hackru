@@ -113,7 +113,7 @@ export function App() {
   if (!session.state) {
     return <div className="game-shell welcome-shell" data-testid="welcome-shell">
       <div className="game-world world-preview" aria-hidden="true" inert><WorldRenderer state={previewState} onAction={previewAction} onTalk={previewTalk} preview /></div>
-      <main className="welcome-screen"><a className="brand" href="/">VibeQuest<span className="brand-dot">.</span></a><span className="language-chip"><span lang="zh-Hans">中文</span>Mandarin Chinese</span><h1>Every street has a story.</h1>{starter}<p className="welcome-footer">One city. Three quests. Mandarin leads the way.</p></main>
+      <main className="welcome-screen"><a className="brand" href="/">VibeQuest<span className="brand-dot">.</span></a>{starter}</main>
     </div>;
   }
 

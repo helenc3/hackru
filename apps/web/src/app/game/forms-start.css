@@ -22,19 +22,6 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
   padding-top: 50px;
 }
 
-.welcome-screen > .language-chip {
-  float: right;
-}
-
-.welcome-screen h1 {
-  margin: 50px 0 20px;
-}
-
-.welcome-footer {
-  margin: 22px 0;
-  color: var(--text-muted);
-}
-
 .start-panel {
   padding: 26px;
   border: var(--outline);

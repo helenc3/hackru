@@ -1,9 +1,3 @@
-.small-label {
-  color: var(--text-muted);
-  font-size: 10px;
-  line-height: 1.7;
-}
-
 .button {
   border: var(--outline);
   border-radius: 14px;

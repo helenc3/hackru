@@ -4,10 +4,6 @@ import { HttpError } from '../errors.js';
 import { createClaudeDialogueProvider } from './claude/live.js';
 import { createGeminiDialogueProvider } from './gemini/live.js';
 
-export { createClaudeDialogueProvider } from './claude/live.js';
-export { createFixtureDialogueProvider } from './gemini/fixture.js';
-export { createGeminiDialogueProvider } from './gemini/live.js';
-export { meetsProgressionGate } from './gemini/gate.js';
 
 /**
  * Live Claude when an Anthropic key is configured, else live Gemini when its key is. Without one, fail as a recoverable

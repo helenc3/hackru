@@ -37,8 +37,8 @@ describe('bootstrap API boundary', () => {
     const response = await request(createApp({ config })).get('/api/health').expect(200);
     expect(response.body).toEqual({
       status: 'ok',
-      buildId: 'segment-007',
-      specVersion: '1.2',
+      buildId: 'speak-your-way',
+      specVersion: '2.0',
       providers: { geminiConfigured: true, elevenlabsConfigured: true },
       features: { validationHarness: true, fixtures: true, cityProvider: 'fallback' },
       segments: { engine: 'implemented', dialogue: 'live', speech: 'live' },

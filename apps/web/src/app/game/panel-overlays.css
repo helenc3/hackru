@@ -31,16 +31,6 @@
   animation: vq-pop .28s var(--bounce);
 }
 
-.game-main > .action-notice {
-  position: absolute;
-  top: 14px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 7;
-  margin: 0;
-  max-width: 50%;
-}
-
 .event-feed {
   position: absolute;
   left: 50%;

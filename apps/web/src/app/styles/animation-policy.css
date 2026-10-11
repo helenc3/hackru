@@ -5,8 +5,7 @@
     transition-duration: .001ms !important;
   }
 
-  .button:hover, .button:active, .voice-control button:hover, .voice-control button:active,
-  .district-nearby button:hover, .district-nearby button:active, .district-error button:hover, .district-error button:active {
+  .button:hover, .button:active, .voice-control button:hover, .voice-control button:active, .district-nearby button:hover, .district-nearby button:active {
     transform: none !important;
   }
 }

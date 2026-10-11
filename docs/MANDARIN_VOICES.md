@@ -49,15 +49,13 @@ provider metadata; inclusion in this table reflects the human's listening judgme
 
 | Character or audio role | Assigned voice | Voice ID |
 | --- | --- | --- |
-| 小林 / Xiaolin — café owner, spoken directions | Coco Li — Calm, Young and Trustworthy | `Ca5bKgudqKJzq8YRFoAz` |
-| 阿陈 / Achen — station worker | James Gao — Calm, Friendly and Warm | `4VZIsMPtgggwNg7OXbPY` |
-| 老周 / Laozhou — ticket agent | Adam Li — Deep, Steady and Calm | `hZTuv9Zqrq4yHYrEmF1r` |
-| Station PA announcements | Adrian — Chinese Mandarin Narration | `agczkAUlHLowaNnL72Cc` |
+| 老王 / Lao Wang — drink vendor (Q1) | Coco Li — Calm, Young and Trustworthy | `Ca5bKgudqKJzq8YRFoAz` |
+| 小李 / Xiao Li — local guide (Q2) | James Gao — Calm, Friendly and Warm | `4VZIsMPtgggwNg7OXbPY` |
+| 小美 / Xiao Mei — passerby (Q3) | Karo Yang — Clear, Lively and Energetic | `5mZxJZhSmJTjL7GoYfYI` |
 | Setup audio check | Coco Li — Calm, Young and Trustworthy | `Ca5bKgudqKJzq8YRFoAz` |
+| Historical station PA clips (1.2) | Adrian — Chinese Mandarin Narration | `agczkAUlHLowaNnL72Cc` |
 
-The player avatar uses the player's microphone or typed input and has no synthetic
-voice assignment. Live NPCs use `eleven_v4_turbo`; prerecorded lines use `eleven_v4`.
-Environment overrides must also select approved IDs. Unapproved overrides are rejected.
+Source of truth: `characterDescriptions` in `packages/shared/src/content/index.ts`. The player avatar uses the microphone or typed input and has no synthetic voice. Live NPCs use `eleven_v4_turbo`; the prerecorded setup clip uses `eleven_v4`.
 
 Historical IPA samples remain in `audio_test` as evidence of the rejected experiment.
 

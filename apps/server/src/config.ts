@@ -17,7 +17,6 @@ const environmentSchema = z.object({
   GEMINI_LIVE_MODEL: z.string().trim().min(1).default('gemini-3.8-live'),
   ELEVENLABS_API_KEY: z.string().trim().min(1).optional(),
   ELEVENLABS_TTS_MODEL: z.string().trim().min(1).default('eleven_v4_turbo'),
-  ELEVENLABS_PA_MODEL: z.string().trim().min(1).default('eleven_v4'),
   ELEVENLABS_STT_MODEL: z.string().trim().min(1).default('scribe_v2'),
   ENABLE_DEMO_FIXTURES: booleanEnvironmentSchema,
   E2E_FAST_MOVEMENT: booleanEnvironmentSchema,
@@ -42,7 +41,6 @@ export interface ServerConfig {
   geminiLiveModel: string;
   elevenlabsApiKey: string | undefined;
   elevenlabsTtsModel: string;
-  elevenlabsPaModel: string;
   elevenlabsSttModel: string;
   voiceIds: Record<NpcId, string>;
   enableClaudeCity: boolean;
@@ -76,7 +74,6 @@ export function loadConfig(environment: NodeJS.ProcessEnv = process.env): Server
     geminiLiveModel: env.GEMINI_LIVE_MODEL,
     elevenlabsApiKey: env.ELEVENLABS_API_KEY,
     elevenlabsTtsModel: env.ELEVENLABS_TTS_MODEL,
-    elevenlabsPaModel: env.ELEVENLABS_PA_MODEL,
     elevenlabsSttModel: env.ELEVENLABS_STT_MODEL,
     voiceIds: Object.fromEntries(characterDescriptions.map((npc) => [npc.id, npc.voice.id])) as Record<NpcId, string>,
     enableClaudeCity: env.ENABLE_CLAUDE_CITY,

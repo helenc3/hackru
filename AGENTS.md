@@ -1,11 +1,13 @@
 # Speak Your Way agent entry point
 
-These instructions apply when this build kit is installed at the implementation repository root. The human team has chosen numbered, independently invokable build segments. A request such as `Build Segment-003` means: implement that segment, run its acceptance checks and repository checks, commit/push its branch, create a pull request, and merge it when green and permitted by repository rules. Do not stop at a plan or ask again for routine in-scope implementation or merge authorization.
+All numbered segments through Segment-010 are merged; the segment protocol below is historical and applies only if a new numbered packet is requested. For current behavior read [IMPLEMENTATION_SPEC.md](IMPLEMENTATION_SPEC.md), [proposals/city-streaming-contracts.md](proposals/city-streaming-contracts.md), and [docs/LOCAL_LAUNCH.md](docs/LOCAL_LAUNCH.md); the code and tests are the source of truth where older documents disagree.
+
+The human team chose numbered, independently invokable build segments. A request such as `Build Segment-003` means: implement that segment, run its acceptance checks and repository checks, commit/push its branch, create a pull request, and merge it when green and permitted by repository rules. Do not stop at a plan or ask again for routine in-scope implementation or merge authorization.
 
 ## Resolving a segment request
 
 1. Normalize `003`, `Segment-003`, or `segment 3` to `Segment-003`.
-2. Read `BUILD_PROTOCOL.md`, `SEGMENT_REGISTRY.md`, `CONTRACT_FREEZE.md`, and `segments/Segment-003.md` (substitute the requested number).
+2. Read `segments/Segment-003.md` (substitute the requested number) and `SEGMENT_REGISTRY.md`; `BUILD_PROTOCOL.md` and `CONTRACT_FREEZE.md` are Spec 1.2 history.
 3. Read the specified sections of `IMPLEMENTATION_SPEC.md`; inspect current code and tests. Never rely on this chat's history.
 4. Verify dependencies on the remote `main`, claim the segment as documented, then work only on its branch and owned files.
 5. Implement the requested result, not just scaffolding, except where Segment-000 explicitly requires stubs. Verify against fixtures and acceptance criteria.
@@ -20,15 +22,11 @@ If the segment is complete on remote `main`, verify its completion record and do
 - Spec 2.0 campaign: three exploration quests offered in order — Q1 buy a drink, Q2 directions to 上海大酒店, Q3 a photo at 黄浦江 ([docs/NEW_QUESTS.md](docs/NEW_QUESTS.md)). No boss mode, boss timer, or freeze.
 - The world is a Shanghai-style city streamed in chunks ([docs/CITY_GENERATION.md](docs/CITY_GENERATION.md), [frozen contracts](proposals/city-streaming-contracts.md)). Claude composes neighborhoods only from the approved component catalog behind `ENABLE_CLAUDE_CITY`; deterministic code validates every manifest, and a seeded fallback always works. Never execute generated code or download generated asset URLs.
 - One coherent third-person player experience combines reading, spoken directions/conversation, and world actions. The developer text harness validates the same engine but is not a selectable game mode.
-- Microphone capture, Mandarin STT, Gemini NPC response, and Mandarin speech playback are core Segment-005 requirements. Typed/subtitle accessibility stays within the same world.
+- Microphone capture, Mandarin STT, NPC dialogue (Claude when `ANTHROPIC_API_KEY` is set, otherwise Gemini; Gemini Live drives the real-time voice relay), and ElevenLabs Mandarin speech playback are core requirements. Typed/subtitle accessibility stays within the same world.
 - AI interprets language and proposes dialogue or city layouts; deterministic rules own game facts, routes, landmark locations, progression, inventory, purchases, photos, and reward grants. Generating a feature or an AI claim of success never completes a quest.
 - Developer-harness interactions grant no player achievement. Subtitle-assisted replies and edited transcripts never become independent listening/spoken evidence.
 - No API secrets in the browser or commits. Tests default to fixture providers.
 - No extra language, multiplayer, authentication, procedural quests, continuous voice, or pronunciation grader. City generation is limited to the catalog-only streamed city above.
-
-## Testing policy
-
-Do not run the full test suite on ordinary edits. While iterating, run only the checks in the blast radius of the change: the unit or UI spec files that cover the edited modules, the typecheck, and lint. Use `vitest run <files>` and `playwright test <files>` with explicit paths; prefer `--workers=1` for world and end-to-end journeys, which are flaky under parallel software rendering. Run the complete suite (`npm test`, `npx playwright test`, and the end-to-end config) only immediately before an actual commit, and report its full result in the commit summary.
 
 ## Testing policy
 

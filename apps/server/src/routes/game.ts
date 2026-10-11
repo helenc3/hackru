@@ -14,6 +14,11 @@ import type { ServerServices } from '../services.js';
 const sessionParamsSchema = z.object({ id: z.string().min(1).max(128) });
 const fixtureDialogue = createFixtureDialogueProvider();
 const semanticPayload = (kind: 'action' | 'turn', value: unknown) => JSON.stringify({ kind, value });
+/** Idempotency cache for recent requests only; a walking session sends thousands of moves. */
+function remember(session: SessionRecord, id: string, payload: string, response: unknown): void {
+  session.completedRequests.set(id, { payload, response });
+  if (session.completedRequests.size > 200) session.completedRequests.delete(session.completedRequests.keys().next().value!);
+}
 
 function existing(session: SessionRecord, id: string, payload: string): { response?: unknown; pending?: Promise<unknown> } | undefined {
   if (session.abandonedRequestIds.has(id)) throw new HttpError(409, 'ATTEMPT_ABANDONED', 'Use a new request ID for this attempt.', true);
@@ -104,7 +109,7 @@ export function createGameRouter(services: ServerServices): Router {
         session.state = engine.state;
         session.state.version++;
         const outcome: ActionResponse = { state: projectPublicState(session.state, nowMs, world), events: engine.events };
-        session.completedRequests.set(body.actionId, { payload, response: outcome });
+        remember(session, body.actionId, payload, outcome);
         return outcome;
       });
       response.json(result);
@@ -174,27 +179,34 @@ async function evaluate(services: ServerServices, body: TurnRequest, pending: Pe
       if (session.state.attemptId !== pending.attemptId || session.pendingRequests.get(body.turnId) !== pending || session.state.pendingTurn?.turnId !== body.turnId) return;
       const nowMs = Date.now();
       const world = viewOf(services, session);
+      // Everything that can throw runs on the candidate state; the session commits last, so a failure never leaves a half-applied turn that a retry re-applies.
       const engine = applyEvaluation(session.state, body.npcId, body.anchorId, evaluation, nowMs, world);
-      session.state = engine.state;
-      session.state.pendingTurn = null;
-      session.state.pauseReasons = session.state.pauseReasons.filter((reason) => reason !== 'provider');
-      session.state.version++;
-      // The engine's committed line (it may be a pacing question rather than the grounded fact reply).
-      const replyZh = session.state.npcState[body.npcId].history.at(-1)!.text;
+      const next = engine.state;
+      next.pendingTurn = null;
+      next.pauseReasons = next.pauseReasons.filter((reason) => reason !== 'provider');
+      next.version++;
+      const history = next.npcState[body.npcId].history;
+      // The engine's committed line (it may be a pacing question rather than the grounded fact reply), bounded for speech and the response.
+      const replyZh = history.at(-1)!.text.slice(0, 240);
       // Verified directions are authoritative: the live model's own words never replace the route text.
       const verifiedRoute = engine.events.some((event) => event.kind === 'directions');
       let speech: { npcReply: string; speechId?: string };
-      if (options.spokenReply) speech = { npcReply: spoken && !verifiedRoute && session.state.status !== 'failed' && spoken.length <= 240 ? spoken : replyZh }; // audio already streamed live; an NPC leaving in annoyance shows the authored line
-      else {
+      let job: Parameters<typeof registerSpeechJob>[1] | undefined;
+      if (options.spokenReply) {
+        speech = { npcReply: spoken && !verifiedRoute && next.status !== 'failed' && spoken.length <= 240 ? spoken : replyZh }; // audio already streamed live; an NPC leaving in annoyance shows the authored line
+        history.at(-1)!.text = speech.npcReply; // history holds what the player actually heard, so the next classification and request_repeat match it
+      } else {
         const speechId = randomUUID();
         const nameKey = world.anchor(body.anchorId)?.nameKey;
-        registerSpeechJob(session, { id: speechId, sessionId: session.id, attemptId: pending.attemptId, turnId: body.turnId, replyZh, voiceKey: npcIdentity(nameKey) ? `npc:${nameKey}` : body.npcId, operationId: speechId, status: 'pending' });
+        job = { id: speechId, sessionId: session.id, attemptId: pending.attemptId, turnId: body.turnId, replyZh, voiceKey: npcIdentity(nameKey) ? `npc:${nameKey}` : body.npcId, operationId: speechId, status: 'pending' };
         speech = { npcReply: replyZh, speechId };
       }
       const ended = Boolean(engine.conversationEnded || (evaluation.intent !== 'request_repeat' && isClosingLine(spoken)));
-      const outcome: TurnResponse = TurnResponseSchema.parse({ turnId: body.turnId, state: projectPublicState(session.state, nowMs, world), events: engine.events, ...speech, actions: turnActions(session.state, body.anchorId, ended), ...(ended ? { conversationEnded: true } : {}), ...(evaluation.coach ? { feedback: evaluation.coach } : {}), vibe: { intent: evaluation.intentGrade.score, clarity: evaluation.clarity, courtesy: evaluation.courtesy } });
+      const outcome: TurnResponse = TurnResponseSchema.parse({ turnId: body.turnId, state: projectPublicState(next, nowMs, world), events: engine.events, ...speech, actions: turnActions(next, body.anchorId, ended), ...(ended ? { conversationEnded: true } : {}), ...(evaluation.coach ? { feedback: evaluation.coach } : {}), vibe: { intent: evaluation.intentGrade.score, clarity: evaluation.clarity, courtesy: evaluation.courtesy } });
+      if (job) registerSpeechJob(session, job);
+      session.state = next;
       session.pendingRequests.delete(body.turnId);
-      session.completedRequests.set(body.turnId, { payload: pending.payload, response: outcome });
+      remember(session, body.turnId, pending.payload, outcome);
       pending.resolve(outcome);
       log('committed', `${evaluation.intent}/${evaluation.interaction} → ${engine.events.map((event) => event.kind).join(',') || 'no events'}`);
     });

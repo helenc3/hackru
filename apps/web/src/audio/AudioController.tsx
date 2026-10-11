@@ -25,7 +25,7 @@ export function AudioController({ state, onAction, speechId }: AudioControllerPr
   }
 
   /** Ends the current track; only the first play of a speech operation reports its phases. */
-  function settle(track: Track, _ended: boolean, report: boolean): Promise<void> {
+  function settle(track: Track, report: boolean): Promise<void> {
     if (playing.current !== track) return Promise.resolve();
     playing.current = null;
     setAudioActivity('idle');
@@ -48,13 +48,13 @@ export function AudioController({ state, onAction, speechId }: AudioControllerPr
     setAudioActivity('playing'); setFailed(null); setBlockedTrack(null);
     player.muted = muted;
     player.src = track.url;
-    player.onended = () => { setStatus('Audio ready'); settle(track, true, report); };
-    player.onerror = () => { setFailed(track.id); setStatus('Audio playback failed. Retry or read the reply.'); settle(track, false, report); };
+    player.onended = () => { setStatus('Audio ready'); settle(track, report); };
+    player.onerror = () => { setFailed(track.id); setStatus('Audio playback failed. Retry or read the reply.'); settle(track, report); };
     setStatus('Playing reply…');
     try { await player.play(); } catch (error) {
       // Autoplay policy: keep the operation open briefly and let a click start it.
       if (error instanceof DOMException && error.name === 'NotAllowedError') { setBlockedTrack(track); setStatus('Click Play to hear the reply.'); return; }
-      setFailed(track.id); setStatus('Audio playback failed. Retry or read the reply.'); settle(track, false, report);
+      setFailed(track.id); setStatus('Audio playback failed. Retry or read the reply.'); settle(track, report);
     }
   }
 
@@ -64,7 +64,7 @@ export function AudioController({ state, onAction, speechId }: AudioControllerPr
     element.current?.pause();
     if (!track) return Promise.resolve();
     setStatus('Audio stopped');
-    return settle(track, false, true);
+    return settle(track, true);
   }
   // The recorder barges in through the bus; re-register each render so stop() sees current props.
   useEffect(() => { setInterrupt(stop); return () => setInterrupt(null); });
@@ -97,7 +97,7 @@ export function AudioController({ state, onAction, speechId }: AudioControllerPr
     <div className="audio-status" data-testid="audio-controller" role="group" aria-label="Audio controls">
       <span aria-hidden="true">♫</span>
       <span role="status">{status}</span>
-      {blockedTrack && <button type="button" className="button secondary" onClick={() => { const track = blockedTrack; setBlockedTrack(null); void audio().play().catch(() => settle(track, false, true)); setStatus('Playing reply…'); }}>Play</button>}
+      {blockedTrack && <button type="button" className="button secondary" onClick={() => { const track = blockedTrack; setBlockedTrack(null); void audio().play().catch(() => settle(track, true)); setStatus('Playing reply…'); }}>Play</button>}
       <button type="button" className="button secondary" aria-pressed={muted} onClick={() => setMuted((value) => !value)}>{muted ? 'Unmute' : 'Mute'}</button>
       <button type="button" className="button secondary" disabled={!busy} onClick={() => stop()}>Stop</button>
       <button type="button" className="button secondary" disabled={busy || !last.current} onClick={() => { if (last.current) void play(last.current, true); }}>Replay</button>

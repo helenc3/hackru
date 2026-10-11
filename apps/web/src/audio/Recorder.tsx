@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type PointerEvent } from 'react';
 import type { RecorderProps } from '@vibequest/shared';
-import { AudioApiError, interruptPlayback, setAudioActivity, setConfirmation, uploadClip, useAudioActivity } from './audio-bus';
+import { AudioApiError, finishConfirmation, interruptPlayback, setAudioActivity, setConfirmation, uploadClip, useAudioActivity } from './audio-bus';
 
 const MAX_MS = 15_000;
 const MAX_BYTES = 3 * 1024 * 1024;
@@ -38,7 +38,7 @@ export function Recorder({ state, onAction, onTranscript }: RecorderProps) {
   useEffect(() => () => {
     const current = capture.current;
     if (current) { current.cancelled = true; if (current.recorder.state !== 'inactive') current.recorder.stop(); release(current); }
-    upload.current?.abort(); setConfirmation(null);
+    upload.current?.abort(); void finishConfirmation().catch(() => undefined); // the server's confirming pause must end, or the next turn is AUDIO_BUSY
   }, [attempt]);
 
   async function start() {
@@ -111,14 +111,15 @@ export function Recorder({ state, onAction, onTranscript }: RecorderProps) {
     try {
       await phase(current.operationId, 'transcribing');
       const result = await uploadClip(state.sessionId, clip, current.operationId, controller.signal);
-      if (controller.signal.aborted) return;
-      await phase(current.operationId, 'confirming');
+      if (!controller.signal.aborted) await phase(current.operationId, 'confirming');
+      if (controller.signal.aborted) { void phase(current.operationId, 'idle').catch(() => undefined); return; }
       setConfirmation(() => phase(current.operationId, 'idle'));
       onTranscript(result);
       setStatus('idle');
     } catch (error) {
+      const idle = phase(current.operationId, 'idle').catch(() => undefined);
       if (controller.signal.aborted) return;
-      await phase(current.operationId, 'idle').catch(() => undefined);
+      await idle;
       if (error instanceof AudioApiError && error.code === 'ATTEMPT_ABANDONED') { setStatus('idle'); return; }
       setStatus('error');
       setMessage(error instanceof AudioApiError && error.code === 'EMPTY_TRANSCRIPT' ? 'No Mandarin was heard. Re-record closer to the microphone, or type instead.' : 'The recording could not be transcribed. Re-record or type instead.');

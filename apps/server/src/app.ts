@@ -1,5 +1,6 @@
 import express, { type ErrorRequestHandler, type Express } from 'express';
 import { fileURLToPath } from 'node:url';
+import { CONTRACT_VERSION } from '@vibequest/shared';
 import { loadConfig, validationHarnessEnabled, type ServerConfig } from './config.js';
 import { HttpError } from './errors.js';
 import { createAudioRouter } from './routes/audio.js';
@@ -8,7 +9,7 @@ import { createDictionaryRouter } from './dictionary/router.js';
 import { createGameRouter } from './routes/game.js';
 import { createServices, type ServerServices } from './services.js';
 
-export interface AppOptions {
+interface AppOptions {
   config?: ServerConfig;
   services?: ServerServices;
   /** Injectable for static/SPA tests; defaults to the built web workspace. */
@@ -27,8 +28,8 @@ export function createApp(options: AppOptions = {}): Express {
   app.get('/api/health', (_request, response) => {
     response.json({
       status: 'ok',
-      buildId: 'segment-007',
-      specVersion: '1.2',
+      buildId: 'speak-your-way',
+      specVersion: CONTRACT_VERSION,
       providers: {
         geminiConfigured: Boolean(config.geminiApiKey),
         elevenlabsConfigured: Boolean(config.elevenlabsApiKey),

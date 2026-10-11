@@ -5,7 +5,7 @@ import { z } from 'zod';
 const unit = z.number().finite().min(0).max(1);
 const count = z.number().int().min(0).max(1_000_000);
 const timestamp = z.number().int().min(0).max(Number.MAX_SAFE_INTEGER);
-const identifier = z.string().min(1).max(120).regex(/^[A-Za-z0-9][A-Za-z0-9._:-]*$/);
+export const identifier = z.string().min(1).max(120).regex(/^[A-Za-z0-9][A-Za-z0-9._:-]*$/);
 const shortText = z.string().min(1).max(240);
 
 // 2.0: the station campaign (P1/P2/B1) is replaced by three Shanghai exploration quests in a
@@ -48,20 +48,12 @@ export const WORLD_RULES = { movementSpeed: 4, interactionRadius: 2, playerRadiu
 export type MissionId = z.infer<typeof MissionIdSchema>;
 export type ZoneId = z.infer<typeof ZoneIdSchema>;
 export type NpcId = z.infer<typeof NpcIdSchema>;
-export type CueId = z.infer<typeof CueIdSchema>;
-export type ChoiceId = z.infer<typeof ChoiceIdSchema>;
 export type Intent = z.infer<typeof IntentSchema>;
-export type GameActionType = z.infer<typeof GameActionTypeSchema>;
-export type Mode = z.infer<typeof ModeSchema>;
 export type Track = z.infer<typeof TrackSchema>;
-export type Item = z.infer<typeof ItemSchema>;
 export type Drink = z.infer<typeof DrinkSchema>;
 export type Tier = z.infer<typeof TierSchema>;
 export type Position = z.infer<typeof PositionSchema>;
-export type Grade = z.infer<typeof GradeSchema>;
-export type InputPreference = z.infer<typeof InputPreferenceSchema>;
 export type InputSource = z.infer<typeof InputSourceSchema>;
-export type AudioPhase = z.infer<typeof AudioPhaseSchema>;
 
 export const GameActionSchema = z.discriminatedUnion('type', [
   /** Server derives zone/chunk from committed manifests; the position must lie in a committed, walkable chunk. */
@@ -99,7 +91,6 @@ export const EvidenceSummarySchema = z.strictObject({ spokenTurns: count, typedT
 export const DebriefSchema = z.strictObject({ tracks: SkillTracksSchema, strengths: z.array(shortText).max(4), improvement: shortText, nextPracticeReason: shortText, nextPracticeMissionId: MissionIdSchema.optional(), evidenceSummary: EvidenceSummarySchema });
 export type Debrief = z.infer<typeof DebriefSchema>;
 export const PurchaseRecordSchema = z.strictObject({ id: identifier, attemptId: identifier, anchorId: identifier, drink: DrinkSchema.exclude(['coffee']), priceCny: z.number().int().min(0).max(1000), atMs: timestamp });
-export type PurchaseRecord = z.infer<typeof PurchaseRecordSchema>;
 export const InventorySchema = z.strictObject({ hint: z.number().int().min(0).max(3), cny: z.number().int().min(0).max(1000), drinks: z.array(DrinkSchema.exclude(['coffee'])).max(20) });
 export type Inventory = z.infer<typeof InventorySchema>;
 export const InteractableKindSchema = z.enum(['npc', 'choice', 'photo-spot', 'landmark']);
@@ -111,7 +102,6 @@ export type Directions = z.infer<typeof DirectionsSchema>;
 export const PhotoStatusSchema = z.enum(['accepted', 'countdown', 'captured', 'failed']);
 /** Q3 photo interaction, issued only after the server accepts a request_photo turn with an eligible passerby. */
 export const PhotoRequestSchema = z.strictObject({ id: identifier, passerbyAnchorId: identifier, viewpointAnchorId: identifier, spot: PositionSchema, status: PhotoStatusSchema, countdownEndsAtMs: timestamp.optional(), attempts: z.number().int().min(0).max(20) });
-export type PhotoRequest = z.infer<typeof PhotoRequestSchema>;
 export const PHOTO_RULES = { spotRadius: 1.5, countdownMs: 3_000, captureWindowMs: 15_000 } as const;
 
 /** UI affordances the server enables for an NPC conversation. Derived deterministically from engine state; the model never grants them. */
@@ -149,13 +139,11 @@ export const PublicStateSchema = z.strictObject({
 });
 export type PublicState = z.infer<typeof PublicStateSchema>;
 export const CoachFeedbackSchema = z.strictObject({ understood: shortText, explanation: shortText, improvedExample: shortText });
-export type CoachFeedback = z.infer<typeof CoachFeedbackSchema>;
 export const GameEventSchema = z.strictObject({ id: identifier, kind: z.enum(['objective', 'reward', 'result', 'photo', 'directions']), message: shortText });
 export type GameEvent = z.infer<typeof GameEventSchema>;
 export const ActionResponseSchema = z.strictObject({ state: PublicStateSchema, events: z.array(GameEventSchema).max(20) });
 export type ActionResponse = z.infer<typeof ActionResponseSchema>;
 export const StateResponseSchema = z.strictObject({ state: PublicStateSchema });
-export type StateResponse = z.infer<typeof StateResponseSchema>;
 export const TurnResponseSchema = z.strictObject({ turnId: identifier, state: PublicStateSchema, events: z.array(GameEventSchema).max(20), npcReply: z.string().min(1).max(240), actions: z.array(NpcActionSchema).max(4).optional(), speechId: identifier.optional(), feedback: CoachFeedbackSchema.optional(), vibe: z.strictObject({ intent: unit, clarity: unit, courtesy: unit }).optional(), conversationEnded: z.literal(true).optional() });
 export type TurnResponse = z.infer<typeof TurnResponseSchema>;
 
@@ -215,12 +203,9 @@ export const TurnProvenanceRecordSchema = z.strictObject({ turnId: identifier, s
   if (record.source === 'stt-edited' && record.text === record.originalSttText) context.addIssue({ code: 'custom', path: ['source'], message: 'Edited STT must differ from the original.' });
   if (record.source === 'typed' && (record.transcriptionId || record.originalSttText)) context.addIssue({ code: 'custom', path: ['source'], message: 'Typed provenance contains no claimed STT record.' });
 });
-export type TurnProvenanceRecord = z.infer<typeof TurnProvenanceRecordSchema>;
 
 /** onTalk receives the NPC anchor; the role is on the interactable. */
 export type RendererProps = { state: PublicState; onAction: (action: GameAction) => Promise<void>; onTalk: (anchorId: string) => void };
-export type WorldRendererProps = RendererProps;
-export type ValidationHarnessProps = RendererProps;
 export type SkillDebriefProps = { state: PublicState };
 export type AudioControllerProps = { state: PublicState; onAction: RendererProps['onAction']; speechId?: string };
 export type RecorderProps = { state: PublicState; npcId: NpcId; onAction: RendererProps['onAction']; onTranscript: (transcription: TranscriptionResponse) => void };
@@ -279,7 +264,6 @@ export type MissionDefinition = z.infer<typeof MissionDefinitionSchema>;
 export type MissionNode = z.infer<typeof MissionNodeSchema>;
 export type ActionTransition = z.infer<typeof ActionTransitionSchema>;
 export type IntentTransition = z.infer<typeof IntentTransitionSchema>;
-export type RewardDefinition = z.infer<typeof RewardDefinitionSchema>;
 /** Role definition. Instances (anchors) supply position and may override nameZh from the reviewed name list. */
 export const NpcDefinitionSchema = z.strictObject({ id: NpcIdSchema, nameZh: shortText, persona: z.string().min(1).max(500), initialPatience: z.number().int().min(0).max(5), voiceKey: NpcIdSchema, allowedIntents: z.array(IntentSchema).min(1).max(10) });
 export type NpcDefinition = z.infer<typeof NpcDefinitionSchema>;
@@ -301,7 +285,6 @@ export const AudioOperationSchema = z.strictObject({ id: identifier, attemptId: 
   if (operation.kind === 'playback' && !['playing', 'idle'].includes(operation.phase)) context.addIssue({ code: 'custom', path: ['phase'], message: 'Playback operations cannot enter recording phases.' });
   if (operation.kind === 'recording' && operation.phase === 'playing') context.addIssue({ code: 'custom', path: ['phase'], message: 'Recording and playback use separate registered operations.' });
 });
-export type AudioOperation = z.infer<typeof AudioOperationSchema>;
 export const NpcRuntimeStateSchema = z.strictObject({ patience: z.number().int().min(0).max(5), mood: MoodSchema, history: TurnContextSchema.shape.history, anchorId: identifier.nullable(), repeatCount: count, cooldownRemainingMs: z.number().int().min(0).max(10_000) });
 /** Quest categories the city planner biases toward (CITY_GENERATION §8). */
 export const QuestCategorySchema = z.enum(['drink-vendor', 'direction-helper', 'hotel-landmark', 'river-viewpoint', 'photo-passerby']);

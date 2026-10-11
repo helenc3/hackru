@@ -107,10 +107,6 @@
   margin-top: 14px;
 }
 
-.game-shell[data-dialogue-open="true"] .choice-dock {
-  display: none;
-}
-
 .recorder-mount {
   margin-bottom: 15px;
 }

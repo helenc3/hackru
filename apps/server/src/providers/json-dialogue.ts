@@ -3,11 +3,11 @@ import { HttpError } from '../errors.js';
 import { clarificationEvaluation } from './gemini/gate.js';
 import { buildPrompt, responseSchemaFor } from './gemini/prompt.js';
 
-export const MAX_INPUT_CHARS = 500;
+const MAX_INPUT_CHARS = 500;
 
-export interface DialoguePrompt { systemInstruction: string; contents: string; schema: Record<string, unknown> }
+interface DialoguePrompt { systemInstruction: string; contents: string; schema: Record<string, unknown> }
 
-export interface JsonDialogueOptions {
+interface JsonDialogueOptions {
   /** Provider name for the fixed error messages, e.g. "Gemini". */
   name: string;
   budgetMs?: number;
@@ -41,6 +41,26 @@ function untilAborted<T>(promise: Promise<T>, signal: AbortSignal): Promise<T> {
   });
 }
 
+/** Trim to the schema caps and anchor the quote in the player text; a good reply should not fail the turn over length or punctuation. */
+function normalizeEvaluation(value: unknown, playerText: string): unknown {
+  if (!value || typeof value !== 'object') return value;
+  const raw = { ...(value as Record<string, unknown>) };
+  if (typeof raw.replyZh === 'string' && raw.replyZh.length > 80) {
+    const cut = raw.replyZh.slice(0, 80);
+    const end = Math.max(cut.lastIndexOf('。'), cut.lastIndexOf('！'), cut.lastIndexOf('？'));
+    raw.replyZh = end > 20 ? cut.slice(0, end + 1) : cut;
+  }
+  if (raw.coach && typeof raw.coach === 'object') raw.coach = Object.fromEntries(Object.entries(raw.coach).map(([key, text]) => [key, typeof text === 'string' ? text.slice(0, 240) : text]));
+  if (typeof raw.evidenceQuote === 'string' && raw.evidenceQuote && !playerText.includes(raw.evidenceQuote)) {
+    const bare = (text: string) => text.replace(/[\s\p{P}]/gu, '');
+    const kept = [...playerText].flatMap((char, index) => bare(char) ? [index] : []);
+    const at = bare(playerText).indexOf(bare(raw.evidenceQuote));
+    const length = bare(raw.evidenceQuote).length;
+    raw.evidenceQuote = at >= 0 && length ? playerText.slice(kept[at]!, kept[at + length - 1]! + 1) : ''; // an invented quote still fails validation for relevant intents
+  }
+  return raw;
+}
+
 /**
  * Shared evaluate loop for any JSON-structured-output dialogue model: input guards, prompt,
  * one deadline, one transient retry, fixed error codes, and client-side schema validation.
@@ -52,7 +72,7 @@ export function createJsonDialogueProvider(options: JsonDialogueOptions): Dialog
       const context = TurnContextSchema.parse(rawContext);
       const playerText = rawText.trim();
       if (playerText.length > MAX_INPUT_CHARS) throw new HttpError(400, 'INPUT_TOO_LONG', `Player input exceeds ${MAX_INPUT_CHARS} characters.`);
-      if (!playerText) return clarificationEvaluation(context, playerText);
+      if (!playerText) return clarificationEvaluation(context);
 
       const prompt: DialoguePrompt = { ...buildPrompt(context, playerText), schema: responseSchemaFor(context) };
       const deadline = new AbortController();
@@ -75,7 +95,7 @@ export function createJsonDialogueProvider(options: JsonDialogueOptions): Dialog
       }
 
       try {
-        return validateEvaluationForContext(JSON.parse(text ?? ''), context, playerText);
+        return validateEvaluationForContext(normalizeEvaluation(JSON.parse(text ?? ''), playerText), context, playerText);
       } catch {
         throw providerError('PROVIDER_INVALID_OUTPUT', `${options.name} returned an evaluation that failed validation.`);
       }

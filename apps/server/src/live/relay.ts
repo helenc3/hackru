@@ -60,6 +60,8 @@ export function createLiveBridge(options: {
     waiters.push((text) => { clearTimeout(timer); resolve(text); });
   });
 
+  // Utterances evaluate one at a time: a follow-up spoken while a turn is pending waits instead of hitting TURN_PENDING and vanishing.
+  let turnTail: Promise<unknown> | undefined;
   function startTurn(afterModelTurn: boolean) {
     // ponytail: the input buffer resets here; a transcription fragment arriving after the turn starts becomes its own utterance.
     const text = inputText.trim().slice(0, 500); inputText = '';
@@ -68,6 +70,13 @@ export function createLiveBridge(options: {
     options.send({ type: 'playerTranscript', text, final: true });
     // Listen for Gemini's reply now, not after evaluation: it usually finishes first, and a late listener waited out REPLY_WAIT_MS.
     const reply = afterModelTurn ? Promise.resolve(lastOutput) : nextOutput();
+    const run = () => evaluateTurn(text, reply, afterModelTurn, outputsBefore);
+    const chained = turnTail ? turnTail.then(run, run) : run(); // first turn starts now; later ones wait their turn
+    turnTail = chained;
+    void chained.then(() => { if (turnTail === chained) turnTail = undefined; });
+  }
+
+  function evaluateTurn(text: string, reply: Promise<string | undefined>, afterModelTurn: boolean, outputsBefore: number): Promise<unknown> {
     const startedMs = Date.now();
     const timing: Record<string, number> = {};
     const mark = (name: string) => { timing[name] ??= Date.now() - startedMs; };
@@ -83,7 +92,7 @@ export function createLiveBridge(options: {
       entry.done = speak(line, abort.signal, () => { entry.heard = true; });
       early = entry;
     });
-    options.turn(text, () => reply).then(async (turn) => {
+    return options.turn(text, () => reply).then(async (turn) => {
       settled = true; mark('evalMs');
       if (closed) return;
       if (options.speak) {
@@ -109,6 +118,7 @@ export function createLiveBridge(options: {
       }
       return Promise.resolve(options.note(turn)).then((note) => { if (note && !closed) options.live.sendNote(note); });
     }).catch((error: unknown) => {
+      early?.abort.abort(); // a rejected turn never gets its speculative line
       if (closed) return;
       const known = error instanceof EngineRuleError ? { code: error.code, message: error.message, retryable: false } : error instanceof HttpError ? { code: error.code, message: error.message, retryable: error.retryable } : { code: 'TURN_FAILED', message: 'The turn could not be evaluated.', retryable: true };
       options.send({ type: 'error', ...known });
@@ -252,13 +262,14 @@ export function attachLiveRelay(server: Server, services: ServerServices, option
     const abort = new AbortController();
     const timer = setTimeout(() => bridge.close('time-limit'), MAX_SESSION_MS); // cap counts from the upgrade
     const release = () => { if (active.get(sessionId) === release) active.delete(sessionId); bridge.close('replaced'); };
+    const provider = services.speechProvider;
     const bridge = createLiveBridge({
       send,
       ends: (turn) => Boolean(pendingGoalAction(turn.state.npcActions, turn.state.inventory.cny, npcId.data)),
       speculate: !(npcId.data === 'guide' && context.missionId === 'Q2'), // the route is only known after evaluation
-      speak: async (text, signal, onAudio) => {
+      // Without a speech provider the bridge forwards Gemini's own audio instead of going silent.
+      speak: !(provider.streamPcm || provider.synthesizePcm) ? undefined : async (text, signal, onAudio) => {
         const epoch = speechEpoch;
-        const provider = services.speechProvider;
         // Stream when the provider can, so the first words play while the rest is still being generated.
         const chunks = provider.streamPcm ? provider.streamPcm(text, voiceKey) : (async function* () {
           if (!provider.synthesizePcm) throw new HttpError(503, 'SPEECH_UNAVAILABLE', 'Mandarin speech is temporarily unavailable.', true);

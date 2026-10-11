@@ -1,6 +1,5 @@
 import { DESTINATION_ALIASES, INTENT_SLOT_KEYS, type Intent, type TurnContext } from '@vibequest/shared';
 
-const MAX_HISTORY_ENTRIES = 12; // six exchanges
 const SLOT_VALUES = { drink: ['coffee', 'tea', 'water'], destination: ['grand-hotel', 'huangpu-river', 'other'],
   priceCny: 'integer CNY; must equal a price stated in facts' } as const;
 const TIER_LIMITS = [
@@ -62,7 +61,7 @@ export function buildPrompt(context: TurnContext, playerText: string): { systemI
     '- replyZh never mentions objectives, rewards, XP, buttons, games or results.',
   ].join('\n');
   const contents = [
-    `Recent conversation (JSON data): ${JSON.stringify(context.history.slice(-MAX_HISTORY_ENTRIES))}`,
+    `Recent conversation (JSON data): ${JSON.stringify(context.history)}`,
     `Player message (JSON data): ${JSON.stringify(playerText)}`,
   ].join('\n');
   return { systemInstruction, contents };

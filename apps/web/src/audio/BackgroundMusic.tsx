@@ -30,6 +30,7 @@ export function BackgroundMusic({ active, conversation }: { active: boolean; con
         if (disposed) return;
         await player.current.start(score);
         setReady(true); setFailed(false);
+        if (player.current.context.state !== 'running') return; // still gesture-locked: the next gesture resumes it (above)
         window.removeEventListener('pointerdown', gesture);
         window.removeEventListener('keydown', gesture);
       } catch {

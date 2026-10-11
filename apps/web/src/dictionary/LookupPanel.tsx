@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import type { DictionaryEntry } from '@vibequest/shared';
 import { DictionaryError, lookupWord } from './client';
 import { addReviewWord, removeReviewWord, useReviewWords } from './review-list';
+import { focusWorld } from '../app/focus-world';
 import './lookup.css';
 
 const SINGLE_WORDS = 'Single words only — try 水 or water.';
@@ -11,7 +12,6 @@ const ONE_WORD = /^(?:\p{Script=Han}+|[a-zA-Zāáǎàēéěèīíǐìōóǒòū�
 type Result = { status: 'idle' | 'loading' } | { status: 'done'; query: string; entries: DictionaryEntry[] } | { status: 'error'; message: string };
 
 const typing = (target: EventTarget | null) => target instanceof HTMLElement && (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName));
-const focusWorld = () => requestAnimationFrame(() => document.querySelector<HTMLElement>('[data-testid="world-renderer"]')?.focus());
 
 /** Pocket dictionary: HUD toggle, "/" shortcut, single-word search with add-to-review. Never touches game state. */
 export function LookupPanel() {

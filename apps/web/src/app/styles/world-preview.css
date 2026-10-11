@@ -38,45 +38,6 @@
   font-size: 10px;
 }
 
-.world-location {
-  position: absolute;
-  padding: 6px 12px;
-  background: var(--cream);
-  border: var(--outline);
-  box-shadow: var(--shadow-sticker-sm);
-  border-radius: var(--radius-pill);
-  pointer-events: none;
-}
-
-.world-location > span {
-  display: block;
-  font-size: 14px;
-  font-weight: 800;
-  letter-spacing: 1px;
-}
-
-.world-location > small {
-  display: block;
-  color: var(--text-muted);
-  font-size: 10px;
-  margin-top: 3px;
-}
-
-.world-location.cafe {
-  top: 42%;
-  left: 13%;
-}
-
-.world-location.station {
-  top: 23%;
-  left: 60%;
-}
-
-.world-location.plaza {
-  top: 71%;
-  left: 46%;
-}
-
 .world-note {
   position: absolute;
   bottom: 12px;

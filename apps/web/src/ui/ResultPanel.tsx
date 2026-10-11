@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { cues, missions, type MissionId, type PublicState, type RendererProps } from '@vibequest/shared';
 import { SkillDebrief } from './SkillDebrief';
+import { useEscape } from './use-escape';
 
 /** The quest NPC's name when they walked off (the only way an attempt fails). */
 const questNpcNames: Record<MissionId, string> = { Q1: '老王', Q2: '小李', Q3: 'The passer-by' };
@@ -15,12 +16,8 @@ export function vocabFor(missionId: MissionId): { zh: string; en: string; kind: 
 
 export function ResultPanel({ state, live, pending, onAction, onExit, onClose }: { state: PublicState; live: PublicState; pending: boolean; onAction: RendererProps['onAction']; onExit: () => void; onClose: () => void }) {
   const close = useRef<HTMLButtonElement>(null);
-  useEffect(() => {
-    close.current?.focus();
-    const key = (event: KeyboardEvent) => { if (event.key === 'Escape' && !event.isComposing) { event.preventDefault(); onClose(); } };
-    document.addEventListener('keydown', key);
-    return () => document.removeEventListener('keydown', key);
-  }, [onClose]);
+  useEffect(() => { close.current?.focus(); }, []);
+  useEscape(onClose);
   if (state.status === 'active') return null;
   // Reviewing an earlier mission while another attempt is active: read-only.
   const review = live.sessionId !== state.sessionId || live.missionId !== state.missionId || live.version !== state.version;

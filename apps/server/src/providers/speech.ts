@@ -2,8 +2,6 @@ import type { SpeechProvider } from '@vibequest/shared';
 import type { ServerConfig } from '../config.js';
 import { createElevenLabsSpeechProvider, createUnavailableSpeechProvider } from './elevenlabs/live.js';
 
-export { createFixtureSpeechProvider } from './elevenlabs/fixture.js';
-export { createElevenLabsSpeechProvider, mp3DurationMs } from './elevenlabs/live.js';
 
 /** Live ElevenLabs when a server key exists; otherwise a recoverable 503, never fabricated audio. */
 export function createSpeechProvider(config: ServerConfig): SpeechProvider {

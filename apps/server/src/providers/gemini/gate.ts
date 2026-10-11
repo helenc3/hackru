@@ -20,7 +20,7 @@ const CLARIFY: Record<NpcId, string> = {
 const EXAMPLE: Record<NpcId, string> = { vendor: '请给我一杯茶。', guide: '请问，去上海大酒店怎么走？', passerby: '可以帮我在这里拍张照吗？' };
 
 /** Safe no-transition evaluation: an in-character clarification (coaching stays in `coach`) that grants nothing. */
-export function clarificationEvaluation(context: TurnContext, _playerText?: string): TurnEvaluation {
+export function clarificationEvaluation(context: TurnContext): TurnEvaluation {
   return {
     intent: 'unknown', slots: [], evidenceQuote: '',
     intentGrade: { score: 0, confidence: 0 }, clarity: 0, courtesy: 0.5,

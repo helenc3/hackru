@@ -61,7 +61,7 @@ Closely mirrors the 1.2 café dialogue with 小林 (Xiaolin), reusing its dialog
 | Confirm | Vendor states drink and price; player confirms aloud | Price confirmed for that drink |
 | Pay | Explicit `q1.pay` action at the vendor anchor | Server deducts ¥, grants the drink and a purchase record; first valid purchase clears Q1 |
 
-Fixed facts: coffee unavailable, tea ¥10, water ¥5. The player starts with ¥20. Insufficient funds reject payment without state change. Repeat purchases record purchases but never re-grant the Q1 reward. The old entrance puzzle and station arrival are not gates. Signs `q1.menu` may be inspected for reading evidence.
+Fixed facts: coffee unavailable, tea ¥10, water ¥5. The player starts with ¥20. Insufficient funds reject payment without state change. Repeat purchases record purchases but never re-grant the Q1 reward. The old entrance puzzle and station arrival are not gates. Signs are scenery (sign inspection was removed).
 
 ### Quest Q2: Find directions to Shanghai Grand Hotel
 
@@ -158,22 +158,29 @@ One npm workspace repository:
 
 ```text
 apps/web/src/
-  app/              # shell, renderer selection, session client
+  app/              # shell, session hook/client, global CSS
   validation/       # developer-only text harness, excluded from player navigation
-  world/            # scene, movement, camera, collision
-  ui/               # shared HUD, dialogue, coach, debrief
-  audio/            # playback, optional recording
+  world/            # player, movement, camera, characters, wayfinding
+  city/             # chunk streaming, chunk renderer, asset components, gallery
+  ui/               # HUD, dialogue, coach, debrief panels
+  audio/            # clip recording, live voice relay client, playback, music
+  dictionary/       # CC-CEDICT gloss popover, lookup, review list
 apps/server/src/
-  routes/           # sessions, actions, turns, speech
-  providers/        # Gemini, ElevenLabs, fixture adapters
+  routes/           # sessions, actions, turns, speech, city chunks
+  providers/        # Claude / Gemini dialogue, ElevenLabs speech, fixtures
+  live/             # WebSocket relay to Gemini Live
+  city/             # world service, Claude city composer
+  dictionary/       # CC-CEDICT lookup and translation route
   session-store.ts  # process-local sessions and locks
 packages/shared/src/
   contracts.ts      # types AND Zod runtime schemas
   engine/           # pure transition rules and scoring
-  content/          # missions, NPCs, scene manifest, cues
-fixtures/           # recorded valid/invalid evaluator responses
-scripts/            # PA pre-generation and fixture checks
-docs/               # spec, ownership, launch checklist
+  content/          # missions, NPCs, signs
+  city/             # chunk contracts, catalog, planner, fallback, validator
+fixtures/           # baseline JSON, scripted UI API, world preview
+tests/e2e/          # real-server browser journeys
+scripts/            # wait-for-api, music generation
+docs/               # launch checklist, quests, city generation, voices
 ```
 
 Data flow:
@@ -204,7 +211,7 @@ These are normative shapes. The authoritative Zod schemas are `packages/shared/s
 - `MissionId = 'Q1' | 'Q2' | 'Q3'`; `Mode = 'practice'` only; `Item = 'hint'`; `timer: null`.
 - `NpcId` is a role: `'vendor' | 'guide' | 'passerby'`. `TurnRequest` adds `anchorId` (the NPC instance). `TurnContext` adds `anchorId` and `nameZh`.
 - `ZoneId` is the district kind at the player's position (`shopping`, `historic`, `residential`, `office`, `waterfront`, `park`, `industrial`), derived by the server from committed manifests.
-- Actions: `move { position }` (replaces `moveZone`), `inspect { targetId: anchorId }`, `choose { choiceId: 'q1.pay' | 'q3.start-photo', anchorId }`, `photoCapture { photoRequestId, outcome: 'captured' | 'failed', imageDigest? }`, plus the unchanged audio/practice/preference/retry/start actions. `playCue`/`finishCue` are removed.
+- Actions: `move { position }` (replaces `moveZone`), `choose { choiceId: 'q1.pay' | 'q3.start-photo', anchorId }`, `photoCapture { photoRequestId, outcome: 'captured' | 'failed', imageDigest? }`, plus the unchanged audio/practice/preference/retry/start actions. `playCue`/`finishCue` are removed.
 - `PublicState` adds `worldId`, `position`, `purchases`, `unlockedMissionIds`, `completedMissionIds`, `directions` (server-verified route, never model-authored), and `photo` (the active photo request). `inventory = { hint, cny, drinks }`. Interactables are anchors from committed chunks near the player.
 - Intents: drink intents as in 1.2, plus `ask_directions { destination: 'grand-hotel' | 'huangpu-river' | 'other' }` and `request_photo`; station intents are removed.
 - Engine functions receive a read-only `WorldView` (walkability, district, anchors, verified hotel directions) supplied by the server.
@@ -261,7 +268,7 @@ Timeout plan: 8-second model budget including at most one transient-network retr
 
 The core interaction is **approach NPC → speak Mandarin → understand the spoken reply → act in the world**. Implement this full loop in Segment-005; voice input is not an optional later segment. A short utterance capture flow is the minimum, not continuous full-duplex audio.
 
-Use `eleven_flash_v2_5` for short NPC TTS and `eleven_multilingual_v2` for authored PA. Those models list Chinese (`zh`) support; Mandarin voice quality must be checked with the actual chosen account-accessible voices. Generate and review standard Mandarin samples, not merely any Chinese-language output. [ElevenLabs models](https://elevenlabs.io/docs/overview/models)
+Use `eleven_v4_turbo` for short NPC TTS (`ELEVENLABS_TTS_MODEL`); the prerecorded setup clip used `eleven_v4`. Those models list Chinese (`zh`) support; Mandarin voice quality must be checked with the actual chosen account-accessible voices. Generate and review standard Mandarin samples, not merely any Chinese-language output. [ElevenLabs models](https://elevenlabs.io/docs/overview/models)
 
 Use user-activated browser MediaRecorder, maximum 15 seconds / 3 MB. Offer hold-to-talk and click Start/Stop within the same NPC panel. Send a supported recorded MIME type to the server for batch STT with `scribe_v2`, `language_code=zh`, and no diarization. Do not request cleaned-up or translated transcripts: preserve the learner’s utterance as recognized. Return `{ text, transcriptionId }` for compact confirmation, then Send creates a normal evaluated turn. Enter must not submit while the Chinese IME is composing. [Create transcript](https://elevenlabs.io/docs/api-reference/speech-to-text/convert)
 
@@ -300,7 +307,7 @@ Spec 2.0 quests are untimed (`timer: null`); there is no boss countdown or freez
 
 City generation reliability and cost rules are in section 17. Health checks and a fixture adapter are implemented on day one. Default fixture journeys include happy path, substitution, wrong platform, uncertain input, and rude input. The fallback adapter recognizes only documented fixture requests; unknown messages request clarification. It must not pretend to provide general AI understanding.
 
-API keys never enter browser environment variables or source control. `.env.example` contains names only: `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL`, `CITY_MODEL`, `ENABLE_CLAUDE_CITY`, `GEMINI_API_KEY`, `GEMINI_MODEL`, `ELEVENLABS_API_KEY`, `ELEVENLABS_TTS_MODEL`, `ELEVENLABS_STT_MODEL`, three voice IDs, `ENABLE_DEMO_FIXTURES`, `ENABLE_VALIDATION_HARNESS`, `PORT`.
+API keys never enter browser environment variables or source control. `.env.example` contains names only: `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL`, `ENABLE_CLAUDE_CITY`, `CITY_MODEL`, `DICTIONARY_MODEL`, `GEMINI_API_KEY`, `GEMINI_MODEL`, `GEMINI_LIVE_MODEL`, `ELEVENLABS_API_KEY`, `ELEVENLABS_TTS_MODEL`, `ELEVENLABS_STT_MODEL`, `ENABLE_DEMO_FIXTURES`, `ENABLE_VALIDATION_HARNESS`, `PORT`, `HOST`, `VITE_ENABLE_VALIDATION_HARNESS`. Voice IDs are authored in `packages/shared/src/content/index.ts`, not configured.
 
 Cap local requests at 30 model turns per session and 10 per minute; clips 15 seconds; reply lengths bounded. Avoid auto-generating TTS while typing. Log request ID, elapsed time, provider/model, response validity, and transition reason; omit keys and raw recordings. Track provider usage separately from game XP. Prices and quotas depend on the team's accounts: verify balance at kickoff and leave a margin for rehearsals rather than baking an unverified dollar estimate into the spec.
 

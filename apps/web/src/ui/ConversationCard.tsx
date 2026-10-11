@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import type { NpcId, PublicState, RendererProps, TurnResponse } from '@vibequest/shared';
 import { CoachPanel } from './CoachPanel';
 import { NpcActions } from './NpcActions';
+import { useEscape } from './use-escape';
 
 /** The NPC anchor being talked to: role drives dialogue rules, name comes from the reviewed name list via the anchor label. */
 export type NpcTarget = { anchorId: string; role: NpcId; name: string };
@@ -12,12 +13,8 @@ export type ConversationSummary = { npc: NpcTarget; thread: ThreadLine[] };
 /** Shown once a goodbye ends a conversation: the exchange, practice feedback, and objective progress. */
 export function ConversationCard({ summary, turn, state, pending, onAction, onClose }: { summary: ConversationSummary; turn: TurnResponse | null; state: PublicState; pending: boolean; onAction: RendererProps['onAction']; onClose: () => void }) {
   const close = useRef<HTMLButtonElement>(null);
-  useEffect(() => {
-    close.current?.focus();
-    const key = (event: KeyboardEvent) => { if (event.key === 'Escape' && !event.isComposing) { event.preventDefault(); onClose(); } };
-    document.addEventListener('keydown', key);
-    return () => document.removeEventListener('keydown', key);
-  }, [onClose]);
+  useEffect(() => { close.current?.focus(); }, []);
+  useEscape(onClose);
   const spoken = summary.thread.filter((line): line is Extract<ThreadLine, { text: string }> => line.role === 'player' || line.role === 'npc');
   return <section className="conversation-card" role="dialog" aria-labelledby="conversation-title" data-testid="conversation-card">
     <button ref={close} type="button" className="button secondary result-close" onClick={onClose} aria-label="Close conversation summary">✕</button>

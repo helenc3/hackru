@@ -1,5 +1,7 @@
 # Independent-account build and merge protocol
 
+> Historical (Spec 1.2 planning kit; all segments merged by 2026-10-11). Current contracts: `packages/shared/src/contracts.ts` and `proposals/city-streaming-contracts.md`.
+
 ## Operating assumptions
 
 One shared GitHub repository, canonical remote `origin`, integration branch `main`, separate checkout per person/account, npm workspaces, one lockfile. Copy this kit to that repository before invoking segments. Each account needs source read access; pushing and merging need the corresponding repository permissions. These are setup requirements, not game-design decisions left open.

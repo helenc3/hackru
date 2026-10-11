@@ -1,7 +1,7 @@
 import { memo, useLayoutEffect, useMemo, useRef } from 'react';
 import { BufferAttribute, BufferGeometry, Color, Matrix4, Mesh, Object3D, type Group, type InstancedMesh, type Material } from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { catalogEntry, chunkOrigin, resolveParams, type CatalogEntry, type ChunkManifest, type DistrictKind, type ParamValues, type Placement, type Position, type Road } from '@vibequest/shared';
+import { catalogEntry, chunkOrigin, hashString, resolveParams, type CatalogEntry, type ChunkManifest, type DistrictKind, type ParamValues, type Placement, type Position, type Road } from '@vibequest/shared';
 import { ASSET_COMPONENTS } from './assets';
 import { candy, SceneryOutlines, Toon } from '../world/toon';
 
@@ -15,12 +15,6 @@ export const districtGround: Record<DistrictKind, string> = {
 };
 const roadColor: Record<Road['kind'], string> = { avenue: '#7d7a8c', street: '#938fa0', lane: '#d8bf9a', promenade: '#ead6ad' };
 const proxyColor: Record<CatalogEntry['category'], string> = { building: '#d9b8a0', storefront: '#d9b8a0', street: '#8a8698', landscape: candy.grassDeep, waterfront: '#b9c6cc', anchor: candy.coral };
-
-function seedOf(text: string): number {
-  let h = 2166136261;
-  for (let i = 0; i < text.length; i++) h = Math.imul(h ^ text.charCodeAt(i), 16777619);
-  return h >>> 0;
-}
 
 /** Neutral stand-in for an asset ID whose component is not authored yet. */
 function MissingAsset({ size }: { size: { w: number; d: number; h: number } }) {
@@ -40,7 +34,7 @@ function resolve(placement: Placement): Resolved {
 function Asset({ item, children, lod, still }: { item: Resolved; children?: React.ReactNode; lod: 0 | 1 | 2; still: boolean }) {
   const Component = item.entry ? ASSET_COMPONENTS[item.entry.id] : undefined;
   return <>
-    {Component ? <Component params={item.params} still={still} lod={lod} seed={seedOf(item.placement.id)} /> : <MissingAsset size={item.size} />}
+    {Component ? <Component params={item.params} still={still} lod={lod} seed={hashString(item.placement.id)} /> : <MissingAsset size={item.size} />}
     {children}
   </>;
 }

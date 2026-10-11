@@ -1,5 +1,0 @@
-.choice-dock, .validation-controls {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}

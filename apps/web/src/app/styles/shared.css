@@ -56,22 +56,3 @@ h1 {
   margin: 10px 0 9px;
 }
 
-.language-chip {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 7px 12px;
-  font-size: 11px;
-  font-weight: 700;
-  background: var(--cream);
-  border: var(--outline);
-  border-radius: var(--radius-pill);
-  box-shadow: var(--shadow-sticker-sm);
-  color: var(--ink);
-}
-
-.language-chip > span {
-  font-size: 16px;
-  color: var(--plum);
-}

@@ -15,6 +15,7 @@ import { GlossPopover } from '../dictionary/GlossPopover';
 import { ReviewPanel } from '../dictionary/ReviewPanel';
 import { useApiHealth } from './use-api-health';
 import { useSession } from './use-session';
+import { focusWorld } from './focus-world';
 import { LookupPanel } from '../dictionary/LookupPanel';
 import './game.css';
 
@@ -48,7 +49,7 @@ export function App() {
   }, [session.state, resultsKey]);
   const closeResults = useCallback(() => {
     setResultsClosed(true); setReview(null);
-    requestAnimationFrame(() => document.querySelector<HTMLElement>('[data-testid="world-renderer"]')?.focus());
+    focusWorld();
   }, []);
   const openReview = useCallback((missionId: MissionId) => { setNpc(null); setConversation(null); setReview(missionId); }, []);
   const leave = useCallback(() => { try { if (resultsKey) localStorage.removeItem(resultsKey); } catch { /* storage optional */ } setNpc(null); session.abandon(); }, [resultsKey, session.abandon]);
@@ -58,11 +59,11 @@ export function App() {
   const closeConversation = useCallback((ended?: ConversationSummary) => {
     setNpc(null);
     if (ended) setConversation({ ...ended, turn: latestTurn.current });
-    else requestAnimationFrame(() => document.querySelector<HTMLElement>('[data-testid="world-renderer"]')?.focus());
+    else focusWorld();
   }, []);
   const closeConversationCard = useCallback(() => {
     setConversation(null);
-    requestAnimationFrame(() => document.querySelector<HTMLElement>('[data-testid="world-renderer"]')?.focus());
+    focusWorld();
   }, []);
 
   const onAction = useCallback(async (action: GameAction) => {

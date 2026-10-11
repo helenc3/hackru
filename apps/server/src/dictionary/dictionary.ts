@@ -9,7 +9,7 @@ import { HttpError } from '../errors.js';
 type RawEntry = { traditional: string; simplified: string; pinyin: string; english: string[] };
 type Dictionary = { byWord: Map<string, DictionaryEntry[]>; byPinyin: Map<string, DictionaryEntry[]>; all: DictionaryEntry[] };
 
-export const MAX_WORD_LENGTH = 6;
+const MAX_WORD_LENGTH = 6;
 const MARKS: Record<string, string> = { a: 'āáǎà', e: 'ēéěè', i: 'īíǐì', o: 'ōóǒò', u: 'ūúǔù', ü: 'ǖǘǚǜ' };
 const UNMARK = new Map(Object.entries(MARKS).flatMap(([vowel, marked]) => [...marked].map((char, tone) => [char, [vowel, tone + 1] as const])));
 const HAN = /\p{Script=Han}/u;
@@ -29,7 +29,7 @@ export function markSyllable(raw: string): string {
   const marked = MARKS[original.toLowerCase()]![tone - 1]!;
   return syllable.slice(0, index) + (original === original.toLowerCase() ? marked : marked.toUpperCase()) + syllable.slice(index + 1);
 }
-export const markPinyin = (numbered: string): string => numbered.split(' ').map(markSyllable).join(' ');
+const markPinyin = (numbered: string): string => numbered.split(' ').map(markSyllable).join(' ');
 
 /** Index keys: tone-marked (shuǐ), numbered (shui3) and bare (shui); ü is v in the ASCII keys. */
 function pinyinKeys(numbered: string, marked: string): string[] {

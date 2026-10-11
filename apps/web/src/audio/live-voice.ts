@@ -113,37 +113,29 @@ export function startLiveVoice(sessionId: string, npcId: string, anchorId: strin
       case 'npcTranscript': emit({ kind: 'npc', text: String(message.text), final: Boolean(message.final) }); break;
       case 'turn': { const parsed = TurnResponseSchema.safeParse(message.turn); if (parsed.success) emit({ kind: 'turn', turn: parsed.data }); break; }
       case 'error': status('error', { message: String(message.message), retryable: Boolean(message.retryable) }); break;
-      case 'closed': {
-        const reason = String(message.reason ?? '');
-        if (reason !== 'farewell' || playing.size === 0) { stop(); status('ended', { reason }); break; }
-        // A goodbye keeps its queued audio; mic and socket close now, the context after the last buffer ends (capped).
-        stopped = true; ws.close();
-        if (stream) for (const track of stream.getTracks()) track.stop();
-        setAudioActivity('idle');
-        const finish = () => { void ctx?.close().catch(() => undefined); listener({ kind: 'status', status: 'ended', reason }); };
-        const cap = setTimeout(finish, 6_000);
-        for (const node of playing) node.onended = () => { playing.delete(node); if (playing.size === 0) { clearTimeout(cap); finish(); } };
-        break;
-      }
+      case 'closed': stop(String(message.reason ?? '')); break;
       default: break;
     }
   };
   ws.onclose = (event) => { if (stopped) return; stop(); status(!ready || event.code >= 4000 ? 'unavailable' : 'ended'); };
   ws.onerror = () => { /* onclose follows with the code */ };
 
-  function stop() {
+  /** Mic and socket close now. Queued NPC audio (a goodbye, the line before a finishing button) plays out first, capped; `reason` reports a server close once it has. */
+  function stop(reason?: string) {
     if (stopped) return;
     stopped = true;
-    flush();
     if (ws.readyState === WebSocket.OPEN) ws.send(JSON.stringify({ type: 'stop' }));
     ws.close();
     if (stream) for (const track of stream.getTracks()) track.stop();
-    void ctx?.close().catch(() => undefined);
     setAudioActivity('idle');
+    const finish = () => { void ctx?.close().catch(() => undefined); if (reason !== undefined) listener({ kind: 'status', status: 'ended', reason }); };
+    if (playing.size === 0) { flush(); finish(); return; }
+    const cap = setTimeout(finish, 6_000);
+    for (const node of playing) node.onended = () => { playing.delete(node); if (playing.size === 0) { clearTimeout(cap); finish(); } };
   }
 
   return {
-    stop,
+    stop: () => stop(),
     pause(on) { paused = on; status(on ? 'paused' : speaking ? 'npc-speaking' : 'live'); },
   };
 }

@@ -12,7 +12,7 @@ import { createRng, hashString } from './rng.js';
 // E-W roads after cities, as in central Shanghai. The Huangpu is a straight N-S corridor with
 // promenades on both banks; creeks run E-W into it west of the river. All values are tunable.
 
-export const ROAD_WIDTH = { avenue: 5, street: 3.5, lane: 1.5, promenade: 3 } as const;
+const ROAD_WIDTH = { avenue: 5, street: 3.5, lane: 1.5, promenade: 3 } as const;
 /** Sidewalk strip kept clear of buildings on each side of every road and creek. */
 export const SIDEWALK = 2.5;
 const CREEK = { half: 4 } as const;
@@ -29,15 +29,12 @@ const HOTEL_CANDIDATES = [[2, 2], [2, -2], [-2, 2], [-2, -2], [0, 2], [0, -2], [
 const mod = (n: number, m: number) => ((n % m) + m) % m;
 const unit = (seed: string, ...salt: (string | number)[]) => createRng(seed, ...salt)();
 
-export type WorldLayout = {
+type WorldLayout = {
   spawn: Position;
   hotel: { coord: ChunkCoord; anchorId: 'hotel.grand'; local: { x: number; z: number } };
   river: { axis: 'x' | 'z'; center: number; width: number };
   creekRows: number[];
 };
-/** A plan plus the deterministic level bridges where its roads cross water (needed for connectivity). */
-/** Alias kept for callers; ChunkPlan now carries planner bridges. */
-export type PlannedChunk = ChunkPlan;
 
 const riverSpan = () => ({ min: RIVER.center - RIVER.width / 2, max: RIVER.center + RIVER.width / 2 });
 const westBankCol = () => Math.floor(riverSpan().min / CHUNK_SIZE);
@@ -212,11 +209,11 @@ function requiredFor(seed: string, coord: ChunkCoord, layout: WorldLayout): Chun
   return out;
 }
 /** Viewpoint deck position along the west bank, clear of the row's road/bridge. */
-export function viewpointZ(seed: string, cz: number, layout = worldLayout(seed)): number {
+function viewpointZ(seed: string, cz: number, layout = worldLayout(seed)): number {
   return rowLine(seed, cz, layout) < CHUNK_SIZE / 2 ? 30 : 10;
 }
 
-export function planChunk(seed: string, coord: ChunkCoord): PlannedChunk {
+export function planChunk(seed: string, coord: ChunkCoord): ChunkPlan {
   const layout = worldLayout(seed);
   const { cx, cz } = coord;
   const connectors = connectorsFor(seed, coord, layout);

@@ -23,7 +23,7 @@ export interface WorldServiceOptions {
 }
 
 type World = { info: WorldInfo; manifests: Map<string, ChunkManifest>; view?: WorldView };
-type Job = { promise: Promise<ChunkManifest>; controller: AbortController; wantedBy: Set<string> };
+type Job = { promise: Promise<ChunkManifest> };
 const NEIGHBOURS: [Edge, number, number][] = [['north', 0, -1], ['east', 1, 0], ['south', 0, 1], ['west', -1, 0]];
 
 export function createWorldService(options: WorldServiceOptions = {}): WorldService {
@@ -69,7 +69,8 @@ export function createWorldService(options: WorldServiceOptions = {}): WorldServ
       worldId: target.info.worldId, coord, district: plan.district, catalogVersion: CATALOG_VERSION, generatorVersion: GENERATOR_VERSION, seed: target.info.seed,
       source: 'claude', questContext, connectors: plan.connectors, water: plan.water, bridges: plan.bridges,
       roads: [...plan.roads, ...draft.roads], placements, missingCapabilities: draft.missingCapabilities,
-      anchors: draft.anchors.map((anchor) => { const nameKey = plan.requiredAnchors.find((entry) => entry.anchorId === anchor.id)?.nameKey; return nameKey ? { ...anchor, nameKey } : anchor; }),
+      // Model-chosen anchor ids are unique per chunk only; the coord prefix (as the fallback uses) keeps them unique across the world.
+      anchors: draft.anchors.map((anchor) => { const required = plan.requiredAnchors.find((entry) => entry.anchorId === anchor.id); return required ? { ...anchor, ...(required.nameKey ? { nameKey: required.nameKey } : {}) } : { ...anchor, id: `c${coord.cx}.${coord.cz}:${anchor.id}` }; }),
     }));
     if (!candidate.success) return candidate.error.issues.slice(0, 5).map((issue) => `schema:${issue.path.join('.')}`);
     const result = validateManifest(candidate.data, plan);
@@ -112,7 +113,6 @@ export function createWorldService(options: WorldServiceOptions = {}): WorldServ
   function generate(sessionId: string, target: World, coord: ChunkCoord, questContext: QuestContextSnapshot): Job {
     const startedMs = Date.now();
     const controller = new AbortController();
-    const wantedBy = new Set([sessionId]);
     const promise = (async () => {
       const base = fallback(target, coord, questContext);
       const errors: string[] = [];
@@ -125,7 +125,7 @@ export function createWorldService(options: WorldServiceOptions = {}): WorldServ
         return commit(target, composed ?? base, Date.now() - startedMs, errors);
       } finally { clearTimeout(timer); controller.abort(); jobs.delete(`${target.info.worldId}|${chunkKey(coord)}`); }
     })();
-    return { promise, controller, wantedBy };
+    return { promise };
   }
 
   return {
@@ -147,9 +147,7 @@ export function createWorldService(options: WorldServiceOptions = {}): WorldServ
     },
     async request(sessionId, worldId, coords, urgent, questContext, allowClaude = true) {
       const target = world(worldId);
-      const wanted = new Set(coords.map((coord) => `${worldId}|${chunkKey(coord)}`));
-      // A newer request from this session supersedes its older, still-uncommitted asks.
-      for (const [jobKey, job] of jobs) if (job.wantedBy.delete(sessionId) && !wanted.has(jobKey) && job.wantedBy.size === 0) job.controller.abort();
+      // Jobs run to their deadline: the client never re-lists in-flight coords, so superseding by request would abort every batch.
       const chunks = await Promise.all(coords.map((coord) => {
         const key = chunkKey(coord);
         const committed = target.manifests.get(key);
@@ -158,7 +156,6 @@ export function createWorldService(options: WorldServiceOptions = {}): WorldServ
         const jobKey = `${worldId}|${key}`;
         let job = jobs.get(jobKey);
         if (!job) { job = generate(sessionId, target, coord, questContext); jobs.set(jobKey, job); }
-        job.wantedBy.add(sessionId);
         return job.promise;
       }));
       return { chunks, pending: [] };
@@ -166,6 +163,7 @@ export function createWorldService(options: WorldServiceOptions = {}): WorldServ
     restore(worldId, manifests) {
       const target = world(worldId);
       const response: ChunkRestoreResponse = { accepted: [], rejected: [], chunks: [] };
+      const anchorOwner = new Map([...target.manifests.values()].flatMap((entry) => entry.anchors.map((anchor) => [anchor.id, chunkKey(entry.coord)] as const)));
       for (const manifest of manifests) {
         const key = chunkKey(manifest.coord);
         const reject = (reason: string) => response.rejected.push({ key, reason });
@@ -174,10 +172,11 @@ export function createWorldService(options: WorldServiceOptions = {}): WorldServ
         else if (manifest.generatorVersion !== GENERATOR_VERSION || manifest.catalogVersion !== CATALOG_VERSION) reject('Incompatible generator or catalog version; migrate or reset the world.');
         else if (!verifyManifestHash(manifest)) reject('Content hash mismatch.');
         else if (existing) { if (existing.contentHash === manifest.contentHash) response.accepted.push(key); else reject('A different layout is already committed for this chunk.'); }
+        else if (manifest.anchors.some((anchor) => (anchorOwner.get(anchor.id) ?? key) !== key)) reject('An anchor id already exists in another chunk.');
         else {
           const result = validateManifest(manifest, planChunk(target.info.seed, manifest.coord), { requireHash: true });
           if (!result.ok) reject(`Invalid manifest: ${result.errors.slice(0, 3).join('; ')}`.slice(0, 240));
-          else { commit(target, manifest, 0); response.accepted.push(key); }
+          else { commit(target, manifest, 0); response.accepted.push(key); for (const anchor of manifest.anchors) anchorOwner.set(anchor.id, key); }
         }
         const committed = target.manifests.get(key);
         if (committed && !response.chunks.includes(committed)) response.chunks.push(committed);

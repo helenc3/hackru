@@ -1,3 +1,9 @@
+.validation-controls {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .validation-panel h3 {
   margin: 16px 0 10px;
 }

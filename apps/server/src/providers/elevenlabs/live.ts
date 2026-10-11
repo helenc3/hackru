@@ -1,5 +1,5 @@
 import { ElevenLabsClient } from '@elevenlabs/elevenlabs-js';
-import { characterDescriptions, audioVoices, npcIdentity, type NpcId, type SpeechProvider } from '@vibequest/shared';
+import { characterDescriptions, npcIdentity, type NpcId, type SpeechProvider } from '@vibequest/shared';
 import { HttpError } from '../../errors.js';
 
 /**
@@ -13,7 +13,6 @@ export const APPROVED_VOICE_IDS = new Set([
 ]);
 
 export const DEFAULT_VOICE_IDS = Object.fromEntries(characterDescriptions.map((npc) => [npc.id, npc.voice.id])) as Record<NpcId, string>;
-export const DEFAULT_PA_VOICE_ID = audioVoices.pa.id;
 
 export const MAX_CLIP_BYTES = 3 * 1024 * 1024;
 // Verified Q2 routes run up to 240 characters (DirectionsSchema.textZh).
@@ -29,6 +28,21 @@ export interface ElevenLabsSpeechOptions {
 }
 
 const speechUnavailable = () => new HttpError(503, 'SPEECH_UNAVAILABLE', 'Mandarin speech is temporarily unavailable.', true);
+// The SDK's timeoutInSeconds covers headers only; a stalled body would otherwise hang a live turn or speech job forever.
+const BODY_TIMEOUT_MS = 15_000;
+async function* bounded(stream: AsyncIterable<Uint8Array>): AsyncGenerator<Uint8Array> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const expired = new Promise<never>((_resolve, reject) => { timer = setTimeout(() => reject(new Error('body timeout')), BODY_TIMEOUT_MS); });
+  void expired.catch(() => undefined);
+  const iterator = stream[Symbol.asyncIterator]();
+  try {
+    for (;;) { const next = await Promise.race([iterator.next(), expired]); if (next.done) return; yield next.value; }
+  } finally { clearTimeout(timer); void iterator.return?.().catch(() => undefined); }
+}
+async function readAll(stream: unknown): Promise<Uint8Array> {
+  if (stream instanceof ReadableStream) { const parts: Uint8Array[] = []; for await (const chunk of bounded(stream)) parts.push(chunk); return new Uint8Array(Buffer.concat(parts)); }
+  return new Uint8Array(await new Response(stream as BodyInit).arrayBuffer());
+}
 const transcriptionUnavailable = () => new HttpError(503, 'TRANSCRIPTION_UNAVAILABLE', 'Mandarin transcription is temporarily unavailable.', true);
 
 export function voiceFor(voiceIds: ElevenLabsSpeechOptions['voiceIds'], voiceKey: string): string {
@@ -59,7 +73,7 @@ export function createElevenLabsSpeechProvider(options: ElevenLabsSpeechOptions)
       // PCM16 samples are 2 bytes; network chunks may split one, so carry an odd byte to the next chunk.
       let carry: Uint8Array = new Uint8Array(0);
       try {
-        for await (const chunk of stream) {
+        for await (const chunk of bounded(stream)) {
           const joined = new Uint8Array(carry.length + chunk.length); joined.set(carry); joined.set(chunk, carry.length);
           const even = joined.length - (joined.length % 2);
           carry = joined.slice(even);
@@ -75,7 +89,7 @@ export function createElevenLabsSpeechProvider(options: ElevenLabsSpeechOptions)
         const stream = await client.textToSpeech.convert(voiceId,
           { text: line, modelId: options.ttsModel, outputFormat: 'pcm_24000', languageCode: 'zh' },
           { timeoutInSeconds: options.ttsTimeoutSeconds ?? 5, maxRetries: 0 });
-        const audio = new Uint8Array(await new Response(stream).arrayBuffer());
+        const audio = await readAll(stream);
         if (!audio.length) throw new Error('empty audio');
         return audio;
       } catch { throw speechUnavailable(); }
@@ -90,7 +104,7 @@ export function createElevenLabsSpeechProvider(options: ElevenLabsSpeechOptions)
           { text: line, modelId: options.ttsModel, outputFormat: 'mp3_44100_128', languageCode: 'zh' },
           { timeoutInSeconds: options.ttsTimeoutSeconds ?? 5, maxRetries: 0 },
         );
-        const audio = new Uint8Array(await new Response(stream).arrayBuffer());
+        const audio = await readAll(stream);
         if (!audio.length) throw new Error('empty audio');
         return audio;
       } catch {

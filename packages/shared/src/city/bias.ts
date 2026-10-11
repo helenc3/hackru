@@ -2,7 +2,7 @@ import { QuestCategorySchema, type ExplorationState, type MissionId, type QuestC
 import { BIAS_RULES } from './contracts.js';
 
 /** Categories each quest makes relevant (CITY_GENERATION §8). */
-export const QUEST_CATEGORIES: Record<MissionId, readonly QuestCategory[]> = {
+const QUEST_CATEGORIES: Record<MissionId, readonly QuestCategory[]> = {
   Q1: ['drink-vendor'],
   Q2: ['direction-helper', 'hotel-landmark'],
   Q3: ['river-viewpoint', 'photo-passerby'],

@@ -9,15 +9,12 @@ const baselineTurnRequest: TurnRequest = { turnId: 'fixture-turn-001', expectedV
 
 const response = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
 
-test('transport validates responses and deduplicates committed event delivery', async () => {
+test('transport validates responses and returns committed events', async () => {
   const calls: RequestInit[] = [];
   const result = { ...baselineActionResponse, events: [{ id: 'reward-once', kind: 'reward', message: 'One reward.' }] };
   const client = createSessionClient({ fetch: (async (_url, init) => { calls.push(init!); return response(result); }) as typeof fetch });
-  const events: string[] = [];
-  client.subscribe('fixture-session', () => { throw new Error('Observer failed'); });
-  const unsubscribe = client.subscribe('fixture-session', (event) => events.push(event.id));
-  await client.act('fixture-session', baselineActionRequest); await client.act('fixture-session', baselineActionRequest); unsubscribe();
-  expect(events).toEqual(['reward-once']); expect(calls).toHaveLength(2);
+  const first = await client.act('fixture-session', baselineActionRequest); await client.act('fixture-session', baselineActionRequest);
+  expect(first.events.map((event) => event.id)).toEqual(['reward-once']); expect(calls).toHaveLength(2);
   expect(JSON.parse(calls[0].body as string)).toEqual(baselineActionRequest);
 });
 test('transport rejects responses that leak private state or break the contract', async () => {

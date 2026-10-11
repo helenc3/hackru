@@ -1,6 +1,6 @@
 # Dense city layout revision
 
-Human-requested city tuning replaces seven generated biomes with shopping/dining, waterfront and park. Existing DistrictKind values remain valid for legacy data and the component gallery. Planner cells expand from three to six chunks, and waterfront includes adjacent inland blocks. Side streets become 3.5 m (50% of 7 m); avenues remain 10 m. Collision and shared boundary connectors use these same widths.
+Human-requested city tuning replaces seven generated biomes with shopping/dining, waterfront and park. Existing DistrictKind values remain valid for legacy data and the component gallery. Planner cells expand from three to six chunks, and waterfront includes adjacent inland blocks. Side streets become 3.5 m (50% of 7 m); avenues are 5 m. Collision and shared boundary connectors use these same widths.
 
 Commercial shop shells use four-to-eight floors; noodle shops use three-to-six. Footprints and renderers share floor parameters. Generator version 2 / catalog-2 distinguish these layouts from old saved manifests. Existing cached worlds are retained; old versions are rejected by the existing restore validator. Start a new city for a clean layout with the revised generator.
 

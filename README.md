@@ -1,26 +1,64 @@
-# Speak Your Way build kit
+# Speak Your Way
 
-This repository contains the portable specification and Segment-000 foundation for a four-person HackRU team. The foundation includes shared contracts, a static Mandarin world preview, explicit unfinished feature slots, server route stubs, and quality checks. Gameplay and live voice are built by the following segments. Every participating account must open a checkout of this repository and have its own GitHub authentication; accounts do not inherit this chat or access to another account's local files.
+A single-player, desktop-browser game for practising Mandarin Chinese. You walk a third-person avatar through a Shanghai-style city that streams in chunks as you explore, read Simplified Chinese signs, and talk to NPCs by voice or typing. Three quests are offered in order: buy a drink from 老王, ask 小李 for directions to 上海大酒店, and get 小美 to take your photo at 黄浦江. AI models interpret your Mandarin and propose NPC dialogue or neighbourhood layouts; deterministic rules own every game fact, route, purchase, photo and reward.
 
-Once the kit is committed and repository access is configured, the entire build instruction can be:
+Current behaviour is defined by the code and tests. [IMPLEMENTATION_SPEC.md](IMPLEMENTATION_SPEC.md), [docs/NEW_QUESTS.md](docs/NEW_QUESTS.md), [docs/CITY_GENERATION.md](docs/CITY_GENERATION.md) and the [frozen streaming contracts](proposals/city-streaming-contracts.md) describe the design; where an older document disagrees with the code, the code wins. [AGENTS.md](AGENTS.md) lists the product invariants that must not change.
 
-> Build Segment-003
+## Repository map
 
-The root `AGENTS.md` resolves that request, loads the relevant documents, and instructs the builder to implement, validate, open a pull request, and merge when its checks pass. A segment can run in a fresh chat on a different account without prior conversation history. Dependencies must already be merged. No custom skill or chat-memory handoff is required.
+```text
+apps/web/            React 19 + Vite + react-three-fiber client
+  src/app/           App shell, session hook/client, global CSS
+  src/world/         Player movement, camera, characters, wayfinding
+  src/city/          Chunk streaming, chunk renderer, catalog asset components, /__gallery
+  src/ui/            HUD, dialogue, coach, results panels
+  src/audio/         Clip recorder, live-voice WebSocket client, playback, music
+  src/dictionary/    CC-CEDICT gloss popover, lookup, review list
+  src/validation/    Developer-only text harness (/__validation)
+  tests/             Playwright specs against the scripted API tape
+apps/server/         Express API + WebSocket live relay
+  src/routes/        Sessions, actions, turns, audio, city chunks
+  src/providers/     Claude / Gemini dialogue, ElevenLabs speech, fixtures
+  src/live/          Relay between the browser and Gemini Live
+  src/city/          World service and Claude city composer
+  src/dictionary/    CC-CEDICT lookup route
+  tests/             Vitest (supertest) API and provider tests
+packages/shared/     Zod contracts, pure game engine, authored content, city planner/validator/fallback
+fixtures/            Baseline JSON, scripted UI API, validation campaigns, standalone world preview
+tests/e2e/           Real-server Playwright journeys; tests/support/ shared browser profile
+scripts/             wait-for-api.js (used by npm run dev), generate-music.py
+docs/                Launch guide, quests, city generation, approved voices, asset attribution
+proposals/           Interface change records that amended the contracts
+segments/, .build/   Historical Spec 1.2 build packets and completion records
+audio_test/          Historical ElevenLabs voice comparison and latency experiments
+```
 
-## Start here
+`_prototype/` (untracked, gitignored) is the original hackathon prototype and is not used by the app. npm package names still use the pre-rename scope `@vibequest/{web,server,shared}`.
 
-1. Clone `helenc3/hackru` into a dedicated local checkout. Do not build in the ChatGPT project's read-only `sources/` mirror.
-2. Follow [local launch and validation](docs/LOCAL_LAUNCH.md). Verify the Segment-000 completion record and corresponding merged PR on remote main before beginning dependent work.
-3. After 000 merges, dispatch **001 to A, 002 to B, 003 to C, and 004 to D** concurrently in separate checkouts.
-4. B proceeds to 005; A proceeds to 006 when its dependencies merge. Run 007 for integrated acceptance, then 008 for the submission package. Segment 005 includes required microphone capture, Mandarin transcription, and spoken replies. Segment 009 is optional conversation pacing polish, never a release prerequisite.
+## Run it
 
-Read [the product specification](IMPLEMENTATION_SPEC.md) for the game decisions; [the registry](SEGMENT_REGISTRY.md) for dependencies and ownership; the build protocol (`BUILD_PROTOCOL.md`, removed in 37f445d; see git history) for claims, tests, and merging; the contract freeze (`CONTRACT_FREEZE.md`, removed in 37f445d; see git history) for implementation seams; and [Segment-003](segments/Segment-003.md) for an example self-contained work packet.
+Node 24.19 and npm 12.2 are pinned. See [docs/LOCAL_LAUNCH.md](docs/LOCAL_LAUNCH.md) for environment variables, ports, provider keys, the production preview and hosting.
 
-Spec 2.0 ([Segment-010](segments/Segment-010.md)) targets three exploration quests — buy a drink, ask for directions to 上海大酒店, get a photo at 黄浦江 — in a Shanghai-style city streamed in chunks as you walk, built from an approved component catalog (Claude composition is opt-in behind `ENABLE_CLAUDE_CITY`; a seeded fallback always works), with live NPC dialogue, required ElevenLabs voice input/output, and transparent skill adaptation. The text harness is internal validation only. See [docs/NEW_QUESTS.md](docs/NEW_QUESTS.md), [docs/CITY_GENERATION.md](docs/CITY_GENERATION.md), and the [frozen contracts](proposals/city-streaming-contracts.md).
+```sh
+npm ci
+cp .env.example .env   # keys are optional; without them the game uses fixture replies
+npm run dev            # API on 3001, web on http://127.0.0.1:5173
+```
 
-This kit specifies automatic merging of an in-scope segment when the repository's checks and rules permit it. Missing permissions, unresolved required reviews, or a failed check are reported as a concrete blocker; they are never bypassed. Publishing a hosted deployment is a separate action from merging source code.
+| Script | What it does |
+| --- | --- |
+| `npm run dev` | Start the API with tsx watch, wait for `/api/health`, then start Vite |
+| `npm run typecheck` | `tsc --noEmit` for shared, server and web |
+| `npm run lint` | ESLint (includes React hooks rules for `apps/web/src`) |
+| `npm test` | Vitest unit/API tests, then `validate_kit.py` |
+| `npm run test:watch` | Vitest in watch mode |
+| `npm run build` | Build shared, web (Vite) and server (tsup) |
+| `npm start` | Serve the built app and API from one origin |
+| `npm run test:e2e` | Playwright component suite, then the real-server `tests/e2e` suite |
+| `npm run check:kit` | Validate the historical segment kit links and dependency graph |
 
-Run `python3 validate_kit.py` to check packet completeness, links, and the dependency graph. This validates the planning kit; the game's checks are implemented in Segment-000 and exercised by subsequent segments.
+While iterating, run only the specs that cover your change (`npx vitest run <file>`, `npx playwright test <file> --workers=1`); run the full suite before committing.
 
-Version 2.0 replaces the 1.2 station campaign with the streamed-city quests. Version 1.2 superseded the earlier Spanish/text-edition plan. Segment numbers remain stable; 003 owns integrated UI plus internal validation, 005 owns the entire required spoken loop, and 009 is optional pacing polish. Use the current packets and merged completion records rather than cached earlier instructions.
+## Historical documents
+
+The repository was built as numbered segments by a four-person team under a Spec 1.2 station campaign, then replaced by the Spec 2.0 streamed-city quests (Segment-010). [SEGMENT_REGISTRY.md](SEGMENT_REGISTRY.md), [BUILD_PROTOCOL.md](BUILD_PROTOCOL.md), [CONTRACT_FREEZE.md](CONTRACT_FREEZE.md), `segments/`, `.build/`, [docs/INTEGRATION_REPORT.md](docs/INTEGRATION_REPORT.md) and `audio_test/` are kept as that history; `python3 validate_kit.py` still checks their links.

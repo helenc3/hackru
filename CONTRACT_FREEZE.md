@@ -1,5 +1,7 @@
 # Frozen seams for parallel builds
 
+> Historical (Spec 1.2 planning kit; all segments merged by 2026-10-11). Current contracts: `packages/shared/src/contracts.ts` and `proposals/city-streaming-contracts.md`.
+
 Contract version: 1.2. The TypeScript shapes in specification section 7 are the starting point; Segment-000 implements their exported types and Zod schemas. Once 000 merges, later segments import those exports and their fixtures. The shared contract is changed only through its owner and an explicit compatible proposal. Do not duplicate it in a frontend or provider package.
 
 ## Module entry points established by 000

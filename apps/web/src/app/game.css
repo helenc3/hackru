@@ -1,7 +1,6 @@
 /* Imports preserve the legacy cascade order. Keep later integration rules after base styles. */
 @import './game/forms-start.css';
 @import './game/quest-details.css';
-@import './game/interactions.css';
 @import './game/dialogue.css';
 @import './game/practice-feedback.css';
 @import './game/outcomes.css';

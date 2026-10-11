@@ -1,5 +1,7 @@
 # Segment-007 integration report
 
+> Historical (Spec 1.2 planning kit; all segments merged by 2026-10-11). Current contracts: `packages/shared/src/contracts.ts` and `proposals/city-streaming-contracts.md`.
+
 Spec 1.2 · branch `build/segment-007` · base `origin/main` 2d6d0c9 · 2026-10-10
 
 ## Status

@@ -3,9 +3,8 @@ import request from 'supertest';
 import type { GameAction, PublicState, SpeechProvider } from '@vibequest/shared';
 import { createApp } from '../../src/app.js';
 import { ANCHORS, fakeServices } from '../game/helpers.js';
-import { createFixtureSpeechProvider } from '../../src/providers/speech.js';
+import { createFixtureSpeechProvider, silentMp3Frame } from '../../src/providers/elevenlabs/fixture.js';
 import { mp3DurationMs } from '../../src/providers/elevenlabs/live.js';
-import { silentMp3Frame } from '../../src/providers/elevenlabs/fixture.js';
 import { HttpError } from '../../src/errors.js';
 
 type Speech = SpeechProvider & { calls: { synthesize: number; transcribe: number } };

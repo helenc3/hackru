@@ -21,7 +21,7 @@ imported or served by the production app.
 
 ```sh
 npm run build
-npm run test:e2e -- apps/web/tests/world
+npx playwright test apps/web/tests/world --workers=1
 ```
 
 The owned tests cover camera-relative movement, normalized speed, water

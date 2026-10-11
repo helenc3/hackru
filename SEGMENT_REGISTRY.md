@@ -1,6 +1,8 @@
 # Numbered segment registry
 
-Use this stable registry to dispatch work. Status is deliberately **planned** in the JSON: actual progress comes from claims, PRs and per-segment completion records on remote main. This kit has not implemented or merged any segment.
+> Historical (Spec 1.2 planning kit; all segments merged by 2026-10-11). Current contracts: `packages/shared/src/contracts.ts` and `proposals/city-streaming-contracts.md`.
+
+Use this stable registry to dispatch work. Status is deliberately **planned** in the JSON: actual progress comes from claims, PRs and per-segment completion records on remote main. Segments 000–007 and 010 are merged on `main`; 008 and 009 were never built. `.build/completed/` holds records through 006 only.
 
 | ID | Result | Dependencies | Suggested owner |
 |---|---|---|---|
@@ -28,7 +30,7 @@ File ownership is explicit in each packet. Root package/lockfile edits are restr
 
 Invocation in a repository with this kit at root: `Build Segment-003`. For a fresh account, only repository access and this request are needed; it reads the root entry point and linked documents. If the root AGENTS.md is not discovered by the client, use: `Read AGENTS.md and build Segment-003`.
 
-The machine-readable equivalent is [segment-registry.json](segment-registry.json). Completion record format and merge rules are in `BUILD_PROTOCOL.md` (removed in 37f445d; see git history).
+The machine-readable equivalent is [segment-registry.json](segment-registry.json). Completion record format and merge rules are in `BUILD_PROTOCOL.md` (historical).
 
 Version 1.2: Mandarin Chinese and one voice-led world. The text harness is development-only; 003 is not a second gameplay edition, 005 is not voice-output-only, and 009 is not the first delivery of speech input. Prior 1.1 completion records require migration.
 

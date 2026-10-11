@@ -15,8 +15,6 @@ export const CITY_LIMITS = { maxPlacements: 160, maxAnchors: 12, maxRoads: 24, m
 export const GENERATION_RULES = { concurrency: 2, deadlineMs: 20_000, retries: 1, batchSize: 6, sessionCallCap: 60, sessionTokenCap: 400_000 } as const;
 /** CITY_GENERATION §8: boost after ~3 active minutes or 6 newly visited chunks without an encounter, capped at 1.5×. */
 export const BIAS_RULES = { absenceMs: 180_000, absenceChunks: 6, maxBoost: 1.5, encounterRadius: 8 } as const;
-/** Guaranteed reachable quest opportunities within this many chunks (Chebyshev) of spawn. */
-export const EXPLORATION_BUDGET_CHUNKS = 4;
 
 export const DistrictKindSchema = ZoneIdSchema;
 export type DistrictKind = ZoneId;
@@ -184,7 +182,6 @@ export const WorldInfoSchema = z.strictObject({ worldId: id, seed: z.string().ma
 export type WorldInfo = z.infer<typeof WorldInfoSchema>;
 /** POST /api/sessions/:id/chunks — request committed manifests; urgent commits a seeded fallback for anything not ready. */
 export const ChunkRequestSchema = z.strictObject({ coords: z.array(ChunkCoordSchema).min(1).max(GENERATION_RULES.batchSize), urgent: z.boolean().default(false) });
-export type ChunkRequest = z.input<typeof ChunkRequestSchema>;
 export const ChunkResponseSchema = z.strictObject({ chunks: z.array(ChunkManifestSchema), pending: z.array(ChunkCoordSchema) });
 export type ChunkResponse = z.infer<typeof ChunkResponseSchema>;
 /** POST /api/sessions/:id/chunks/restore — client IndexedDB manifests; server re-validates before accepting. */

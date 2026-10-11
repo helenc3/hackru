@@ -20,11 +20,14 @@ npm-debug.log*
 .vscode/
 .idea/
 
-# local Claude settings
-.claude/settings.local.json
+# local Claude settings and worktrees
+.claude/
 
-# local Impeccable configuration
-.impeccable/config.json
+# local Impeccable cache
+.impeccable/
+
+# untracked original hackathon prototype
+_prototype/
 
 # Generated verification outputs (all workspaces)
 test-results/

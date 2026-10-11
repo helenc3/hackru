@@ -2,11 +2,12 @@ import {
   CHUNK_SIZE, CITY_LIMITS, GENERATOR_VERSION,
   type Anchor, type CatalogEntry, type ChunkCoord, type ChunkManifest, type DistrictKind, type ParamValues, type Placement, type QuestContextSnapshot, type Rect, type Road,
 } from './contracts.js';
+import type { ChunkPlan } from './contracts.js';
 import { CATALOG, CATALOG_VERSION, catalogEntry, resolveParams } from './catalog/index.js';
 import { TEXT_CATALOG } from './text-catalog.js';
 import { npcIdentity } from './npc-identity.js';
 import { sealManifest } from './hash.js';
-import { planChunk, SIDEWALK, worldLayout, type PlannedChunk } from './planner.js';
+import { planChunk, SIDEWALK, worldLayout } from './planner.js';
 import { createRng } from './rng.js';
 import { overlaps, repairManifest, roadRect, rotateRect, validateManifest } from './validate.js';
 /** npc-name keys reserved for the planner's quest givers (spawn vendor 老王, guide 小李). */
@@ -46,7 +47,7 @@ const round = (v: number) => Math.round(v * 100) / 100;
 type Lot = { rect: Rect; faces: Face[] };
 type PlaceOptions = { onRoad?: boolean; attachTo?: { placementId: string; socketId: string }; required?: boolean };
 
-export function generateFallbackChunk(worldId: string, seed: string, coord: ChunkCoord, questContext: QuestContextSnapshot, plan: PlannedChunk = planChunk(seed, coord)): ChunkManifest {
+export function generateFallbackChunk(worldId: string, seed: string, coord: ChunkCoord, questContext: QuestContextSnapshot, plan: ChunkPlan = planChunk(seed, coord)): ChunkManifest {
   const { cx, cz } = coord;
   const rng = createRng(seed, 'fallback', cx, cz);
   const pick = <T>(items: readonly T[]): T | undefined => items[Math.floor(rng() * items.length)];

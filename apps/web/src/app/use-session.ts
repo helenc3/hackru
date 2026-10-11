@@ -16,8 +16,6 @@ export function useSession(validation: boolean) {
   const [resumeId, setResumeId] = useState<string | null>(null);
   const [checkingSession, setCheckingSession] = useState(true);
   const [pending, setPending] = useState(0);
-  const [turnPending, setTurnPending] = useState(false);
-  const activeTurn = useRef<string | null>(null);
   const [problem, setProblem] = useState<UiProblem | null>(null);
   const [turn, setTurn] = useState<TurnResponse | null>(null);
   const [turnNpc, setTurnNpc] = useState<string | null>(null);
@@ -74,20 +72,24 @@ export function useSession(validation: boolean) {
     return () => { live = false; };
   }, [validation, report]);
 
-  const enqueue = useCallback((task: (token: number) => Promise<void>, token = generation.current): Promise<void> => {
-    setPending((count) => count + 1);
+  // Movement syncs every few hundred ms, so they run `silent`: still serialized (versions must stay ordered) but they never
+  // flip `pending`, clear a problem the player is reading, or become the retry target. A conflict with an in-flight turn
+  // (409) only resyncs from the attached state; the player sees nothing.
+  const enqueue = useCallback((task: (token: number) => Promise<void>, token = generation.current, silent = false): Promise<void> => {
+    if (!silent) setPending((count) => count + 1);
     const execution = tail.current.catch(() => undefined).then(async () => {
       if (token !== generation.current) return;
-      setProblem(null);
-      try { await task(token); if (token === generation.current) retry.current = null; } catch (error: unknown) {
+      if (!silent) setProblem(null);
+      try { await task(token); if (!silent && token === generation.current) retry.current = null; } catch (error: unknown) {
+        if (silent && error instanceof SessionClientError && error.status === 409) { if (error.state) accept(error.state, token); throw error; }
         report(error, token);
-        if (token === generation.current) retry.current = () => enqueue(task, token);
+        if (token === generation.current && (!silent || !retry.current)) retry.current = () => enqueue(task, token, silent); // a move never displaces a failed action's retry
         throw error;
       }
-    }).finally(() => { if (token === generation.current) setPending((count) => Math.max(0, count - 1)); });
+    }).finally(() => { if (!silent && token === generation.current) setPending((count) => Math.max(0, count - 1)); });
     tail.current = execution.catch(() => undefined);
     return execution;
-  }, [report]);
+  }, [accept, report]);
 
   const refresh = useCallback(async () => {
     const id = current.current?.sessionId ?? resumeId;
@@ -117,7 +119,7 @@ export function useSession(validation: boolean) {
       accept(response.state, token);
       setEvents((previous) => [...previous, ...response.events.filter((event) => !previous.some((known) => known.id === event.id))].slice(-8));
       if (action.type === 'startMission') { setTurn(null); setTurnNpc(null); setEvents(response.events); }
-    }, scope);
+    }, scope, action.type === 'move');
   }, [accept, enqueue]);
 
   const submit = useCallback(async (npc: NpcTarget, input: TurnRequest['input']) => {
@@ -130,11 +132,7 @@ export function useSession(validation: boolean) {
       const snapshot = current.current;
       if (!snapshot || snapshot.status !== 'active') throw new SessionClientError(422, 'NO_ACTIVE_SESSION', 'There is no active conversation.', false);
       request = { turnId, expectedVersion: snapshot.version, npcId: npc.role, anchorId: npc.anchorId, input };
-      activeTurn.current = turnId; setTurnPending(true);
-      let response: TurnResponse;
-      try { response = await sendTurn(snapshot.sessionId, request); } finally {
-        if (activeTurn.current === turnId) { activeTurn.current = null; setTurnPending(false); }
-      }
+      const response = await sendTurn(snapshot.sessionId, request);
       if (token !== generation.current) return;
       accept(response.state, token);
       if (token === generation.current && response.state.version >= (current.current?.version ?? 0)) { setTurn(response); setTurnNpc(npc.anchorId); }
@@ -152,10 +150,10 @@ export function useSession(validation: boolean) {
 
   const abandon = useCallback(() => {
     generation.current++; current.current = null; setState(null); setTurn(null); setEvents([]); setProblem(null);
-    tail.current = Promise.resolve(); setPending(0); activeTurn.current = null; setTurnPending(false);
+    tail.current = Promise.resolve(); setPending(0);
     retry.current = null; remember(validation, null); setResumeId(null);
   }, [validation]);
 
-  return { state, pending: pending > 0 || checkingSession, turnPending, problem, turn, turnNpc, events, resumeId, start, refresh, onAction, submit, applyTurn, abandon,
+  return { state, pending: pending > 0 || checkingSession, problem, turn, turnNpc, events, resumeId, start, refresh, onAction, submit, applyTurn, abandon,
     retry: async () => { await retry.current?.(); }, dismiss: () => setProblem(null) };
 }

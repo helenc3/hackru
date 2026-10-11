@@ -15,7 +15,7 @@ const CACHE_SIZE = 500;
 const RATE_PER_MINUTE = 20;
 const TIMEOUT_MS = 4_000;
 
-export interface DictionaryRouterOptions {
+interface DictionaryRouterOptions {
   /** Injected in tests; otherwise built from config when an Anthropic key exists outside test mode. */
   client?: ClaudeClient | null;
   now?: () => number;

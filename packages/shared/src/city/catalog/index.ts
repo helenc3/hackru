@@ -38,8 +38,8 @@ export function resolveParams(entry: CatalogEntry, raw: ParamValues = {}): Param
 }
 
 /** Compact machine-readable catalog for Claude, filtered by district; connector and quest assets always included. */
-export function catalogForPrompt(districts: readonly DistrictKind[], approvedOnly = true) {
-  return CATALOG.filter((entry) => (!approvedOnly || entry.review === 'approved') && (entry.category === 'anchor' || entry.category === 'waterfront' || entry.category === 'street' || entry.districts.some((district) => districts.includes(district))))
+export function catalogForPrompt(districts: readonly DistrictKind[]) {
+  return CATALOG.filter((entry) => entry.review === 'approved' && (entry.category === 'anchor' || entry.category === 'waterfront' || entry.category === 'street' || entry.districts.some((district) => districts.includes(district))))
     .map((entry) => {
       const defaults = resolveParams(entry);
       return { id: entry.id, category: entry.category, description: entry.description, districts: entry.districts, placement: entry.placement, attachesTo: entry.attachesTo, params: entry.params, footprintAtDefaults: entry.footprint(defaults), sockets: entry.sockets(defaults).map(({ id, kind }) => ({ id, kind })), capabilities: entry.capabilities, clearance: entry.clearance };

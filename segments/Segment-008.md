@@ -1,5 +1,7 @@
 # Segment-008: Submission package and final demo readiness
 
+> Historical (Spec 1.2 planning kit; all segments merged by 2026-10-11). Current contracts: `packages/shared/src/contracts.ts` and `proposals/city-streaming-contracts.md`.
+
 Spec version 1.2 · Suggested owner C/D · Invocation: **Build Segment-008**
 
 ## Context available to a fresh account
@@ -8,7 +10,7 @@ Speak Your Way is a single-player desktop Mandarin Chinese simulation for four m
 
 ## Mandatory reads
 
-Read [AGENTS.md](../AGENTS.md), `BUILD_PROTOCOL.md` (removed in 37f445d; see git history), [SEGMENT_REGISTRY.md](../SEGMENT_REGISTRY.md), `CONTRACT_FREEZE.md` (removed in 37f445d; see git history), and [IMPLEMENTATION_SPEC.md](../IMPLEMENTATION_SPEC.md) sections 12, 14, 15. Inspect current implementation/tests. The protocol defines claiming, green checks, and automatic merge; do not rely on another account's conversation.
+Read [AGENTS.md](../AGENTS.md), `BUILD_PROTOCOL.md` (historical), [SEGMENT_REGISTRY.md](../SEGMENT_REGISTRY.md), `CONTRACT_FREEZE.md` (historical), and [IMPLEMENTATION_SPEC.md](../IMPLEMENTATION_SPEC.md) sections 12, 14, 15. Inspect current implementation/tests. The protocol defines claiming, green checks, and automatic merge; do not rely on another account's conversation.
 
 ## Dependencies
 

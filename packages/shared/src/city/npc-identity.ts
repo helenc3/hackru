@@ -1,4 +1,3 @@
-export type NpcGender = 'male' | 'female';
 export const NPC_IDENTITIES = {
   laowang: { gender: 'male', look: 'laozhou', voiceId: 'hZTuv9Zqrq4yHYrEmF1r' },
   xiaoli: { gender: 'male', look: 'achen', voiceId: '4VZIsMPtgggwNg7OXbPY' },

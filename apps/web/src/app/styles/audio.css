@@ -69,14 +69,6 @@
   font-weight: 700;
 }
 
-.unimplemented-note {
-  flex-basis: 100%;
-  text-align: right;
-  font-size: 10px;
-  color: var(--text-muted);
-  padding-top: 3px;
-}
-
 .audio-status {
   display: flex;
   align-items: center;
@@ -90,7 +82,3 @@
   font-size: 15px;
 }
 
-.audio-status .small-label {
-  margin-left: auto;
-  font-size: 10px;
-}

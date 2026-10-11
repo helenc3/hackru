@@ -19,7 +19,7 @@ export interface ComposeInput {
 }
 /** Model-proposed local composition. Planner-owned fields (connectors, water, avenues) are added by the server. */
 export type ComposeDraft = Pick<ChunkManifest, 'placements' | 'roads' | 'anchors' | 'missingCapabilities'>;
-export interface ComposeResult { draft: ComposeDraft | undefined; usage: { inputTokens: number; outputTokens: number } }
+interface ComposeResult { draft: ComposeDraft | undefined; usage: { inputTokens: number; outputTokens: number } }
 export type CityComposer = (input: ComposeInput, signal: AbortSignal) => Promise<ComposeResult>;
 
 const num = { type: 'number' };
@@ -27,7 +27,7 @@ const point = { type: 'object', properties: { x: num, z: num }, required: ['x', 
 const nullable = (schema: object) => ({ anyOf: [schema, { type: 'null' }] });
 
 /** Structured-output schema. Params are a name/value list because strict objects cannot have open keys. */
-export function draftSchema(assetIds: string[]) {
+function draftSchema(assetIds: string[]) {
   return strictSchema({
     type: 'object',
     properties: {
@@ -56,7 +56,7 @@ type RawDraft = {
 const defined = <T extends object>(value: T) => Object.fromEntries(Object.entries(value).filter(([, entry]) => entry !== null)) as { [K in keyof T]: Exclude<T[K], null> };
 
 /** Shape conversion only; every value is re-validated by validateManifest before commit. */
-export function draftFromJson(text: string): ComposeDraft {
+function draftFromJson(text: string): ComposeDraft {
   const raw = JSON.parse(text) as RawDraft;
   return {
     placements: raw.placements.map(({ params, ...placement }) => defined({ ...placement, params: Object.fromEntries(params.map(({ name, value }) => [name, value])) }) as Placement),
@@ -66,7 +66,7 @@ export function draftFromJson(text: string): ComposeDraft {
   };
 }
 
-export function buildCityPrompt(input: ComposeInput): { system: string; contents: string; assetIds: string[] } {
+function buildCityPrompt(input: ComposeInput): { system: string; contents: string; assetIds: string[] } {
   const districts = [...new Set([input.plan.district, ...Object.values(input.plan.neighbours).filter((entry): entry is DistrictKind => entry !== 'water')])];
   const catalog = catalogForPrompt(districts);
   const system = [

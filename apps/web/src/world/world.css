@@ -77,7 +77,7 @@
   z-index: 7;
 }
 
-.district-nearby button, .district-error button {
+.district-nearby button {
   background: var(--cream);
   color: var(--ink);
   border: var(--outline);
@@ -90,13 +90,13 @@
   transition: transform .14s var(--bounce), box-shadow .14s, background-color .14s;
 }
 
-.district-nearby button:hover:not(:disabled), .district-error button:hover {
+.district-nearby button:hover:not(:disabled) {
   background: var(--lemon);
   transform: translate(-1px, -1px);
   box-shadow: 4px 4px 0 var(--ink);
 }
 
-.district-nearby button:active:not(:disabled), .district-error button:active {
+.district-nearby button:active:not(:disabled) {
   transform: translate(1.5px, 1.5px);
   box-shadow: 1.5px 1.5px 0 var(--ink);
 }
@@ -106,30 +106,10 @@
   cursor: wait;
 }
 
-.district-nearby button:focus-visible, .district-error button:focus-visible {
+.district-nearby button:focus-visible {
   outline: var(--focus);
   outline-offset: 0;
   box-shadow: var(--shadow-sticker-sm), var(--focus-ring);
-}
-
-.district-error {
-  position: absolute;
-  top: 55px;
-  left: 12px;
-  right: 12px;
-  z-index: 5;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  background: #fde8ec;
-  color: var(--ink);
-  border: 3px solid var(--ink);
-  box-shadow: var(--shadow-sticker-sm);
-  padding: 8px 10px;
-  border-radius: var(--radius-md);
-  font-size: 12px;
-  font-weight: 700;
 }
 
 /* Full-bleed layout: HUD cards sit in the corners, so in-world chrome moves to the top centre. */

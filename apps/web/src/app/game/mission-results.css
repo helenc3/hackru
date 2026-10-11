@@ -1,7 +1,7 @@
 /* Welcome screen over a blurred, non-interactive world preview; mission results review, conversation card, intro controls. */
 .welcome-shell { position: relative; background: var(--sky, #dff1ff); }
 .world-preview { z-index: 0; pointer-events: none; filter: blur(5px) saturate(1.15); transform: scale(1.03); }
-.world-preview .district-nearby, .world-preview .world-note, .world-preview .world-caption, .world-preview .district-error, .world-preview .compatibility-screen { display: none; }
+.world-preview .district-nearby, .world-preview .world-note, .world-preview .world-caption, .world-preview .compatibility-screen { display: none; }
 .welcome-shell::after { content: ''; position: absolute; inset: 0; z-index: 0; pointer-events: none; background: linear-gradient(180deg, #fffdf5bb 0%, #fffdf588 50%, #fffdf533 100%); }
 .welcome-shell .welcome-screen { position: relative; z-index: 1; flex: 1; min-height: 0; overflow-y: auto; }
 

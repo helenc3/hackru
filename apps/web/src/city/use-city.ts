@@ -3,7 +3,7 @@ import {
   QuestCategorySchema, SPAWN_RADIUS_CHUNKS, chunkKey, chunkOf, createWorldView, generateFallbackChunk, seedFromWorldId,
   type ChunkManifest, type Position, type QuestCategory, type PublicState, type WorldView,
 } from '@vibequest/shared';
-import { createCityClient, type CityClient } from './city-client';
+import { createCityClient } from './city-client';
 import { rememberWorld } from './chunk-cache';
 import { ChunkStreamer } from './streamer';
 
@@ -38,7 +38,8 @@ function previewChunks(): ChunkManifest[] {
  * Streams committed layouts from the authoritative server as the player moves. With `state`
  * null: a local preview city. With `options.manifests`: a static city (tests/fixtures), no network.
  */
-export function useCity(state: Pick<PublicState, 'sessionId' | 'worldId' | 'validationMode'> | null, options: { client?: CityClient; manifests?: readonly ChunkManifest[] } = {}): CityHandle {
+const client = createCityClient();
+export function useCity(state: Pick<PublicState, 'sessionId' | 'worldId' | 'validationMode'> | null, options: { manifests?: readonly ChunkManifest[] } = {}): CityHandle {
   const sessionId = state?.sessionId ?? null;
   const validation = state?.validationMode ?? false;
   const worldId = options.manifests?.[0]?.worldId ?? state?.worldId ?? PREVIEW_WORLD;
@@ -47,7 +48,6 @@ export function useCity(state: Pick<PublicState, 'sessionId' | 'worldId' | 'vali
   const [revision, setRevision] = useState(0);
   const [status, setStatus] = useState<CityStatus>('restoring');
   const [error, setError] = useState<string>();
-  const client = useMemo(() => options.client ?? createCityClient(), [options.client]);
   const staticManifests = options.manifests;
 
   useEffect(() => {
@@ -61,7 +61,7 @@ export function useCity(state: Pick<PublicState, 'sessionId' | 'worldId' | 'vali
       const fresh = manifests.filter((manifest) => manifest.worldId === worldId && !map.has(chunkKey(manifest.coord)));
       if (!fresh.length) return;
       for (const manifest of fresh) map.set(chunkKey(manifest.coord), manifest);
-      setRevision((value) => value + 1);
+      setRevision((value) => value + 1); setError(undefined); // a retried batch that lands clears the earlier failure
     };
     if (staticManifests || !sessionId) {
       commit(staticManifests ?? previewChunks());
@@ -73,7 +73,7 @@ export function useCity(state: Pick<PublicState, 'sessionId' | 'worldId' | 'vali
     streamer.current = stream;
     setStatus('streaming');
     return () => { live = false; stream.stop(); if (streamer.current === stream) streamer.current = null; };
-  }, [client, sessionId, worldId, staticManifests, validation]);
+  }, [sessionId, worldId, staticManifests, validation]);
 
   // ponytail: the view is rebuilt per commit (≤ a few per second); make it incremental if profiling says so.
   const view = useMemo(() => createWorldView(worldId, seedFromWorldId(worldId), store.current), [worldId, revision]);

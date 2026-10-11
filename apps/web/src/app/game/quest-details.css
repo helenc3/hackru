@@ -19,24 +19,3 @@
   opacity: .25;
   margin: 12px 0;
 }
-
-.mission-clock {
-  font-variant-numeric: tabular-nums;
-  font-size: 30px;
-  font-weight: 800;
-  margin: 20px 0;
-}
-
-.mission-clock > span {
-  display: block;
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--text-muted);
-  margin-top: 6px;
-}
-
-.controls-note {
-  color: var(--text-muted);
-  font-size: 11px;
-  line-height: 1.8;
-}

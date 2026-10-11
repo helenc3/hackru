@@ -1,28 +1,23 @@
 # Stylesheet organization
 
-`styles.css` and `game.css` are ordered import manifests. The application and
-isolated world fixture keep their existing entry imports; do not also import
-the individual feature files from components.
+`styles.css` and `game.css` are ordered import manifests. `main.tsx` and the
+isolated world fixture import `styles.css`; `App.tsx` imports `game.css`. Do
+not also import the individual feature files from components.
 
-The files follow contiguous ranges of the original stylesheets. Their order
-preserves the cascade, including the later HUD and panel layout rules that
-override earlier component presentation. Shared selectors spanning features
-(such as start/result actions and interaction/validation controls) remain
-together. Keep these integration rules in their current ordered location.
+Order matters: later files override earlier ones (HUD and panel layout rules
+override component presentation). Add new rules to the file that owns the
+component and keep the manifests' order.
 
-Global tokens, defaults, shared chrome, buttons, audio, preview, feedback,
-validation, accessibility, and responsive rules live in `styles/`. Shared
-keyframes retain their early position; the reduced-motion policy remains last.
-Game component content lives in `game/`, followed by shell, HUD, panel, and
-validation overlay integration.
+`styles/` holds global tokens, reset, keyframes, shared chrome, buttons, audio,
+the welcome preview, compatibility, validation, skill debrief, and responsive
+rules; the reduced-motion policy stays last. `game/` holds game component
+content followed by shell, HUD, panel-overlay and validation-overlay
+integration; `mission-results.css` overrides `panel-overlays.css` and
+`forms-start.css`, and `quest-cards.css` comes after it.
 
-`../world/world.css` and `../audio/live.css` remain component-owned entries.
-The world fixture intentionally does not load game or live-dialogue styles.
+Component-owned entries imported directly by their components:
+`../world/world.css`, `../audio/live.css`, `../dictionary/dictionary.css`,
+`../dictionary/lookup.css`, `../city/gallery/gallery.css`. The world fixture
+intentionally loads none of the game or live-dialogue styles.
 
-The current UI uses native controls rather than Radix. There are no Radix
-override files, duplicate conversation blocks, or intro breakpoints to migrate
-from the older refactor proposal. This refactor preserves existing selectors,
-values, animations, breakpoint membership, and import sites without adding a
-CSS framework or changing component classes.
-
-`game/mission-results.css` (welcome preview overlay, intro columns, mission results review, conversation card) is imported last in `game.css` on purpose: it overrides `panel-overlays.css` and `forms-start.css` and must stay at the end of the manifest.
+Native controls only; there is no Radix or CSS framework.

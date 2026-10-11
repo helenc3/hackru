@@ -12,6 +12,28 @@ const context = (boost = 1): QuestContextSnapshot => ({ missionId: 'Q1', weights
 const worlds = ['w-alpha', 'w-beta', 'w-gamma', 'w-delta'];
 
 describe('seeded fallback chunks', () => {
+  it('fills spawn neighbourhoods with dense buildings while preserving valid pedestrian access', () => {
+    let buildings = 0, footprintArea = 0;
+    for (const worldId of worlds) {
+      const seed = seedFromWorldId(worldId);
+      for (let cx = -1; cx <= 1; cx++) for (let cz = -1; cz <= 1; cz++) {
+        const coord = { cx, cz }, plan = planChunk(seed, coord);
+        const manifest = generateFallbackChunk(worldId, seed, coord, context(), plan);
+        expect(validateManifest(manifest, plan)).toEqual({ ok: true });
+        for (const placement of manifest.placements.filter((p) => p.assetId.startsWith('bld.'))) {
+          const entry = catalogEntry(placement.assetId)!;
+          const { w, d } = entry.footprint(resolveParams(entry, placement.params));
+          buildings++;
+          footprintArea += w * d;
+        }
+      }
+    }
+    // The previous sparse layout averaged 7 buildings and 369 m² per chunk.
+    // Count and coverage together prevent tiny decorative shells satisfying density.
+    expect(buildings / 36).toBeGreaterThan(9);
+    expect(footprintArea / 36).toBeGreaterThan(450);
+  });
+
   it('gives 老王 a visible serving stand in the reported world', () => {
     const worldId = 'wacdf281718b44f01', seed = seedFromWorldId(worldId);
     expect(seed).toBe('1ac08beb7e09dee1');

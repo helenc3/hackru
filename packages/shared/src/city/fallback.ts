@@ -419,6 +419,11 @@ export function generateFallbackChunk(worldId: string, seed: string, coord: Chun
         const useMetro: boolean = !metro && frontageExtras.length > 0 && rng() < 0.08;
         const entry = useMetro ? frontageExtras[0]! : pick(kit)!;
         const params = randomParams(entry);
+        // More individual shopfronts per block, while retaining larger landmark shells.
+        const width = entry.params.width;
+        if (/^bld\.(shop\.twostory|restaurant\.noodle)$/.test(entry.id) && width?.type === 'number') {
+          params.width = Math.min(params.width as number, width.min + 1.5);
+        }
         // Fit variable footprints to the remaining lot before rejecting the candidate.
         // Random full-size widths/depths otherwise leave narrow outer-city lots empty.
         for (const [key, available] of [['width', end - cursor], ['depth', depth]] as const) {
@@ -442,8 +447,8 @@ export function generateFallbackChunk(worldId: string, seed: string, coord: Chun
       }
       if (!placed) cursor += 1;
     }
-    // Interior behind the street row: courtyards, trees, quieter residential blocks.
-    const inner = innerRect(lot.rect, face, deepest + 1);
+    // Leave a pedestrian lane behind the street row before filling the block interior.
+    const inner = innerRect(lot.rect, face, deepest + 2);
     if (inner) interiorFill(inner, face);
   }
 
@@ -458,17 +463,22 @@ export function generateFallbackChunk(worldId: string, seed: string, coord: Chun
     arrangeFeatures(rect, entries((e) => e.id === 'st.bench' || e.id === 'st.lamp.lantern-post'), 3, 's');
   }
   function interiorFill(rect: Rect, face: Face) {
-    // Fill block interiors with aligned rows; greenery belongs to parks and sidewalk slots.
-    for (let z = rect.minZ + 4; z < rect.maxZ - 3; z += 9) {
-      for (let x = rect.minX + 3; x < rect.maxX - 2; x += 6) {
-        for (const entry of kit.filter((e) => /shop.twostory|restaurant.noodle/.test(e.id))) {
+    // Work in frontage coordinates so east/west rows fit just as well as north/south.
+    const horizontal = FACE[face].dz !== 0;
+    const [start, end] = horizontal ? [rect.minX, rect.maxX] : [rect.minZ, rect.maxZ];
+    const depth = horizontal ? rect.maxZ - rect.minZ : rect.maxX - rect.minX;
+    const front = frontLine(rect, face);
+    const compact = buildings.filter((e) => /shop.twostory|restaurant.noodle/.test(e.id));
+    for (let row = 0; row + 7 <= depth; row += 10) {
+      for (let along = start; along + 4 <= end; along += 4.5) {
+        for (const entry of compact) {
           const params = randomParams(entry, { width: 4 });
           const valid = resolved(entry, params);
           if (!valid) continue;
-          const f = entry.footprint(valid);
-          const [w, d] = FACE[face].dz !== 0 ? [f.w, f.d] : [f.d, f.w];
-          if (x - w / 2 < rect.minX || x + w / 2 > rect.maxX || z - d / 2 < rect.minZ || z + d / 2 > rect.maxZ) continue;
-          if (place(entry, params, x, z, FACE[face].rot)) break;
+          const { w, d } = entry.footprint(valid);
+          if (along + w > end || row + d > depth) continue;
+          const c = behind(face, front, along + w / 2, row + d / 2);
+          if (place(entry, params, c.x, c.z, FACE[face].rot)) break;
         }
       }
     }

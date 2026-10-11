@@ -1,7 +1,7 @@
 import { useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { Group, Vector3 } from 'three';
-import type { Position, PublicState } from '@vibequest/shared';
+import { Group, Vector3, Vector2, Raycaster, Plane } from 'three';
+import { sceneManifest, type Position, type PublicState } from '@vibequest/shared';
 import { distance, movePlayer, zoneAt } from './navigation';
 import { Player, type Gait } from './characters';
 import { initialPosition, type Runtime } from './runtime';
@@ -21,23 +21,37 @@ export function Motion({ runtime, root, labels, state, tick, sync }: {
   const gait = useRef<Gait>({ moving: false, speed: 0 });
   const clock = useRef({ ui: 0, frames: 0, elapsed: 0, wasMoving: false });
   const projected = useRef(new Vector3());
-  useFrame(({ camera, size }, delta) => {
+  const ray = useRef(new Raycaster());
+  const ground = useRef(new Plane(new Vector3(0, 1, 0), 0));
+  useFrame(({ camera, size, gl }, delta) => {
     const r = runtime.current;
-    const k = r.keys;
     const blocked = !r.active || r.busy || state.status !== 'active' || document.activeElement !== root.current || document.hidden;
-    const right = blocked ? 0 : Number(k.has('KeyD') || k.has('ArrowRight')) - Number(k.has('KeyA') || k.has('ArrowLeft'));
-    const forward = blocked ? 0 : Number(k.has('KeyW') || k.has('ArrowUp')) - Number(k.has('KeyS') || k.has('ArrowDown'));
-    const moving = Boolean(right || forward);
+    r.groundPoint = (x, y) => {
+      const bounds = gl.domElement.getBoundingClientRect();
+      ray.current.setFromCamera(new Vector2((x - bounds.left) / bounds.width * 2 - 1, 1 - (y - bounds.top) / bounds.height * 2), camera);
+      const point = ray.current.ray.intersectPlane(ground.current, new Vector3());
+      return point ? { x: point.x, z: point.z } : null;
+    };
+    if (blocked) r.path = [];
+    const waypoint = r.path?.[0];
+    const moving = Boolean(waypoint);
     const previous = r.position;
-    r.position = movePlayer(r.position, right, forward, r.yaw, delta);
+    if (waypoint) {
+      const remaining = distance(r.position, waypoint);
+      const seconds = Math.min(delta, remaining / sceneManifest.movementSpeed);
+      r.position = movePlayer(r.position, waypoint.x - r.position.x, r.position.z - waypoint.z, 0, seconds);
+      if (distance(r.position, waypoint) < .01) r.path?.shift();
+      else if (distance(previous, r.position) < .0001) r.path = [];
+    }
     if (avatar.current) {
       avatar.current.position.set(r.position.x, 0, r.position.z);
       if (distance(previous, r.position) > .0001) avatar.current.rotation.y = Math.atan2(r.position.x - previous.x, r.position.z - previous.z);
     }
     gait.current.moving = moving;
     gait.current.speed = Math.min(distance(previous, r.position) / Math.max(delta, 1e-4), 4.5);
-    // Fixed elevated pitch keeps the capsule visible; yaw is the only orbit axis.
-    camera.position.set(r.position.x + Math.sin(r.yaw) * 9, 8.5, r.position.z + Math.cos(r.yaw) * 9);
+    const pitch = r.pitch ?? Math.atan2(7.8, 9);
+    const orbit = Math.hypot(7.8, 9);
+    camera.position.set(r.position.x + Math.sin(r.yaw) * orbit * Math.cos(pitch), .7 + orbit * Math.sin(pitch), r.position.z + Math.cos(r.yaw) * orbit * Math.cos(pitch));
     camera.lookAt(r.position.x, .7, r.position.z);
     camera.updateMatrixWorld();
     landmarks.forEach((mark, i) => {

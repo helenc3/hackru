@@ -58,3 +58,34 @@ export function targetAction(target: PublicState['interactables'][number]): Game
   }
   return null;
 }
+
+/** Route through a half-meter grid using collision-safe segments. */
+export function walkingPath(start: Position, destination: Position): Position[] {
+  const b = sceneManifest.bounds, radius = sceneManifest.playerRadius, step = .5;
+  const valid = (p: Position) => p.x >= b.minX + radius && p.x <= b.maxX - radius && p.z >= b.minZ + radius && p.z <= b.maxZ - radius && !collides(p);
+  const clear = (a: Position, end: Position) => {
+    const count = Math.max(1, Math.ceil(distance(a, end) / (radius / 2)));
+    for (let i = 1; i <= count; i++) if (!valid({ x: a.x + (end.x - a.x) * i / count, z: a.z + (end.z - a.z) * i / count })) return false;
+    return true;
+  };
+  if (!valid(destination)) return [];
+  if (clear(start, destination)) return [destination];
+  const queue = [start], parents = [-1], seen = new Set(['0,0']);
+  for (let i = 0; i < queue.length; i++) {
+    const here = queue[i];
+    if (distance(here, destination) <= step * 1.5 && clear(here, destination)) {
+      const path = [destination];
+      for (let j = i; j > 0; j = parents[j]) path.unshift(queue[j]);
+      return path;
+    }
+    for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const next = { x: here.x + dx * step, z: here.z + dz * step };
+      const key = `${Math.round((next.x - start.x) / step)},${Math.round((next.z - start.z) / step)}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      if (!clear(here, next)) continue;
+      queue.push(next); parents.push(i);
+    }
+  }
+  return [];
+}

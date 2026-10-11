@@ -1,8 +1,11 @@
-﻿import { Component, useEffect, useRef, useState, type ReactNode } from 'react';
+﻿import { Component, memo, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { Group, Vector3 } from 'three';
 import { sceneManifest, type Position, type PublicState, type RendererProps } from '@vibequest/shared';
 import { distance, movePlayer, nearbyTargets, targetAction, zoneAt } from './navigation';
+import { candy, INK, Toon, useReducedMotion } from './toon';
+import { Player, Npc, type Gait } from './characters';
+import { Cafe, Cue, Ground, Kiosk, LanternString, Petals, Platforms, Sign, Sky, Trees, Twinkles } from './decor';
 import './world.css';
 
 const landmarks = [
@@ -47,37 +50,47 @@ function initialPosition(state: PublicState): Position {
   return { ...(state.zoneId === 'plaza' ? sceneManifest.spawn : sceneManifest.zones.find((zone) => zone.id === state.zoneId)?.center ?? sceneManifest.spawn) };
 }
 
-function Shape({ x, z, width, depth, height, color }: { x: number; z: number; width: number; depth: number; height: number; color: string }) {
-  return <mesh position={[x, height / 2, z]}><boxGeometry args={[width, height, depth]} /><meshStandardMaterial color={color} /></mesh>;
+function Shape({ x, z, width, depth, height, color, outline = true, thickness }: { x: number; z: number; width: number; depth: number; height: number; color: string; outline?: boolean; thickness?: number }) {
+  return <mesh position={[x, height / 2, z]}><boxGeometry args={[width, height, depth]} /><Toon color={color} outline={outline} thickness={thickness} /></mesh>;
 }
 
-function District({ targets }: { targets: PublicState['interactables'] }) {
+const colliderColor = (id: string) => (id.startsWith('cafe') ? candy.coral : id.startsWith('kiosk') ? candy.lemon : candy.teal);
+
+/** Static scene. Memoized: targets and the runtime ref are stable between position ticks. */
+const District = memo(function District({ targets, runtime }: { targets: PublicState['interactables']; runtime: React.RefObject<Runtime> }) {
+  const still = useReducedMotion();
   return <>
-    <color attach="background" args={['#dce9de']} />
-    <ambientLight intensity={1.8} />
-    <directionalLight position={[12, 24, 14]} intensity={2.1} />
-    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.03, 0]}><planeGeometry args={[40, 40]} /><meshStandardMaterial color="#b9ccb3" /></mesh>
-    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0, 0]}><planeGeometry args={[30, 36]} /><meshStandardMaterial color="#e8dfc5" /></mesh>
-    {sceneManifest.colliders.map(({ id, bounds: b }) => <Shape key={id} x={(b.minX + b.maxX) / 2} z={(b.minZ + b.maxZ) / 2} width={b.maxX - b.minX} depth={b.maxZ - b.minZ} height={id.startsWith('platform') ? 1 : 2.4} color={id.startsWith('cafe') ? '#c27d59' : '#426658'} />)}
+    <color attach="background" args={[candy.peach]} />
+    <fog attach="fog" args={['#ffd9c2', 38, 80]} />
+    <Sky />
+    {/* Toon rim approximation: warm key, cool lavender fill on shadow sides, soft sky/ground bounce. */}
+    <ambientLight intensity={.3} />
+    <hemisphereLight args={[candy.lavender, candy.peach, .65]} />
+    <directionalLight position={[12, 24, 14]} intensity={2.4} color="#fff1dc" />
+    <directionalLight position={[-14, 10, -10]} intensity={.55} color={candy.lavender} />
+    <Ground />
+    {sceneManifest.colliders.map(({ id, bounds: b }) => <Shape key={id} x={(b.minX + b.maxX) / 2} z={(b.minZ + b.maxZ) / 2} width={b.maxX - b.minX} depth={b.maxZ - b.minZ} height={id.startsWith('platform') ? 1 : 2.4} color={colliderColor(id)} thickness={3} />)}
     {/* Flat slabs mark walkable areas; only frozen colliders are solid. */}
-    <Shape x={-10} z={5} width={8} depth={6} height={0.045} color="#e6b28b" />
-    <Shape x={8} z={5} width={6} depth={4} height={0.04} color="#e5cc85" />
-    <Shape x={0} z={-2.5} width={30} depth={10} height={0.03} color="#91b5a9" />
+    <Shape x={-10} z={5} width={8} depth={6} height={0.045} color={candy.paving} thickness={1.6} />
+    <Shape x={8} z={5} width={6} depth={4} height={0.04} color="#ffe39a" thickness={1.6} />
+    <Shape x={0} z={-2.5} width={30} depth={10} height={0.03} color={candy.mint} thickness={1.6} />
     {[-10, 0, 10].map((x) => <group key={x}>
-      <Shape x={x} z={-12} width={7} depth={8} height={0.05} color="#6b9585" />
-      <Shape x={x} z={-17.8} width={7} depth={0.4} height={0.07} color="#d7bd6f" />
-      <Shape x={x} z={-18.8} width={7} depth={0.1} height={0.07} color="#4a6258" />
+      <Shape x={x} z={-12} width={7} depth={8} height={0.05} color="#a9c9bf" thickness={1.6} />
+      <Shape x={x} z={-17.8} width={7} depth={0.4} height={0.07} color={candy.lemon} outline={false} />
+      <Shape x={x} z={-18.8} width={7} depth={0.1} height={0.07} color={INK} outline={false} />
     </group>)}
-    {targets.filter((target) => target.kind === 'npc').map((target) => <group key={target.id} position={[target.position.x, 0, target.position.z]}>
-      <mesh position={[0, .7, 0]}><capsuleGeometry args={[.27, .65, 4, 8]} /><meshStandardMaterial color="#396d67" /></mesh>
-      <mesh position={[0, 1.4, 0]}><sphereGeometry args={[.24, 8, 8]} /><meshStandardMaterial color="#eed2ad" /></mesh>
+    <Cafe player={runtime} still={still} />
+    <Kiosk player={runtime} still={still} />
+    <Platforms player={runtime} />
+    <LanternString still={still} />
+    <Trees still={still} />
+    {targets.filter((target) => target.kind === 'npc').map((target, index) => <group key={target.id} position={[target.position.x, 0, target.position.z]}>
+      <Npc id={target.id} index={index} look={runtime} offset={target.position} />
     </group>)}
-    {targets.filter((target) => target.kind === 'sign' || target.kind === 'pa').map((target) => <group key={target.id} position={[target.position.x, 0, target.position.z]}>
-      <mesh position={[.6, .7, 0]}><boxGeometry args={[.08, 1.4, .08]} /><meshStandardMaterial color="#405c4a" /></mesh>
-      <mesh position={[.6, 1.4, 0]}><boxGeometry args={[target.kind === 'sign' ? 1 : .35, .6, .1]} /><meshStandardMaterial color="#efcb7f" /></mesh>
-    </group>)}
+    {targets.filter((target) => target.kind === 'sign' || target.kind === 'pa').map((target, i) => <Sign key={target.id} target={target} phase={i * 1.9} still={still} />)}
+    {!still && <><Petals /><Twinkles /></>}
   </>;
-}
+});
 
 function Motion({ runtime, root, labels, state, tick, sync }: {
   runtime: React.RefObject<Runtime>; root: React.RefObject<HTMLElement | null>;
@@ -85,6 +98,7 @@ function Motion({ runtime, root, labels, state, tick, sync }: {
   tick: (position: Position) => void; sync: (position: Position) => void;
 }) {
   const avatar = useRef<Group>(null);
+  const gait = useRef<Gait>({ moving: false, speed: 0 });
   const clock = useRef({ ui: 0, frames: 0, elapsed: 0, wasMoving: false });
   const projected = useRef(new Vector3());
   useFrame(({ camera, size }, delta) => {
@@ -100,6 +114,8 @@ function Motion({ runtime, root, labels, state, tick, sync }: {
       avatar.current.position.set(r.position.x, 0, r.position.z);
       if (distance(previous, r.position) > .0001) avatar.current.rotation.y = Math.atan2(r.position.x - previous.x, r.position.z - previous.z);
     }
+    gait.current.moving = moving;
+    gait.current.speed = Math.min(distance(previous, r.position) / Math.max(delta, 1e-4), 4.5);
     // Fixed elevated pitch keeps the capsule visible; yaw is the only orbit axis.
     camera.position.set(r.position.x + Math.sin(r.yaw) * 9, 8.5, r.position.z + Math.cos(r.yaw) * 9);
     camera.lookAt(r.position.x, .7, r.position.z);
@@ -132,9 +148,7 @@ function Motion({ runtime, root, labels, state, tick, sync }: {
     c.wasMoving = moving;
   });
   return <group ref={avatar} position={[runtime.current.position.x, 0, runtime.current.position.z]}>
-    <mesh position={[0, .72, 0]}><capsuleGeometry args={[sceneManifest.playerRadius, .7, 4, 10]} /><meshStandardMaterial color="#e78348" /></mesh>
-    <mesh position={[0, 1.48, 0]}><sphereGeometry args={[.27, 10, 8]} /><meshStandardMaterial color="#f3d4af" /></mesh>
-    <mesh position={[0, 1.35, .26]}><boxGeometry args={[.14, .1, .12]} /><meshStandardMaterial color="#4c4639" /></mesh>
+    <Player gait={gait} />
   </group>;
 }
 
@@ -233,9 +247,9 @@ export function WorldRenderer({ state, onAction, onTalk }: RendererProps) {
     onPointerMove={(event) => { if (drag.current) { runtime.current.yaw -= (event.clientX - drag.current.x) * .006; drag.current.x = event.clientX; } }}
     onPointerUp={(event) => { drag.current = null; if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId); }}
     onPointerCancel={() => { drag.current = null; }}>
-    {hasWebGl ? <CanvasBoundary onFailure={() => { runtime.current.keys.clear(); runtime.current.active = false; setHasWebGl(false); }}><Canvas dpr={[1, 1.5]} camera={{ position: [0, 8.5, 19], fov: 52, near: .1, far: 85 }} gl={{ antialias: false, powerPreference: 'high-performance' }}
+    {hasWebGl ? <CanvasBoundary onFailure={() => { runtime.current.keys.clear(); runtime.current.active = false; setHasWebGl(false); }}><Canvas dpr={[1, 1.5]} camera={{ position: [0, 8.5, 19], fov: 52, near: .1, far: 85 }} gl={{ antialias: true, powerPreference: 'high-performance' }}
       onCreated={({ gl }) => { gl.domElement.addEventListener('webglcontextlost', (event) => { event.preventDefault(); runtime.current.keys.clear(); runtime.current.active = false; setHasWebGl(false); }, { once: true }); }} fallback={<CompatibilityRecovery />}>
-      <District targets={state.interactables} /><Motion runtime={runtime} root={root} labels={labels} state={state} tick={setPosition} sync={sync} />
+      <District targets={state.interactables} runtime={runtime} /><Cue at={nearby[0]?.position} /><Motion runtime={runtime} root={root} labels={labels} state={state} tick={setPosition} sync={sync} />
     </Canvas></CanvasBoundary> : <CompatibilityRecovery />}
     {hasWebGl && <>
       <div className="district-labels" aria-hidden="true">{landmarks.map((mark, i) => <span key={mark.label} ref={(node) => { labels.current[i] = node; }} className="district-landmark" lang="zh-Hans">{mark.label}</span>)}</div>

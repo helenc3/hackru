@@ -145,6 +145,9 @@ export function createGameRouter(services: ServerServices): Router {
 
   async function evaluate(body: TurnRequest, pending: PendingRequest, context: TurnContext, fixture: boolean): Promise<void> {
     let timeout: ReturnType<typeof setTimeout> | undefined;
+    const startedMs = Date.now();
+    // §11 turn log: no keys, player audio or provider bodies.
+    const log = (outcome: string, detail: string) => console.info(JSON.stringify({ turnId: body.turnId, elapsedMs: Date.now() - startedMs, provider: fixture ? 'fixture' : `gemini:${services.config.geminiModel}`, outcome, detail }));
     try {
       const provider = fixture ? fixtureDialogue : services.dialogueProvider;
       const raw = await Promise.race([provider.evaluate(context, body.input.text), new Promise<never>((_resolve, reject) => { timeout = setTimeout(() => reject(new Error('Provider timeout')), 8_000); })]);
@@ -163,8 +166,10 @@ export function createGameRouter(services: ServerServices): Router {
         session.pendingRequests.delete(body.turnId);
         session.completedRequests.set(body.turnId, { payload: pending.payload, response: outcome });
         pending.resolve(outcome);
+        log('committed', `${evaluation.intent}/${evaluation.interaction} → ${engine.events.map((event) => event.kind).join(',') || 'no transition'}`);
       });
-    } catch {
+    } catch (error) {
+      log('failed', error instanceof HttpError || error instanceof EngineRuleError ? `${error.code}: ${error.message}`.slice(0, 160) : error instanceof Error ? error.message.slice(0, 160) : 'unknown');
       await store.withSession(contextSessionId(), async (session) => {
         if (session.state.attemptId !== pending.attemptId || session.pendingRequests.get(body.turnId) !== pending) return;
         sync(session, Date.now());

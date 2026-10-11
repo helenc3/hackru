@@ -124,11 +124,13 @@ function cueDelivered(state: InternalState, cueId: string, events: EngineResult[
 function decisionEvidence(state: InternalState, correct: boolean): void {
   const cueId = state.missionId === 'P2' ? 'p2.platform-change' : 'b1.harbor-change';
   const record = [...state.cuePlaybacks].reverse().find((entry) => entry.cueId === cueId && entry.delivered);
-  evidence(state, 'listening', correct ? 1 : 0, cueId, !record || record.listeningAssisted || state.cuePlaybacks.some((entry) => entry.cueId === cueId && entry.listeningAssisted) || Boolean(state.flags['session.assisted']));
+  const assisted = !record || record.listeningAssisted || state.cuePlaybacks.some((entry) => entry.cueId === cueId && entry.listeningAssisted) || Boolean(state.flags['session.assisted']);
+  evidence(state, 'listening', correct ? 1 : 0, cueId, assisted);
   if (correct && state.flags['p2.wrong-platform']) {
-    evidence(state, 'repair', 0.5, 'p2.platform-change', Boolean(state.flags['session.assisted']));
+    // A repair made after subtitle-assisted PA is not independent: no mastery, no +20 milestone.
+    evidence(state, 'repair', 0.5, 'p2.platform-change', assisted);
     const rewardId = 'p2.independent-repair';
-    if (!state.validationMode && !state.flags['session.assisted'] && !state.awardedRewardIds.includes(rewardId)) { state.xp += 20; state.awardedRewardIds.push(rewardId); }
+    if (!state.validationMode && !assisted && !state.awardedRewardIds.includes(rewardId)) { state.xp += 20; state.awardedRewardIds.push(rewardId); }
   }
 }
 

@@ -39,6 +39,20 @@ test('production world, sign, voice slot, typed accessibility and practice feedb
   expect(turn.input.source).toBe('typed');
 });
 
+test('Pause & Learn reopens the latest practice feedback after the conversation closes', async ({ page }) => {
+  const api = await installScriptedApi(page, { steps: [{ text: '我要水。', reply: '好的。', feedback: true }] });
+  await start(page); const panel = await typedPanel(page);
+  await panel.getByRole('textbox').fill('我要水。'); await panel.getByRole('button', { name: 'Send Mandarin' }).click();
+  await expect(panel.getByTestId('npc-reply')).toContainText('好的。');
+  await panel.getByRole('button', { name: 'Close conversation' }).click();
+  await expect(page.getByTestId('coach-panel')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Pause & Learn' }).click();
+  await expect(page.getByTestId('coach-panel')).toContainText('Your request was understood.');
+  await page.getByRole('button', { name: 'Resume practice' }).click();
+  await expect(page.getByTestId('coach-panel')).toHaveCount(0);
+  expect(api.failures).toEqual([]);
+});
+
 test('Chinese IME Enter waits for composition to finish and the focused panel contains movement keys', async ({ page }) => {
   const api = await installScriptedApi(page, { steps: [{ text: '我要水。', reply: '好的。', feedback: true }] });
   await start(page); const panel = await typedPanel(page);

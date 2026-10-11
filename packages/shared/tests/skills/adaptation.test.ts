@@ -44,7 +44,9 @@ describe('evidence-based adaptation', () => {
   it('uses the mean of multiple independent units within one track', () => {
     const state = fresh();
     state.evidence = [unit(state, 'conversation', 1, { turnId: 'one' }), unit(state, 'conversation', 0, { turnId: 'two', id: 'two' })];
-    expect(finish(state).skills.conversation).toEqual({ mastery: 0.42500000000000004, independentCount: 2 });
+    const result = finish(state);
+    expect(result.skills.conversation).toEqual({ mastery: 0.42500000000000004, independentCount: 2 });
+    expect(result.debrief!.nextPracticeMissionId).toBe('P1'); // weakest track picks the targeted replay
   });
   it('keeps assisted, subtitle and validation successes separate from mastery and listening evidence', () => {
     for (const validationMode of [false, true]) {

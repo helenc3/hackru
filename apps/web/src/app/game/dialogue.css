@@ -149,3 +149,7 @@
   width: auto;
   flex-shrink: 0;
 }
+
+/* Patience cue: impatience shows as colour, never a number. */
+.mood-label[data-mood='terse'] { color: var(--coral, #d9543f); }
+.mood-label[data-mood='disengaged'] { color: var(--raspberry, #d94f6b); font-weight: 700; }

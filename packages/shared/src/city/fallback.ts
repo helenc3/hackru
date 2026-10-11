@@ -61,7 +61,7 @@ export function generateFallbackChunk(worldId: string, seed: string, coord: Chun
   const approved = (entry: CatalogEntry | undefined): entry is CatalogEntry => Boolean(entry && entry.review === 'approved');
   const entries = (filter: (entry: CatalogEntry) => boolean) => CATALOG.filter((entry) => approved(entry) && filter(entry));
   /** Names other than the quest givers, so 老王 and 小李 stay unique. */
-  const extraNames = () => Object.keys(TEXT_CATALOG['npc-name']).filter((k) => !QUEST_GIVERS.includes(k));
+  const extraNames = () => Object.keys(TEXT_CATALOG['npc-name']).filter((k) => !QUEST_GIVERS.includes(k) && k !== 'xiaolin'); // 小林 was the old spawn vendor; avoid confusing reuse
 
   if (cx === 0 && cz === 0) { const s = worldLayout(seed).spawn; keep.push(square(s.x, s.z, 1.5)); }
 
@@ -221,7 +221,8 @@ export function generateFallbackChunk(worldId: string, seed: string, coord: Chun
     if (!dir) { const { face } = frontage(standX, standZ); dir = { dx: -FACE[face].dx, dz: -FACE[face].dz }; }
     const fx = standX + dir.dx * 1.2, fz = standZ + dir.dz * 1.2;
     const facing: Face = dir.dx > 0 ? 'w' : dir.dx < 0 ? 'e' : dir.dz > 0 ? 'n' : 's';
-    const figures = entries((e) => e.capabilities.includes(capability) && e.placement !== 'socket');
+    // People only: the info board also grants direction-helper but is a prop, not someone to talk to.
+    const figures = entries((e) => e.capabilities.includes(capability) && e.placement !== 'socket' && e.id.startsWith('an.npc.'));
     for (const entry of figures) {
       const nameKey = fixedName ?? pick(extraNames())!;
       const placementId = place(entry, randomParams(entry, 'nameKey' in entry.params ? { nameKey } : {}), fx, fz, FACE[facing].rot, { onRoad: true, required });

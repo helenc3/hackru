@@ -73,17 +73,24 @@ test('Chinese IME Enter waits for composition to finish and the focused panel co
 test('turns carry the NPC role and anchor; the server-enabled Pay button completes Q1', async ({ page }) => {
   const pay = { kind: 'pay' as const, anchorId: 'ui.vendor', drink: 'water' as const, priceCny: 5 };
   const api = await installScriptedApi(page, { steps: [
-    { text: '我要水。', reply: '好的，一杯水，五元。', patch: { npcActions: [{ anchorId: 'ui.vendor', action: pay }] } },
+    { text: '我要水。', reply: '好嘞，水五块。', patch: { npcActions: [{ anchorId: 'ui.vendor', action: pay }] } },
     { action: { type: 'choose', choiceId: 'q1.pay', anchorId: 'ui.vendor' }, patch: { status: 'cleared', inventory: { hint: 1, cny: 15, drinks: ['water'] }, npcActions: [], completedMissionIds: ['Q1'], objectives: [{ id: 'q1.goal', label: 'Buy a drink from 老王 (Lao Wang).', complete: true }] }, event: 'Paid ¥5 for water.' },
   ] });
   await start(page); const panel = await typedPanel(page);
   await expect(page.getByTestId('wallet')).toContainText('¥20');
   await expect(panel.getByTestId('pay-button')).toHaveCount(0); // no Pay until the vendor has priced a drink
   await panel.getByRole('textbox').fill('我要水。'); await panel.getByRole('button', { name: 'Send Mandarin' }).click();
-  await expect(panel.getByTestId('npc-reply')).toContainText('五元');
+  await expect(panel.getByTestId('npc-reply')).toContainText('五块');
   const turn = api.requests.find((request) => request.path.endsWith('/turns'))?.body as { npcId: string; anchorId: string };
   expect(turn).toMatchObject({ npcId: 'vendor', anchorId: 'ui.vendor' });
   await expect(panel.getByTestId('pay-button')).toHaveText(/Pay ¥5 for 水 water/);
+  // The talking is over: no text box or voice controls, only the button finishes the task.
+  await expect(panel.getByRole('textbox')).toHaveCount(0);
+  await expect(panel.getByRole('button', { name: 'Use voice' })).toHaveCount(0);
+  await expect(panel.getByTestId('goal-hint')).toHaveText('Click to finish.');
+  await panel.getByRole('button', { name: 'Close conversation' }).click();
+  await page.getByRole('button', { name: '老王 · Talk', exact: true }).click(); // reopening keeps the button
+  await expect(panel.getByTestId('pay-button')).toBeVisible();
   await panel.getByTestId('pay-button').click();
   await expect(page.getByTestId('wallet')).toContainText('¥15');
   await expect(page.getByTestId('drinks')).toContainText('水');
@@ -93,12 +100,13 @@ test('turns carry the NPC role and anchor; the server-enabled Pay button complet
 
 test('Pay is disabled when money is short', async ({ page }) => {
   const pay = { kind: 'pay' as const, anchorId: 'ui.vendor', drink: 'tea' as const, priceCny: 10 };
-  const api = await installScriptedApi(page, { steps: [{ text: '我要茶。', reply: '好的，一杯茶，十元。', patch: { npcActions: [{ anchorId: 'ui.vendor', action: pay }] } }] });
+  const api = await installScriptedApi(page, { steps: [{ text: '我要茶。', reply: '好嘞，茶十块。', patch: { npcActions: [{ anchorId: 'ui.vendor', action: pay }] } }] });
   api.patch({ inventory: { hint: 1, cny: 5, drinks: [] } });
   await start(page); const panel = await typedPanel(page);
   await panel.getByRole('textbox').fill('我要茶。'); await panel.getByRole('button', { name: 'Send Mandarin' }).click();
   await expect(panel.getByTestId('pay-button')).toBeDisabled();
   await expect(panel.getByTestId('pay-button')).toContainText('only ¥5 left');
+  await expect(panel.getByRole('textbox')).toBeVisible(); // an unaffordable Pay keeps the conversation open
   expect(api.failures).toEqual([]);
 });
 

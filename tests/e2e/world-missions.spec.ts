@@ -11,6 +11,7 @@ test('Q1: ambiguous requests clarify, repeat purchases spend money but never re-
   const unclear = await h.talk(vendor.id, 'vendor', '嗯……那个');
   expect(unclear.npcReply).toMatch(/[茶水]/); // the clarification names the available drinks
   await h.act({ type: 'choose', choiceId: 'q1.pay', anchorId: vendor.id }, 422); // no drink ordered yet
+  await h.chat(vendor.id, 'vendor'); // 老王 chats a little before he names a price
   await h.talk(vendor.id, 'vendor', '我要水。');
   await h.act({ type: 'choose', choiceId: 'q1.pay', anchorId: vendor.id });
   expect(h.state).toMatchObject({ status: 'cleared', inventory: { cny: 15, drinks: ['water'] } });
@@ -18,12 +19,16 @@ test('Q1: ambiguous requests clarify, repeat purchases spend money but never re-
 
   for (const [drink, cny] of [['茶', 5], ['水', 0]] as const) {
     await h.act({ type: 'startMission', missionId: 'Q1' }); // play again
+    await h.talk(vendor.id, 'vendor', '你好！'); // each attempt is a fresh conversation
+    await h.chat(vendor.id, 'vendor');
     await h.talk(vendor.id, 'vendor', `我要${drink}。`);
     await h.act({ type: 'choose', choiceId: 'q1.pay', anchorId: vendor.id });
     expect(h.state.inventory.cny).toBe(cny);
     expect({ xp: h.state.xp, badges: h.state.badges }).toEqual(rewarded);
   }
   await h.act({ type: 'startMission', missionId: 'Q1' });
+  await h.talk(vendor.id, 'vendor', '你好！');
+  await h.chat(vendor.id, 'vendor');
   await h.talk(vendor.id, 'vendor', '我要水。');
   const broke = await h.act({ type: 'choose', choiceId: 'q1.pay', anchorId: vendor.id }, 422);
   expect(broke.error.code).toBe('ACTION_FORBIDDEN');

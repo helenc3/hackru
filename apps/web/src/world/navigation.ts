@@ -1,4 +1,4 @@
-import { CHUNK_SIZE, ChoiceIdSchema, WORLD_RULES, type GameAction, type Position, type PublicState, type WorldView, type ZoneId } from '@vibequest/shared';
+import { CHUNK_SIZE, ChoiceIdSchema, WORLD_RULES, streetPath, type ChunkManifest, type GameAction, type Position, type PublicState, type WorldView, type ZoneId } from '@vibequest/shared';
 
 /** The movement subset of WorldView. Client prediction uses the same committed manifests as server validation. */
 export type Walkable = Pick<WorldView, 'walkable'>;
@@ -77,6 +77,34 @@ export function walkingPath(view: Walkable, start: Position, destination: Positi
       if (!clear(here, next)) continue;
       queue.push(next); parents.push(i);
     }
+  }
+  return [];
+}
+
+/** How far one walking leg reaches along a long route; short enough for walkingPath's grid search. */
+export const LEG_METRES = 18;
+
+/**
+ * The next obstacle-aware leg toward a far goal: follow the street network (committed roads, planner
+ * roads where chunks have not streamed yet) and path-find only the next ≤ LEG_METRES. Callers re-plan
+ * when a leg ends, so legs into newly committed chunks succeed once streaming catches up.
+ */
+export function nextLeg(view: Walkable, seed: string, manifests: ReadonlyMap<string, ChunkManifest>, start: Position, goal: Position): Position[] {
+  if (distance(start, goal) <= LEG_METRES) return walkingPath(view, start, goal);
+  const route = [start, ...(streetPath(seed, manifests, start, goal) ?? []), goal];
+  // Walk the polyline from the start; try the farthest walkable point within one leg, then nearer ones.
+  const samples: Position[] = [];
+  let travelled = 0;
+  for (let i = 1; i < route.length && travelled < LEG_METRES; i++) {
+    const a = route[i - 1]!, b = route[i]!, length = distance(a, b);
+    for (let d = 1; d <= length && travelled + d <= LEG_METRES; d += 1) samples.push({ x: a.x + (b.x - a.x) * d / length, z: a.z + (b.z - a.z) * d / length });
+    travelled += length;
+  }
+  for (const sample of samples.reverse()) {
+    if (distance(sample, start) < 1) break;
+    if (collides(view, sample)) continue;
+    const path = walkingPath(view, start, sample);
+    if (path.length) return path;
   }
   return [];
 }

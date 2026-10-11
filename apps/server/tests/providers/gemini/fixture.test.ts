@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { baselineTurnContext, malformedEvaluation, validateEvaluationForContext } from '@vibequest/shared';
+import { baselineTurnContext, COACHING_PHRASES, malformedEvaluation, NpcIdSchema, validateEvaluationForContext } from '@vibequest/shared';
 import { createFixtureDialogueProvider, loadLanguageExamples } from '../../../src/providers/gemini/fixture.js';
-import { meetsProgressionGate } from '../../../src/providers/gemini/gate.js';
+import { clarificationEvaluation, meetsProgressionGate } from '../../../src/providers/gemini/gate.js';
 
 const examples = loadLanguageExamples();
 const provider = createFixtureDialogueProvider(examples);
@@ -83,5 +83,12 @@ describe('fixture dialogue provider', () => {
   it('rejects a bad fixture file at load time', () => {
     const [first] = examples;
     expect(() => loadLanguageExamples([{ ...first, evaluation: { ...first.evaluation, evidenceQuote: 'not in text' } }])).toThrow();
+  });
+});
+
+describe('in-character reply templates', () => {
+  it('never put a coaching script in an NPC reply', () => {
+    const replies = [...NpcIdSchema.options.map((npcId) => clarificationEvaluation({ ...baselineTurnContext, npcId }).replyZh), ...loadLanguageExamples().map((example) => example.evaluation.replyZh)];
+    for (const reply of replies) for (const phrase of COACHING_PHRASES) expect(reply.toLowerCase(), reply).not.toContain(phrase);
   });
 });

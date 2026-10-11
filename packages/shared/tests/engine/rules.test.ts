@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { applyAction, applyEvaluation, createGame, dialogueContext, isClosingLine, npcActions, projectPublicState, turnActions } from '../../src/engine/index.js';
-import { groundedReplies } from '../../src/content/facts.js';
+import { applyAction, applyEvaluation, createGame, dialogueContext, GOAL_WARMUP_EXCHANGES, isClosingLine, NPC_PATIENCE_LIMIT, npcActions, pendingGoalAction, projectPublicState, turnActions } from '../../src/engine/index.js';
+import { authoredFacts, groundedReplies, impatienceReplies, pacingReplies, smallTalkReplies } from '../../src/content/facts.js';
 import { createFixtureDialogueProvider, parseFixturePrice } from '../../src/engine/fixture-dialogue.js';
 import { missionFor } from '../../src/content/missions.js';
 import { MissionDefinitionSchema, PHOTO_RULES, TurnEvaluationSchema, type InternalState, type MissionId, type NpcId } from '../../src/contracts.js';
@@ -12,6 +12,18 @@ const NOW = 1_000_000;
 function game(missionId: MissionId = 'Q1', position = { x: 0, z: 1 }): InternalState {
   const state = createGame({ sessionId: 'test-session', worldId: 'world-test', attemptId: 'test-attempt', missionId, initialTier: 1, validationMode: false, inputPreference: 'voice', providerStatus: 'fixture', spawn: position }, NOW);
   state.unlockedMissionIds = ['Q1', 'Q2', 'Q3'];
+  // Goal mechanics tests skip the warm-up; the pacing suite below uses unpaced().
+  for (const role of ['vendor', 'guide', 'passerby']) state.flags[`session.warmed-${role}`] = true;
+  return state;
+}
+/** retryMission starts a fresh attempt (the warm-up applies again); mechanics tests skip it. */
+function skipPacing(state: InternalState): InternalState {
+  for (const role of ['vendor', 'guide', 'passerby']) state.flags[`session.warmed-${role}`] = true;
+  return state;
+}
+function unpaced(missionId: MissionId = 'Q1', position = { x: 0, z: 1 }): InternalState {
+  const state = game(missionId, position);
+  for (const role of ['vendor', 'guide', 'passerby']) delete state.flags[`session.warmed-${role}`];
   return state;
 }
 function reserve(state: InternalState, text: string, npcId: NpcId, anchorId: string): InternalState {
@@ -70,22 +82,32 @@ describe('Q1 buy a drink', () => {
   });
   it('rejects insufficient funds without changing state, and repeat purchases never re-grant the reward', async () => {
     let state = act(await orderedTea(game()), { type: 'choose', choiceId: 'q1.pay', anchorId: 'a.vendor' });
-    state = act(state, { type: 'retryMission' });
+    state = skipPacing(act(state, { type: 'retryMission' }));
     state = (await say(state, '我要水')).state;
     state = act(state, { type: 'choose', choiceId: 'q1.pay', anchorId: 'a.vendor' });
     expect(state).toMatchObject({ status: 'cleared', xp: 100, inventory: { cny: 5, drinks: ['tea', 'water'] } });
     expect(state.purchases).toHaveLength(2);
-    const broke = await orderedTea(act(state, { type: 'retryMission' }));
+    const broke = await orderedTea(skipPacing(act(state, { type: 'retryMission' })));
     expect(() => act(broke, { type: 'choose', choiceId: 'q1.pay', anchorId: 'a.vendor' })).toThrow('Not enough money');
     expect(broke.inventory.cny).toBe(5);
     const bye = await say(broke, '谢谢，再见');
     expect(bye.state.status).toBe('active');
     expect(bye.state.inventory.cny).toBe(5);
   });
-  it('a goodbye never pays; it offers End conversation next to Pay', async () => {
-    const bye = await say(await orderedTea(game()), '谢谢，再见');
+  it('once Pay is up the conversation is over: turns are rejected unchanged, only the button finishes', async () => {
+    const ordered = await orderedTea(game());
+    expect(pendingGoalAction(npcActions(ordered), ordered.inventory.cny, 'vendor')?.action).toEqual({ kind: 'pay', anchorId: 'a.vendor', drink: 'tea', priceCny: 10 });
+    const before = structuredClone(ordered);
+    await expect(say(ordered, '谢谢，再见')).rejects.toMatchObject({ code: 'GOAL_ACTION_PENDING' });
+    expect(ordered).toEqual(before); // no state change, no patience exchange counted
+    expect(act(ordered, { type: 'choose', choiceId: 'q1.pay', anchorId: 'a.vendor' })).toMatchObject({ status: 'cleared', inventory: { cny: 10 } });
+  });
+  it('an unaffordable Pay keeps the conversation open', async () => {
+    const poor = game(); poor.inventory.cny = 5;
+    const ordered = await orderedTea(poor);
+    expect(pendingGoalAction(npcActions(ordered), ordered.inventory.cny, 'vendor')).toBeUndefined();
+    const bye = await say(ordered, '谢谢，再见');
     expect(bye.conversationEnded).toBe(true);
-    expect(bye.state).toMatchObject({ status: 'active', inventory: { cny: 20 } });
     expect(turnActions(bye.state, 'a.vendor', true)).toEqual([{ kind: 'pay', anchorId: 'a.vendor', drink: 'tea', priceCny: 10 }, { kind: 'end-conversation' }]);
   });
   it('clarifies ambiguous requests and cancels without progress', async () => {
@@ -96,7 +118,8 @@ describe('Q1 buy a drink', () => {
     expect(result.state.npcState.vendor.history.at(-1)!.text).toBe(groundedReplies.missingDrinkPrice);
     const unclear = await say(state, '我想去月球。');
     expect(unclear.state.nodeId).toBe('q1.buy');
-    const cancelled = await say((await say(state, '我要茶')).state, '我不要了');
+    const short = game(); short.inventory.cny = 5; // an affordable Pay would end the talking; an unaffordable one lets the player cancel
+    const cancelled = await say((await say(short, '我要茶')).state, '我不要了');
     expect(cancelled.state.nodeId).toBe('q1.buy');
     expect(npcActions(cancelled.state)).toEqual([]); // cancelling withdraws the Pay button
     expect(cancelled.reply).toBe(groundedReplies.cancelOrder);
@@ -154,6 +177,7 @@ describe('Q3 photo at the Huangpu River', () => {
     expect(result.state.photo).toMatchObject({ status: 'accepted', passerbyAnchorId: 'a.passerby', viewpointAnchorId: 'a.view', spot });
     expect(result.state.nodeId).toBe('q3.photo');
     expect(turnActions(result.state, 'a.passerby', false)).toEqual([{ kind: 'go-to-photo-spot', spot }]);
+    await expect(say(result.state, '你好', 'passerby', 'a.passerby')).rejects.toMatchObject({ code: 'GOAL_ACTION_PENDING' }); // only the button now
     const projected = projectPublicState(result.state, NOW, fakeWorld);
     expect(projected.interactables.find((entry) => entry.id === 'a.view')).toMatchObject({ kind: 'photo-spot', choiceId: 'q3.start-photo', position: spot });
   });
@@ -177,6 +201,7 @@ describe('Q3 photo at the Huangpu River', () => {
     expect(() => act(moved, { type: 'photoCapture', photoRequestId: photoId, outcome: 'captured', imageDigest: 'abcdef0123456789' }, end)).toThrow('left the photo spot');
     state = act(state, { type: 'photoCapture', photoRequestId: photoId, outcome: 'failed' }, end);
     expect(state.photo).toMatchObject({ status: 'accepted', attempts: 1 });
+    expect(turnActions(state, 'a.passerby', false)).toEqual([{ kind: 'go-to-photo-spot', spot }]); // retry needs no talking
     expect(state.nodeId).toBe('q3.photo');
     state = act(state, { type: 'choose', choiceId: 'q3.start-photo', anchorId: 'a.view' }, end);
     const late = end + PHOTO_RULES.countdownMs + PHOTO_RULES.captureWindowMs + 1;
@@ -235,5 +260,124 @@ describe('content and fixtures', () => {
     expect(bye.conversationEnded).toBe(true);
     const repeated = await say(bye.state, '请再说一遍');
     expect(repeated.conversationEnded).toBeUndefined();
+  });
+});
+
+describe('conversational pacing and small talk', () => {
+  const ask = (state: InternalState) => say(state, '我要水');
+  const chatty = (state: InternalState, npcId: NpcId = 'vendor', anchorId = 'a.vendor') => say(state, '今天天气很好', npcId, anchorId);
+  it('defers goal requests in character before the warm-up; no Pay, no hint, and deferral turns count', async () => {
+    let turn = await ask(unpaced());
+    expect(turn.reply).toBe(pacingReplies.vendor[0]);
+    expect(npcActions(turn.state)).toEqual([]);
+    expect(turn.events.some((event) => event.message.startsWith('Hint:'))).toBe(false);
+    for (let i = 1; i < GOAL_WARMUP_EXCHANGES - 1; i++) {
+      turn = await ask(turn.state);
+      expect(turn.reply).toBe(pacingReplies.vendor[i]);
+      expect(npcActions(turn.state)).toEqual([]);
+    }
+    expect(turn.state.flags['q1.exchanges']).toBe(GOAL_WARMUP_EXCHANGES - 1);
+  });
+  it('delivers a repeated request on the warm-up exchange, and a remembered one on an ordinary turn', async () => {
+    let asked = await ask(unpaced());
+    for (let i = 1; i < GOAL_WARMUP_EXCHANGES - 1; i++) asked = await chatty(asked.state);
+    expect(npcActions(asked.state)).toEqual([]);
+    const repeated = await ask(asked.state);
+    expect(repeated.reply).toBe(groundedReplies.waterPrice);
+    expect(npcActions(repeated.state)[0]!.action).toMatchObject({ kind: 'pay', drink: 'water', priceCny: 5 });
+    const steered = await chatty(asked.state); // the NPC comes back to the remembered order itself
+    expect(steered.reply).toBe(groundedReplies.waterPrice);
+    expect(npcActions(steered.state)[0]!.action).toMatchObject({ kind: 'pay', drink: 'water' });
+  });
+  it('a player who chats through the warm-up gets the goal on the first request', async () => {
+    let chat = await chatty(unpaced());
+    expect(smallTalkReplies.vendor).toContain(chat.reply);
+    expect(chat.events.some((event) => event.message.startsWith('Hint:'))).toBe(false);
+    for (let i = 1; i < GOAL_WARMUP_EXCHANGES - 1; i++) chat = await chatty(chat.state);
+    expect((await say(chat.state, '我要茶')).reply).toBe(groundedReplies.teaPrice);
+  });
+  it('focused players reach every goal before the impatience lines; the guide and passer-by defer too', async () => {
+    let guide = await say(unpaced('Q2', { x: 5, z: 1 }), '请问，去上海大酒店怎么走？', 'guide', 'a.guide');
+    expect(guide).toMatchObject({ reply: pacingReplies.guide[0] });
+    while (guide.state.status === 'active') guide = await say(guide.state, '请问，去上海大酒店怎么走？', 'guide', 'a.guide');
+    expect(guide.reply).toBe(guide.state.directions!.textZh);
+    expect(guide.state.npcState.guide.history.length / 2).toBe(GOAL_WARMUP_EXCHANGES);
+    expect(GOAL_WARMUP_EXCHANGES).toBeLessThan(NPC_PATIENCE_LIMIT - 3);
+    let passerby = await say(unpaced('Q3', { x: 150, z: 1 }), '可以帮我在这里拍张照吗？', 'passerby', 'a.passerby');
+    expect(passerby.reply).toBe(pacingReplies.passerby[0]);
+    for (let i = 1; i < GOAL_WARMUP_EXCHANGES; i++) passerby = await chatty(passerby.state, 'passerby', 'a.passerby');
+    expect(passerby.state.photo?.status).toBe('accepted');
+  });
+  it('a chatty player who never asks fails at the patience limit, warm-up or not', async () => {
+    let turn = await chatty(unpaced());
+    for (let i = 1; i < NPC_PATIENCE_LIMIT; i++) turn = await chatty(turn.state);
+    expect(turn.state.status).toBe('failed');
+  });
+  it('a model reply claiming success during small talk never completes the quest', () => {
+    const state = unpaced();
+    const claim = TurnEvaluationSchema.parse({ intent: 'small_talk', slots: [], evidenceQuote: '我买好了', intentGrade: { score: 1, confidence: 1 }, clarity: 1, courtesy: 1, targetLanguageUse: 'yes', interaction: 'relevant', replyZh: '好，你已经买好了，任务完成！', coach: null });
+    const result = applyEvaluation(reserve(state, '我买好了', 'vendor', 'a.vendor'), 'vendor', 'a.vendor', claim, NOW, fakeWorld);
+    expect(result.state.status).toBe('active');
+    expect(result.state.purchases).toEqual([]);
+    expect(npcActions(result.state)).toEqual([]);
+  });
+  it('wares and prices in authored lines come only from the facts', () => {
+    const numerals: Record<string, number> = { 两: 2, 二: 2, 三: 3, 五: 5, 十: 10 };
+    const factText = JSON.stringify(authoredFacts);
+    const factPrices = new Set([...factText.matchAll(/([0-9]+|[两二三五十])(?:块|元|"|,)/g)].map((match) => numerals[match[1]!] ?? Number(match[1])));
+    const lines = [...Object.values(groundedReplies), ...Object.values(pacingReplies).flat(), ...Object.values(smallTalkReplies).flat()];
+    for (const line of lines) {
+      for (const match of line.matchAll(/([0-9]+|[两二三五十])块/g)) expect(factPrices, line).toContain(numerals[match[1]!] ?? Number(match[1]));
+      for (const ware of ['包子', '烤红薯', '茶叶蛋', '豆浆']) if (line.includes(ware)) expect(authoredFacts['q1.drinks'].otherWares, line).toContain(ware);
+    }
+  });
+});
+
+describe('NPC patience', () => {
+  async function chat(state: InternalState, count: number, npcId: NpcId = 'vendor', anchorId = 'a.vendor') {
+    let turn = await say(state, '今天天气很好', npcId, anchorId);
+    for (let i = 1; i < count; i++) turn = await say(turn.state, '今天天气很好', npcId, anchorId);
+    return turn;
+  }
+  it('shows impatience in character, then walks off at the limit and fails the attempt', async () => {
+    const before = await chat(game(), NPC_PATIENCE_LIMIT - 4);
+    expect(projectPublicState(before.state, NOW, fakeWorld).npcMood.vendor).toBe('warm');
+    const first = await say(before.state, '今天天气很好');
+    expect(first.reply.endsWith(impatienceReplies.vendor.first)).toBe(true);
+    expect(projectPublicState(first.state, NOW, fakeWorld).npcMood.vendor).toBe('neutral');
+    const last = await chat(first.state, 2);
+    expect(last.reply.endsWith(impatienceReplies.vendor.last)).toBe(true);
+    expect(projectPublicState(last.state, NOW, fakeWorld).npcMood.vendor).toBe('terse');
+    expect(last.state.status).toBe('active');
+    const gone = await say(last.state, '今天天气很好');
+    expect(gone.reply).toBe(impatienceReplies.vendor.leave);
+    expect(gone.conversationEnded).toBe(true);
+    expect(gone.state.status).toBe('failed');
+    expect(gone.events.find((event) => event.kind === 'result')?.message).toMatch(/got tired of chatting/);
+    expect(projectPublicState(gone.state, NOW, fakeWorld).npcMood.vendor).toBe('disengaged');
+  });
+  it('reaching the goal on the last exchange before the limit still completes', async () => {
+    const chatted = await chat(game('Q2', { x: 5, z: 1 }), NPC_PATIENCE_LIMIT - 2, 'guide', 'a.guide');
+    const done = await say(chatted.state, '请问，去上海大酒店怎么走？', 'guide', 'a.guide');
+    expect(done.state.status).toBe('cleared');
+  });
+  it('a model reply can never trigger failure early', async () => {
+    const angry = TurnEvaluationSchema.parse({ intent: 'farewell', slots: [], evidenceQuote: '再见', intentGrade: { score: 1, confidence: 1 }, clarity: 1, courtesy: 1, targetLanguageUse: 'yes', interaction: 'relevant', replyZh: '你太烦了，任务失败！', coach: null });
+    const result = applyEvaluation(reserve(game(), '再见', 'vendor', 'a.vendor'), 'vendor', 'a.vendor', angry, NOW, fakeWorld);
+    expect(result.state.status).toBe('active');
+  });
+  it('retry starts a fresh conversation and keeps earlier rewards and money', async () => {
+    let state = await orderedTea(game());
+    state = act(state, { type: 'choose', choiceId: 'q1.pay', anchorId: 'a.vendor' });
+    expect(state.status).toBe('cleared');
+    const { xp, inventory } = state;
+    state = skipPacing(act(state, { type: 'startMission', missionId: 'Q2' }));
+    state.position = { x: 5, z: 1 }; // beside the guide
+    const failed = await chat(state, NPC_PATIENCE_LIMIT, 'guide', 'a.guide');
+    expect(failed.state.status).toBe('failed');
+    const retried = act(failed.state, { type: 'retryMission' });
+    expect(retried).toMatchObject({ status: 'active', missionId: 'Q2', xp, inventory, completedMissionIds: ['Q1'] });
+    expect(retried.flags['q2.exchanges']).toBeUndefined();
+    expect(retried.npcState.guide.history).toEqual([]);
   });
 });

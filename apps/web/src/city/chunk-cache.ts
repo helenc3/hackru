@@ -40,7 +40,8 @@ export async function saveChunks(manifests: readonly ChunkManifest[]): Promise<v
     transaction.objectStore('worlds').put({ worldId: manifest.worldId, generatorVersion: manifest.generatorVersion, catalogVersion: manifest.catalogVersion });
     const id = rowId(manifest);
     const existing = chunks.get(id);
-    existing.onsuccess = () => { if (!existing.result) chunks.put({ id, worldId: manifest.worldId, pinned: inSpawnBox(manifest.coord), savedAt: Date.now(), manifest } satisfies Row); };
+    // Rows come only from server commits, which are authoritative: a differing hash means the server rejected the cached copy.
+    existing.onsuccess = () => { if ((existing.result as Row | undefined)?.manifest.contentHash !== manifest.contentHash) chunks.put({ id, worldId: manifest.worldId, pinned: inSpawnBox(manifest.coord), savedAt: Date.now(), manifest } satisfies Row); };
   }
   await done(transaction);
   await prune(manifests[0]!.worldId);

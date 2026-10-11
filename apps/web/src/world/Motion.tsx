@@ -54,7 +54,12 @@ export function Motion({ runtime, root, labels, marks, city, state, tick, sync }
     const right = blocked ? 0 : Number(k.has('KeyD') || k.has('ArrowRight')) - Number(k.has('KeyA') || k.has('ArrowLeft'));
     const forward = blocked ? 0 : Number(k.has('KeyW') || k.has('ArrowUp')) - Number(k.has('KeyS') || k.has('ArrowDown'));
     const keyed = Boolean(right || forward);
-    if (keyed) r.path = [];
+    if (keyed) { r.path = []; r.goal = undefined; }
+    // A far goal re-plans one leg at a time, so it keeps going as chunks ahead stream in.
+    if (!blocked && !keyed && !r.path?.length && r.goal) {
+      if (distance(r.position, r.goal) < 1) r.goal = undefined;
+      else if (performance.now() >= (r.replanAt ?? 0)) { r.path = r.leg?.(r.position, r.goal) ?? []; r.replanAt = performance.now() + 400; }
+    }
     const waypoint = r.path?.[0];
     const moving = keyed || Boolean(waypoint);
     const previous = r.position;

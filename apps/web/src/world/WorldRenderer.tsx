@@ -1,11 +1,14 @@
 import { Component, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Canvas, useThree } from '@react-three/fiber';
-import { VISIBLE_RADIUS_CHUNKS, chunkOf, chunkOrigin, text, type ChunkManifest, type Position, type RendererProps } from '@vibequest/shared';
-import { distance, nearbyTargets, targetAction, walkingPath } from './navigation';
+import { VISIBLE_RADIUS_CHUNKS, chunkOf, chunkOrigin, seedFromWorldId, text, worldLayout, type ChunkManifest, type Position, type RendererProps } from '@vibequest/shared';
+import { distance, nearbyTargets, nextLeg, targetAction, walkingPath } from './navigation';
 import { registerWalkHandler } from './walk-request';
 import { DEFAULT_PITCH, dragOrbit } from './camera';
 import { Cue } from './decor';
 import { DestinationMarker } from './DestinationMarker';
+import { FarRiver, QuestBeacon, QuestCompass } from './Wayfinding';
+import { useReducedMotion } from './toon';
+import { requestWalk } from './walk-request';
 import { Motion, type Landmark } from './Motion';
 import { initialPosition, type Runtime } from './runtime';
 import { CityScene } from '../city/CityScene';
@@ -97,11 +100,14 @@ export function WorldRenderer({ state, onAction, onTalk, preview = false, manife
     setPosition({ ...r.position }); setBusy(false);
   }, [sessionKey]);
   // UI buttons (e.g. "Go to photo spot") walk the player like a ground click.
-  const view = useRef(city.view); view.current = city.view;
+  const seed = useMemo(() => seedFromWorldId(city.worldId), [city.worldId]);
+  runtime.current.leg = (from, goal) => nextLeg(city.view, seed, city.manifests, from, goal);
+  const river = useMemo(() => worldLayout(seed).river, [seed]);
+  const still = useReducedMotion();
   useEffect(() => preview ? undefined : registerWalkHandler((target) => {
     const r = runtime.current;
     root.current?.focus();
-    r.keys.clear(); r.path = walkingPath(view.current, r.position, target);
+    r.keys.clear(); r.path = []; r.goal = { ...target }; r.replanAt = 0;
   }), [preview]);
   useEffect(() => {
     const clear = () => { runtime.current.keys.clear(); runtime.current.path = []; runtime.current.active = false; drag.current = null; };
@@ -199,7 +205,7 @@ export function WorldRenderer({ state, onAction, onTalk, preview = false, manife
       if (!gesture || gesture.pointerId !== event.pointerId) return;
       if (!gesture.moved && !runtime.current.busy && current.current.state.status === 'active') {
         const point = runtime.current.groundPoint?.(event.clientX, event.clientY);
-        if (point) { runtime.current.keys.clear(); runtime.current.path = walkingPath(city.view, runtime.current.position, point); }
+        if (point) { runtime.current.keys.clear(); runtime.current.goal = undefined; runtime.current.path = walkingPath(city.view, runtime.current.position, point); }
       }
       drag.current = null;
       if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
@@ -209,12 +215,14 @@ export function WorldRenderer({ state, onAction, onTalk, preview = false, manife
       fallback={<CompatibilityRecovery />}>
       <ContextLossHandler onFailure={() => { runtime.current.keys.clear(); runtime.current.path = []; runtime.current.active = false; setHasWebGl(false); }} />
       <CityScene city={city} runtime={runtime} position={position} /><Cue at={nearby[0]?.position} /><Motion runtime={runtime} root={root} labels={labels} marks={marks} city={city} state={state} tick={setPosition} sync={sync} /><DestinationMarker runtime={runtime} />
+      <FarRiver river={river} runtime={runtime} />{!preview && state.questTarget && <QuestBeacon target={state.questTarget.position} still={still} />}
     </Canvas></CanvasBoundary> : <CompatibilityRecovery />}
     {hasWebGl && <>
       <div className="district-labels" aria-hidden="true">{marks.map((mark, i) => <span key={`${mark.label}@${mark.x},${mark.z}`} ref={(node) => { labels.current[i] = node; }} className="district-landmark" lang="zh-Hans">{mark.label}</span>)}</div>
       <div className="world-caption"><span className="live-dot" />Shanghai<span>Third-person navigation</span></div>
       {loading && <div className="world-note" role="status" data-testid="city-loading">Building the neighbourhood…</div>}
       {city.error && !preview && <div className="world-note" role="status" data-testid="city-error">{city.error}</div>}
+      {!preview && state.status === 'active' && state.questTarget && <QuestCompass target={state.questTarget} position={position} yaw={runtime.current.yaw} onWalk={() => requestWalk(state.questTarget!.position)} />}
       <div className="district-nearby" aria-label="Nearby interactions">{nearby.map((target, i) => <button key={target.id} disabled={busy || state.status !== 'active'} onClick={() => void interact(target.id)} data-target-id={target.id}><span lang="zh-Hans">{target.label}</span>{i === 0 ? ' · E' : ''}</button>)}</div>
       <div className="world-note">WASD / arrows or click to walk · Drag sideways to orbit, up / down to tilt · E to interact</div>
     </>}

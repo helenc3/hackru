@@ -58,12 +58,17 @@ export function createWorldService(options: WorldServiceOptions = {}): WorldServ
 
   function fromDraft(target: World, coord: ChunkCoord, questContext: QuestContextSnapshot, draft: ComposeDraft, _base: ChunkManifest): ChunkManifest | string[] {
     const plan = planChunk(target.info.seed, coord);
+    // Quest givers keep their planned names (老王, 小李) whoever composes the chunk: on the anchor and on the figure standing there.
+    const plannedName = new Map(draft.anchors.flatMap((anchor) => { const nameKey = plan.requiredAnchors.find((entry) => entry.anchorId === anchor.id)?.nameKey; return nameKey ? [[anchor.placementId, nameKey] as const] : []; }));
+    const placements = draft.placements.map((placement) => {
+      const nameKey = plannedName.get(placement.id) ?? (placement.attachTo ? plannedName.get(placement.attachTo.placementId) : undefined);
+      return nameKey && placement.assetId.startsWith('an.npc.') ? { ...placement, params: { ...placement.params, nameKey } } : placement;
+    });
     // Planner-owned fields (connectors, water, avenues, bridges) come from the plan.
     const candidate = ChunkManifestSchema.safeParse(sealManifest({
       worldId: target.info.worldId, coord, district: plan.district, catalogVersion: CATALOG_VERSION, generatorVersion: GENERATOR_VERSION, seed: target.info.seed,
       source: 'claude', questContext, connectors: plan.connectors, water: plan.water, bridges: plan.bridges,
-      roads: [...plan.roads, ...draft.roads], placements: draft.placements, missingCapabilities: draft.missingCapabilities,
-      // Quest givers keep their planned names (老王, 小李) whoever composes the chunk.
+      roads: [...plan.roads, ...draft.roads], placements, missingCapabilities: draft.missingCapabilities,
       anchors: draft.anchors.map((anchor) => { const nameKey = plan.requiredAnchors.find((entry) => entry.anchorId === anchor.id)?.nameKey; return nameKey ? { ...anchor, nameKey } : anchor; }),
     }));
     if (!candidate.success) return candidate.error.issues.slice(0, 5).map((issue) => `schema:${issue.path.join('.')}`);

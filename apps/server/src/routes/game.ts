@@ -1,6 +1,6 @@
 import {
   ActionRequestSchema, CreateSessionRequestSchema, TurnRequestSchema, TurnResponseSchema, createGame, applyAction, applyEvaluation, isClosingLine, projectPublicState,
-  synchronizeGame, dialogueContext, turnActions, groundedReply, createFixtureDialogueProvider, EngineRuleError, validateEvaluationForContext,
+  synchronizeGame, dialogueContext, turnActions, createFixtureDialogueProvider, EngineRuleError, validateEvaluationForContext,
   type PublicState, type TurnRequest, type TurnContext, type TurnResponse, type ActionResponse, type WorldView,
 } from '@vibequest/shared';
 import { randomUUID } from 'node:crypto';
@@ -140,7 +140,8 @@ export async function runTurn(services: ServerServices, id: string, body: TurnRe
     if (session.state.activeAudioOperationId) throw new HttpError(422, 'AUDIO_BUSY', 'Finish the current audio operation before submitting.');
     const provenance = resolveTranscription(session, body.input, nowMs);
     session.modelCalls = session.modelCalls.filter((time) => time > nowMs - 60_000);
-    if (session.totalModelCalls >= 60 || session.modelCalls.length >= 10) throw new HttpError(429, 'TURN_LIMIT', 'Session or per-minute turn budget reached.');
+    // Three quests of up to NPC_PATIENCE_LIMIT exchanges each, plus retries, fit comfortably.
+    if (session.totalModelCalls >= 120 || session.modelCalls.length >= 20) throw new HttpError(429, 'TURN_LIMIT', 'Session or per-minute turn budget reached.');
     session.totalModelCalls++; session.modelCalls.push(nowMs);
     let resolve!: PendingRequest['resolve']; let reject!: PendingRequest['reject'];
     const result = new Promise<unknown>((yes, no) => { resolve = yes; reject = no; });
@@ -178,11 +179,12 @@ async function evaluate(services: ServerServices, body: TurnRequest, pending: Pe
       session.state.pendingTurn = null;
       session.state.pauseReasons = session.state.pauseReasons.filter((reason) => reason !== 'provider');
       session.state.version++;
-      const replyZh = groundedReply(session.state, body.npcId, evaluation, world);
+      // The engine's committed line (it may be a pacing question rather than the grounded fact reply).
+      const replyZh = session.state.npcState[body.npcId].history.at(-1)!.text;
       // Verified directions are authoritative: the live model's own words never replace the route text.
       const verifiedRoute = engine.events.some((event) => event.kind === 'directions');
       let speech: { npcReply: string; speechId?: string };
-      if (options.spokenReply) speech = { npcReply: spoken && !verifiedRoute && spoken.length <= 240 ? spoken : replyZh }; // audio already streamed live
+      if (options.spokenReply) speech = { npcReply: spoken && !verifiedRoute && session.state.status !== 'failed' && spoken.length <= 240 ? spoken : replyZh }; // audio already streamed live; an NPC leaving in annoyance shows the authored line
       else {
         const speechId = randomUUID();
         registerSpeechJob(session, { id: speechId, sessionId: session.id, attemptId: pending.attemptId, turnId: body.turnId, replyZh, voiceKey: body.npcId, operationId: speechId, status: 'pending' });

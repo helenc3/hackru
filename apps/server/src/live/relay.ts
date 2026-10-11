@@ -1,5 +1,5 @@
 import { GoogleGenAI, Modality, type LiveServerMessage, type Session } from '@google/genai';
-import { NpcIdSchema, EngineRuleError, dialogueContext, type NpcId, type TurnContext, type TurnResponse } from '@vibequest/shared';
+import { NpcIdSchema, EngineRuleError, dialogueContext, pendingGoalAction, type NpcId, type TurnContext, type TurnResponse } from '@vibequest/shared';
 import { randomUUID } from 'node:crypto';
 import type { Server } from 'node:http';
 import { WebSocketServer, type WebSocket } from 'ws';
@@ -33,6 +33,8 @@ export function createLiveBridge(options: {
   live: LiveSink;
   turn: (text: string, spokenReply: () => Promise<string | undefined>) => Promise<TurnResponse>;
   note: (turn: TurnResponse) => Promise<string | undefined> | string | undefined;
+  /** True when the turn leaves only a button to finish the task: the session ends like a goodbye. */
+  ends?: (turn: TurnResponse) => boolean;
 }): Bridge {
   let inputText = '';
   let outputText = '';
@@ -56,11 +58,13 @@ export function createLiveBridge(options: {
     options.turn(text, spokenReply).then((turn) => {
       if (closed) return;
       options.send({ type: 'turn', turn });
-      if (turn.conversationEnded) {
+      if (turn.conversationEnded || options.ends?.(turn)) {
         // The spoken goodbye already completed while the engine evaluated: close now. Otherwise let it finish (next completed model turn), else cap.
-        if (afterModelTurn || outputs > outputsBefore) { close('farewell'); return; }
-        const timer = setTimeout(() => close('farewell'), FAREWELL_WAIT_MS);
-        waiters.push(() => { clearTimeout(timer); close('farewell'); });
+        // A goodbye closes the panel; a finishing button ('goal') leaves it open on the button.
+        const reason = turn.conversationEnded ? 'farewell' : 'goal';
+        if (afterModelTurn || outputs > outputsBefore) { close(reason); return; }
+        const timer = setTimeout(() => close(reason), FAREWELL_WAIT_MS);
+        waiters.push(() => { clearTimeout(timer); close(reason); });
         return;
       }
       return Promise.resolve(options.note(turn)).then((note) => { if (note && !closed) options.live.sendNote(note); });
@@ -113,40 +117,35 @@ export function createLiveBridge(options: {
   };
 }
 
-/** What each role steers toward; the engine, not this text, decides progress. */
+/** What each person knows and does in their own world; the engine, not this text, decides progress. */
 const ROLE_GOALS: Record<NpcId, string> = {
-  vendor: 'You sell drinks. Goal: the customer names a drink, you state its price, then they pay with the on-screen Pay button. Coffee is sold out; offer tea or water. After greetings or unclear speech, ask what they would like to drink.',
-  guide: 'You are a local who knows the way. If asked how to reach 上海大酒店, say the hotelRoute fact word for word. If there is no hotelRoute fact, or they ask about another place, say you are not sure of the way. Never invent roads, turns or distances.',
-  passerby: 'You are a friendly passer-by by the Huangpu River. If the learner asks you to take their photo, agree and ask them to stand at the photo spot with the river behind them; the game runs the countdown. Do not claim the photo was taken.',
+  vendor: 'You run a small drink stall. You have tea and water; coffee is sold out today. When someone wants a drink, tell them what you have and the price. Payment happens at your counter, so once the price is clear you just wait for them to pay.',
+  guide: 'You are a local who knows these streets. If someone asks how to get to 上海大酒店, give the hotelRoute fact word for word. If there is no hotelRoute fact, or they ask about another place, say you are not sure. Never invent roads, turns or distances.',
+  passerby: 'You are strolling by the Huangpu River. If someone asks you to take their photo, agree and tell them to stand where the river is behind them; you count down once they are in place. Do not say the photo was taken until it is.',
 };
 
 function liveInstruction(context: TurnContext): string {
   return [
-    `You are ${context.nameZh}, an NPC in a Mandarin Chinese learning game set in a Shanghai neighbourhood, talking with a learner by voice. Persona: ${context.persona}`,
-    'Speak only Simplified Chinese, standard Mandarin, as a real person would: at most two short sentences per reply (a verified route may be longer), no English, no pinyin, no translations, no explanations, no coaching.',
+    `You are ${context.nameZh}, an ordinary person in a Shanghai neighbourhood, talking with someone who has just come up to you. ${context.persona}`,
+    'You know nothing about games, lessons, learners, quests or buttons, and you never teach: no model sentences, no "你可以说…", no "请说中文", no English, no pinyin, no translations, no explanations.',
+    'Speak only Simplified Chinese, standard Mandarin, casually and naturally: at most two short sentences per reply (a route you were given may be longer). Answer what was said and ask a natural follow-up when it fits.',
     `Immutable facts, the only truth; never invent prices, roads, landmarks or places not listed: ${JSON.stringify(context.facts)}`,
     ROLE_GOALS[context.npcId],
-    'If the learner\'s Mandarin is understood but makes no sense for the situation, ask a short clarifying question in Mandarin that includes the key vocabulary they need, so every unclear answer still teaches the needed word.',
-    `If the learner speaks English or another language, or their Mandarin is too unclear to understand, do NOT act on it: reply in simple Mandarin asking them to say it in Chinese and model the exact phrase for the current step, for example 请说中文。您可以说：${targetPhrase(context.npcId, undefined)} Never translate into English and never speak English yourself.`,
-    'Never announce objectives, rewards, XP or game results. Rudeness gets a firm, polite boundary, never abuse.',
-    'Lines starting with [game] are system notes about the game state, not the customer speaking; follow them silently and never read them aloud. They tell you the next step and the target phrase to model.',
+    'You like a chat and are in no hurry. Mention something else you have or know when it fits (only from the facts: otherWares, smallTalk — other wares are not for sale right now), and ask one friendly personal question per reply (where they are from, first time in Shanghai, what they have seen). Never claim something happened that has not (a photo taken, money paid).',
+    'The first time someone asks you for something (a drink, the way, a photo) before you have chatted at all, answer with a friendly question first and help once they reply or ask again.',
+    'If you did not catch what they meant, react like a real person (啊？什么？ / 你是说茶吗？). If they speak English or another language, you do not really understand it: show brief, natural confusion in Mandarin and do not act on it.',
+    'Rudeness gets a firm, polite boundary, never abuse.',
+    'Lines starting with [context] describe what just happened around you, not something the other person said; take them into account silently and never read them aloud.',
   ].join('\n');
 }
 
-/** Authored target phrase per role (and café step); the voice NPC models it when the learner stalls or speaks English. */
-export function targetPhrase(npcId: NpcId, nodeId: string | undefined, drink?: unknown): string {
-  if (npcId === 'guide') return '请问，去上海大酒店怎么走？';
-  if (npcId === 'passerby') return '可以帮我在这里拍张照吗？';
-  if (nodeId?.endsWith('.substitute')) return '那就茶吧';
-  if (nodeId?.endsWith('.receipt')) return drink === 'water' ? '水五元' : '茶十元';
-  return '我要一杯茶';
-}
-
-export function alignmentNote(turn: TurnResponse, npcId: NpcId, nodeId: string, drink: unknown): string {
-  // A verified route must be spoken exactly; the model's earlier reply may have improvised.
-  if (turn.events.some((event) => event.kind === 'directions') && turn.state.directions) return `[game] Say this verified route to the learner word for word, adding nothing: ${turn.state.directions.textZh}`;
-  const next = turn.state.objectives.find((objective) => !objective.complete);
-  return `[game] ${turn.events.length ? turn.events.map((event) => event.message).join(' ') : 'No progress this turn.'}${next ? ` Next step for the learner: ${next.label}` : ''} Target phrase the learner should say: ${targetPhrase(npcId, nodeId, drink)}`;
+/** In-world context after a committed turn; the verified route must be spoken exactly, since the model may have improvised. */
+export function alignmentNote(turn: TurnResponse): string | undefined {
+  if (turn.events.some((event) => event.kind === 'directions') && turn.state.directions) return `[context] Tell them this route word for word, adding nothing: ${turn.state.directions.textZh}`;
+  if (turn.state.photo?.status === 'accepted') return '[context] You agreed to take their photo. Tell them to stand where the river is behind them; you count down once they are ready.';
+  // The engine's patience count: near its limit the NPC shows it (the engine ends the attempt at the limit).
+  if (turn.state.status === 'active' && Object.values(turn.state.npcMood).includes('terse')) return '[context] You have been chatting a long time and have things to do. Show some impatience and say you need to get going soon.';
+  return undefined;
 }
 
 /** WebSocket upgrade at /api/sessions/:id/live?npcId=…&anchorId=… on the API server (the dev proxy forwards upgrades). */
@@ -193,6 +192,7 @@ export function attachLiveRelay(server: Server, services: ServerServices, option
     const release = () => { if (active.get(sessionId) === release) active.delete(sessionId); bridge.close('replaced'); };
     const bridge = createLiveBridge({
       send,
+      ends: (turn) => Boolean(pendingGoalAction(turn.state.npcActions, turn.state.inventory.cny, npcId.data)),
       live: {
         sendAudio: (data) => gemini?.sendRealtimeInput({ audio: { data, mimeType: 'audio/pcm;rate=16000' } }),
         sendNote: (text) => gemini?.sendClientContent({ turns: [{ role: 'user', parts: [{ text }] }], turnComplete: false }),
@@ -213,7 +213,7 @@ export function attachLiveRelay(server: Server, services: ServerServices, option
         });
         return runTurn(services, sessionId, { turnId: randomUUID(), expectedVersion: 0, npcId: npcId.data, anchorId, input: { text, source: 'stt', transcriptionId } }, { checkVersion: false, spokenReply });
       },
-      note: async (turn) => store.withSession(sessionId, async (session) => alignmentNote(turn, npcId.data, session.state.nodeId, session.state.flags['q1.drink'])),
+      note: (turn) => alignmentNote(turn),
     });
     active.set(sessionId, release);
     ws.on('message', (data, isBinary) => { if (isBinary) bridge.onClientAudio(Buffer.isBuffer(data) ? data : Buffer.from(data as ArrayBuffer)); else bridge.onClientText(data.toString()); });

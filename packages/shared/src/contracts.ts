@@ -20,7 +20,7 @@ export const NpcIdSchema = z.enum(['vendor', 'guide', 'passerby']);
 /** Readable world text the player can inspect (reading evidence). Positions come from chunk anchors. */
 export const CueIdSchema = z.enum(['q1.menu', 'q2.hotel-sign', 'q3.river-sign']);
 export const ChoiceIdSchema = z.enum(['q1.pay', 'q3.start-photo']);
-export const IntentSchema = z.enum(['order_drink', 'accept_substitute', 'cancel_order', 'confirm_drink_price', 'ask_directions', 'request_photo', 'request_repeat', 'greeting', 'farewell', 'unknown']);
+export const IntentSchema = z.enum(['order_drink', 'accept_substitute', 'cancel_order', 'confirm_drink_price', 'ask_directions', 'request_photo', 'request_repeat', 'greeting', 'small_talk', 'farewell', 'unknown']);
 export const GameActionTypeSchema = z.enum(['move', 'inspect', 'choose', 'photoCapture', 'audioPhase', 'useItem', 'pausePractice', 'resumePractice', 'setInputPreference', 'retryMission', 'startMission']);
 export const DESTINATION_ALIASES = {
   'grand-hotel': ['上海大酒店', '大酒店', 'Shanghai Grand Hotel'],
@@ -125,6 +125,9 @@ export const NpcActionSchema = z.discriminatedUnion('kind', [
   z.strictObject({ kind: z.literal('go-to-photo-spot'), spot: PositionSchema }),
 ]);
 export type NpcAction = z.infer<typeof NpcActionSchema>;
+/** Where the active quest's next step is (server-derived from the planner/committed anchors). Guidance only: never progress. */
+export const QuestTargetSchema = z.strictObject({ label: shortText, english: shortText, position: PositionSchema, anchorId: identifier.optional() });
+export type QuestTarget = z.infer<typeof QuestTargetSchema>;
 export const PublicStateSchema = z.strictObject({
   sessionId: identifier, worldId: identifier, version: count, missionId: MissionIdSchema, mode: ModeSchema,
   status: StatusSchema, zoneId: ZoneIdSchema, position: PositionSchema, tier: TierSchema,
@@ -137,6 +140,7 @@ export const PublicStateSchema = z.strictObject({
   directions: DirectionsSchema.nullable(), photo: PhotoRequestSchema.nullable(),
   /** Current per-NPC actions, so a reopened conversation shows the same buttons as the last turn. */
   npcActions: z.array(z.strictObject({ anchorId: identifier, action: NpcActionSchema })).max(8),
+  questTarget: QuestTargetSchema.nullable().optional(),
   timer: z.null(),
   capabilities: z.strictObject({ coach: z.boolean(), hints: z.boolean(), freeze: z.literal(false) }),
   validationMode: z.boolean(), inputPreference: InputPreferenceSchema, providerStatus: ProviderStatusSchema,
@@ -168,7 +172,7 @@ export const SlotSchema = z.discriminatedUnion('key', [
 export type Slot = z.infer<typeof SlotSchema>;
 export const INTENT_SLOT_KEYS: Record<Intent, readonly Slot['key'][]> = {
   order_drink: ['drink'], accept_substitute: ['drink'], cancel_order: [], confirm_drink_price: ['drink', 'priceCny'], ask_directions: ['destination'],
-  request_photo: [], request_repeat: [], greeting: [], farewell: [], unknown: [],
+  request_photo: [], request_repeat: [], greeting: [], small_talk: [], farewell: [], unknown: [],
 };
 export const TurnEvaluationSchema = z.strictObject({
   intent: IntentSchema, slots: z.array(SlotSchema).max(2), evidenceQuote: z.string().max(500),

@@ -6,7 +6,12 @@ import { baselineEvaluation } from '../../src/fixtures.js';
 import { selectPracticeTier, updateSkillsAfterAttempt } from '../../src/engine/skills.js';
 import { DebriefSchema, InternalStateSchema, type EvidenceRecord, type InternalState, type Track } from '../../src/contracts.js';
 
-const fresh = () => createGame({ sessionId: 'skills-session', worldId: 'world-test', spawn: { x: 0, z: 1 }, attemptId: 'attempt-1', missionId: 'Q1', initialTier: 1, validationMode: false, inputPreference: 'voice', providerStatus: 'fixture' }, 0);
+// Conversational pacing (the goal warm-up) is covered in rules.test.ts; skip it here.
+const fresh = () => {
+  const state = createGame({ sessionId: 'skills-session', worldId: 'world-test', spawn: { x: 0, z: 1 }, attemptId: 'attempt-1', missionId: 'Q1', initialTier: 1, validationMode: false, inputPreference: 'voice', providerStatus: 'fixture' }, 0);
+  for (const role of ['vendor', 'guide', 'passerby']) state.flags[`session.warmed-${role}`] = true;
+  return state;
+};
 function unit(state: InternalState, track: Track, score: EvidenceRecord['score'] = 1, patch: Partial<EvidenceRecord> = {}): EvidenceRecord {
   return { id: `unit-${state.evidence.length}-${track}`, attemptId: state.attemptId, missionId: state.missionId, track, score, independent: true, firstAttempt: true, validationMode: false, listeningAssisted: false, providerFailure: false,
     ...(track === 'conversation' ? { turnId: `turn-${state.evidence.length}`, conversationSource: 'typed' as const } : { cueId: 'q1.menu' as const }), ...patch };
@@ -83,11 +88,10 @@ describe('evidence-based adaptation', () => {
   it('records a confident incorrect request once and cannot farm a corrected confirmation', () => {
     let state = fresh(); state.nodeId = 'q1.buy'; state.flags['q1.drink'] = 'tea';
     state = vendorTurn(state, 'wrong', { intent: 'confirm_drink_price', slots: [{ key: 'drink', value: 'tea' }, { key: 'priceCny', value: 9 }], coach: null });
-    state = vendorTurn(state, 'corrected', { intent: 'confirm_drink_price', slots: [{ key: 'drink', value: 'tea' }, { key: 'priceCny', value: 10 }], coach: null });
+    // Once the priced drink puts Pay up, the conversation is locked: no corrected confirmation can be farmed.
+    expect(() => vendorTurn(state, 'corrected', { intent: 'confirm_drink_price', slots: [{ key: 'drink', value: 'tea' }, { key: 'priceCny', value: 10 }], coach: null })).toThrow(expect.objectContaining({ code: 'GOAL_ACTION_PENDING' }));
     const result = finish(state);
-    expect(result.skills.conversation).toMatchObject({ independentCount: 1 });
-    expect(result.skills.conversation.mastery).toBeCloseTo(0.3);
-    expect(result.debrief!.evidenceSummary.typedTurns).toBe(2);
+    expect(result.debrief!.evidenceSummary.typedTurns).toBe(1);
   });
   it('awards ambiguous independent repair only when no example answer was supplied', () => {
     for (const coached of [false, true]) {

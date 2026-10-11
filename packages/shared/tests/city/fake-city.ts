@@ -13,7 +13,7 @@ export const FAKE_CATALOG: CatalogEntry[] = [
     sockets: () => [{ id: 'sign', kind: 'sign', x: 0, y: 2, z: 2, facing: 0 }], clearance: { front: 1, side: 0 } }),
   entry({ id: 'sf.test.sign', category: 'storefront', placement: 'socket', attachesTo: ['sign'], collision: () => ({ solids: [], walkable: [] }), footprint: () => ({ w: 1, d: 0.2, h: 1 }) }),
   entry({ id: 'sf.test.awning', category: 'storefront', placement: 'socket', attachesTo: ['awning'], collision: () => ({ solids: [], walkable: [] }) }),
-  entry({ id: 'an.test.stall', category: 'anchor', capabilities: ['drink-vendor'], footprint: () => ({ w: 2, d: 2, h: 2 }), collision: () => ({ solids: [box(2, 2)], walkable: [] }) }),
+  entry({ id: 'an.npc.test-stall', category: 'anchor', capabilities: ['drink-vendor'], footprint: () => ({ w: 2, d: 2, h: 2 }), collision: () => ({ solids: [box(2, 2)], walkable: [] }) }),
   entry({ id: 'an.hotel.grand', category: 'anchor', capabilities: ['hotel-landmark'], footprint: () => ({ w: 8, d: 8, h: 10 }), collision: () => ({ solids: [box(8, 8)], walkable: [] }) }),
   entry({ id: 'an.test.landmark', category: 'anchor', capabilities: [], footprint: () => ({ w: 1, d: 1, h: 1 }), collision: () => ({ solids: [], walkable: [] }) }),
   entry({ id: 'an.test.viewpoint', category: 'anchor', placement: 'water-edge', capabilities: ['river-viewpoint'], footprint: () => ({ w: 1, d: 1, h: 1 }), collision: () => ({ solids: [], walkable: [] }) }),

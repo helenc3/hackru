@@ -14,8 +14,11 @@ import { WorldInteractions } from '../ui/WorldInteractions';
 import { ConversationCard, type ConversationSummary, type NpcTarget } from '../ui/ConversationCard';
 import { DirectionsCard } from '../ui/DirectionsCard';
 import { PhotoOverlay } from '../ui/PhotoOverlay';
+import { GlossPopover } from '../dictionary/GlossPopover';
+import { ReviewPanel } from '../dictionary/ReviewPanel';
 import { useApiHealth } from './use-api-health';
 import { useSession } from './use-session';
+import { LookupPanel } from '../dictionary/LookupPanel';
 import { rememberedWorldId, resetWorld } from '../city/chunk-cache';
 import './game.css';
 
@@ -123,6 +126,8 @@ export function App() {
 
   return <div className="game-shell" data-testid="game-shell" data-dialogue-open={Boolean(npc)}>
     <header className="game-topbar"><a className="brand" href="#world">VibeQuest<span className="brand-dot">.</span></a><span>Quest {state.missionId.slice(1)} · {state.zoneId}</span>{state.validationMode ? <span className="environment-banner">Developer validation · all XP, loot and badges are simulated. Progress stays separate from player sessions.</span> : state.providerStatus !== 'live' ? <span className="environment-banner">{state.providerStatus === 'fixture' ? 'Fixture demonstration · scripted responses' : 'Voice or AI service is degraded · retry or use the same-world fallback.'}</span> : null}<div className="topbar-controls">
+      <LookupPanel />
+      <ReviewPanel />
       {!state.validationMode && <BackgroundMusic active={state.status === 'active' && !paused} conversation={Boolean(npc)} />}
       <details className="game-settings" onKeyDown={(event) => {
         if (event.key === 'Escape') {
@@ -159,5 +164,6 @@ export function App() {
       {(review ? results[review] : resultsClosed ? null : state.status !== 'active' ? state : null) && <ResultPanel state={(review && results[review]) ?? state} live={state} pending={session.pending} onAction={onAction} onExit={leave} onClose={closeResults} />}
       {validation && state.validationMode && ValidationHarness && <Suspense fallback={<p>Loading internal validator…</p>}><ValidationHarness state={state} onAction={onAction} onTalk={onTalk} /></Suspense>}
     </main>
+    <GlossPopover />
   </div>;
 }

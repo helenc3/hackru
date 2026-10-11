@@ -206,10 +206,17 @@ function inspect(manifest: ChunkManifest, plan: ChunkPlan, options: Options): Is
     const role = ROLE_FOR[anchor.capability as keyof typeof ROLE_FOR];
     if (role && (anchor.kind !== 'npc' || anchor.role !== role)) { bad(`${anchor.capability} anchors are npc anchors with role ${role}`); continue; }
     if (!role && anchor.role) { bad('only NPC capabilities carry a role'); continue; }
+    if (anchor.kind === 'npc') {
+      // Someone must actually stand there: the bound placement is a figure, or carries one in a socket (vendor counters).
+      const figure = bound.entry.id.startsWith('an.npc.') ? bound : kept.find((k) => k.placement.attachTo?.placementId === bound.placement.id && k.entry.id.startsWith('an.npc.'));
+      if (!figure) { bad(`${bound.entry.id} has no NPC figure`); continue; }
+      if (anchor.nameKey && figure.placement.params.nameKey !== anchor.nameKey) { bad(`figure is named ${String(figure.placement.params.nameKey)}, not ${anchor.nameKey}`); continue; }
+    }
   }
   for (const required of plan.requiredAnchors) {
     const anchor = manifest.anchors.find((a) => a.id === required.anchorId && a.capability === required.capability);
     if (!anchor) structural(`required ${required.capability} anchor ${required.anchorId} missing`);
+    else if (required.nameKey && anchor.nameKey !== required.nameKey) structural(`required anchor ${required.anchorId} must be named ${required.nameKey}`);
     else if (required.near && Math.hypot(anchor.x - required.near.x, anchor.z - required.near.z) > 10) structural(`required anchor ${required.anchorId} is too far from its planned spot`);
   }
   if (!issues.some((i) => i.structural)) {

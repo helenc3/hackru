@@ -23,15 +23,11 @@ function project(p: Position, s: Segment): Position {
 }
 const onSegment = (p: Position, s: Segment) => { const q = project(p, s); return Math.hypot(q.x - p.x, q.z - p.z) < 0.01; };
 
-export function routeToHotel(seed: string, manifests: ReadonlyMap<string, ChunkManifest>, fromAnchor: { id: string; position: Position }): Directions | null {
-  const layout = worldLayout(seed);
-  const hotelManifest = manifests.get(chunkKey(layout.hotel.coord));
-  const hotelAnchor = hotelManifest?.anchors.find((a) => a.id === layout.hotel.anchorId);
-  const ho = chunkOrigin(layout.hotel.coord);
-  const hotel = hotelAnchor ? { x: ho.x + hotelAnchor.x, z: ho.z + hotelAnchor.z } : { x: ho.x + layout.hotel.local.x, z: ho.z + layout.hotel.local.z };
+type Step = { from: Position; to: Position; edge: Edge };
 
-  // Road segments over the bounding box of both ends plus one chunk of margin.
-  const s = chunkOf(fromAnchor.position), h = layout.hotel.coord;
+/** Road segments (committed where streamed, planner elsewhere) over the bounding box of a and b plus one chunk of margin. */
+function network(seed: string, manifests: ReadonlyMap<string, ChunkManifest>, a: Position, b: Position) {
+  const s = chunkOf(a), h = chunkOf(b);
   const segments: Segment[] = [];
   const landmarks: { position: Position; zh: string; english: string }[] = [];
   for (let cx = Math.min(s.cx, h.cx) - 1; cx <= Math.max(s.cx, h.cx) + 1; cx++) for (let cz = Math.min(s.cz, h.cz) - 1; cz <= Math.max(s.cz, h.cz) + 1; cz++) {
@@ -39,18 +35,17 @@ export function routeToHotel(seed: string, manifests: ReadonlyMap<string, ChunkM
     const o = chunkOrigin({ cx, cz });
     const roads: Road[] = manifest ? manifest.roads : planChunk(seed, { cx, cz }).roads;
     for (const road of roads) segments.push({ a: { x: o.x + road.from.x, z: o.z + road.from.z }, b: { x: o.x + road.to.x, z: o.z + road.to.z }, nameKey: road.nameKey });
-    for (const a of manifest?.anchors ?? []) {
-      const row = a.kind === 'landmark' && a.capability !== 'hotel-landmark' && a.nameKey ? text('landmark', a.nameKey) : undefined;
-      if (row) landmarks.push({ position: { x: o.x + a.x, z: o.z + a.z }, zh: row.zh, english: row.english });
+    for (const anchor of manifest?.anchors ?? []) {
+      const row = anchor.kind === 'landmark' && anchor.capability !== 'hotel-landmark' && anchor.nameKey ? text('landmark', anchor.nameKey) : undefined;
+      if (row) landmarks.push({ position: { x: o.x + anchor.x, z: o.z + anchor.z }, zh: row.zh, english: row.english });
     }
   }
-  const usable = segments.filter((seg) => Math.hypot(seg.a.x - seg.b.x, seg.a.z - seg.b.z) > 0.01);
-  if (!usable.length) return null;
-  const nearest = (p: Position) => usable.reduce((best, seg) => { const q = project(p, seg); const d = Math.hypot(q.x - p.x, q.z - p.z); return d < best.d ? { q, d } : best; }, { q: usable[0]!.a, d: Infinity }).q;
-  const start = nearest(fromAnchor.position), end = nearest(hotel);
-  // Both ends must sit on the street network; never describe a road the player cannot see from there.
-  if (Math.hypot(start.x - fromAnchor.position.x, start.z - fromAnchor.position.z) > MAX_STREET_GAP || Math.hypot(end.x - hotel.x, end.z - hotel.z) > MAX_STREET_GAP) return null;
+  return { usable: segments.filter((seg) => Math.hypot(seg.a.x - seg.b.x, seg.a.z - seg.b.z) > 0.01), landmarks };
+}
+const nearestOn = (usable: Segment[], p: Position) => usable.reduce((best, seg) => { const q = project(p, seg); const d = Math.hypot(q.x - p.x, q.z - p.z); return d < best.d ? { q, d } : best; }, { q: usable[0]!.a, d: Infinity }).q;
 
+/** Few-turn shortest route between two points on the network (Dijkstra over node × heading with a turn penalty). */
+function shortest(usable: Segment[], start: Position, end: Position): Step[] | null {
   // Graph: every segment split at endpoints, crossings, and the two projections.
   const nodes: Position[] = [], index = new Map<string, number>(), edges: Edge[][] = [];
   const node = (p: Position) => { const k = key(p); let i = index.get(k); if (i === undefined) { i = nodes.length; index.set(k, i); nodes.push(p); edges.push([]); } return i; };
@@ -72,8 +67,6 @@ export function routeToHotel(seed: string, manifests: ReadonlyMap<string, ChunkM
   });
   const from = index.get(key(start)), to = index.get(key(end));
   if (from === undefined || to === undefined) return null;
-
-  // Dijkstra over (node, heading) with a turn penalty, so the route stays describable.
   // ponytail: O(V²) scan; a heap if road graphs ever exceed a few thousand nodes.
   const headings: (Dir | 'none')[] = ['none', 'east', 'west', 'north', 'south'];
   const state = (n: number, d: Dir | 'none') => n * 5 + headings.indexOf(d);
@@ -92,8 +85,33 @@ export function routeToHotel(seed: string, manifests: ReadonlyMap<string, ChunkM
     }
   }
   if (goal === undefined) return null;
-  const path: { from: Position; edge: Edge }[] = [];
-  for (let st = goal; prev.has(st); st = prev.get(st)!.s) path.unshift({ from: nodes[Math.floor(prev.get(st)!.s / 5)]!, edge: prev.get(st)!.edge });
+  const path: Step[] = [];
+  for (let st = goal; prev.has(st); st = prev.get(st)!.s) path.unshift({ from: nodes[Math.floor(prev.get(st)!.s / 5)]!, to: nodes[prev.get(st)!.edge.to]!, edge: prev.get(st)!.edge });
+  return path;
+}
+
+/** Walking route along the street network: [road point nearest `from`, …corners…, road point nearest `to`]. */
+export function streetPath(seed: string, manifests: ReadonlyMap<string, ChunkManifest>, from: Position, to: Position): Position[] | null {
+  const { usable } = network(seed, manifests, from, to);
+  if (!usable.length) return null;
+  const start = nearestOn(usable, from), end = nearestOn(usable, to);
+  const path = shortest(usable, start, end);
+  return path ? [start, ...path.map((step) => step.to)] : null;
+}
+
+export function routeToHotel(seed: string, manifests: ReadonlyMap<string, ChunkManifest>, fromAnchor: { id: string; position: Position }): Directions | null {
+  const layout = worldLayout(seed);
+  const hotelManifest = manifests.get(chunkKey(layout.hotel.coord));
+  const hotelAnchor = hotelManifest?.anchors.find((a) => a.id === layout.hotel.anchorId);
+  const ho = chunkOrigin(layout.hotel.coord);
+  const hotel = hotelAnchor ? { x: ho.x + hotelAnchor.x, z: ho.z + hotelAnchor.z } : { x: ho.x + layout.hotel.local.x, z: ho.z + layout.hotel.local.z };
+  const { usable, landmarks } = network(seed, manifests, fromAnchor.position, hotel);
+  if (!usable.length) return null;
+  const start = nearestOn(usable, fromAnchor.position), end = nearestOn(usable, hotel);
+  // Both ends must sit on the street network; never describe a road the player cannot see from there.
+  if (Math.hypot(start.x - fromAnchor.position.x, start.z - fromAnchor.position.z) > MAX_STREET_GAP || Math.hypot(end.x - hotel.x, end.z - hotel.z) > MAX_STREET_GAP) return null;
+  const path = shortest(usable, start, end);
+  if (!path) return null;
 
   // Runs of one heading; the name is the run's longest named segment.
   const runs: { dir: Dir; length: number; start: Position; nameKey?: string }[] = [];

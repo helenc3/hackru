@@ -53,7 +53,7 @@
     "providerStatus": "fixture"
   },
   "events": [],
-  "npcReply": "好的，一杯茶，十元。",
+  "npcReply": "好嘞，茶十块。",
   "speechId": "fixture-speech-001",
   "feedback": {
     "understood": "You asked for tea.",

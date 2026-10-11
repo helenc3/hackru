@@ -12,7 +12,7 @@ const { manifest, plan } = await import('./fake-city.js');
 
 const p = plan({ water: [{ id: 'w', kind: 'creek', rect: { minX: 0, maxX: 40, minZ: 30, maxZ: 36 } }] });
 const chunk = sealManifest(manifest(p, {
-  placements: [{ id: 'box', assetId: 'bld.test.box', params: {}, x: 10, z: 10, rotation: 0 }, { id: 'stall', assetId: 'an.test.stall', params: {}, x: 30, z: 10, rotation: 0 }],
+  placements: [{ id: 'box', assetId: 'bld.test.box', params: {}, x: 10, z: 10, rotation: 0 }, { id: 'stall', assetId: 'an.npc.test-stall', params: {}, x: 30, z: 10, rotation: 0 }],
   bridges: [{ id: 'b', assetId: 'wf.test.bridge', rect: { minX: 18, maxX: 22, minZ: 28, maxZ: 38 }, axis: 'z' }],
   anchors: [{ id: 'guide.1', placementId: 'stall', capability: 'drink-vendor', kind: 'npc', role: 'vendor', x: 30, z: 12 }],
 }));

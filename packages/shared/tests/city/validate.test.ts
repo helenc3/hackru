@@ -39,7 +39,7 @@ describe('validateManifest', () => {
   });
   it('binds anchor capability to the placement entry and the hotel to the reserved spot', () => {
     const m = sealManifest(manifest(plan(), {
-      placements: [shop('a', 10, 10), { ...shop('stall', 30, 10), assetId: 'an.test.stall' }, { ...shop('h', 25, 32), assetId: 'an.hotel.grand' }],
+      placements: [shop('a', 10, 10), { ...shop('stall', 30, 10), assetId: 'an.npc.test-stall' }, { ...shop('h', 25, 32), assetId: 'an.hotel.grand' }],
       anchors: [{ id: 'x1', placementId: 'a', capability: 'drink-vendor', kind: 'npc', role: 'vendor', x: 10, z: 13 },
         { id: 'x2', placementId: 'stall', capability: 'drink-vendor', kind: 'npc', role: 'guide', x: 30, z: 12 },
         { id: 'x3', placementId: 'stall', capability: 'drink-vendor', kind: 'npc', role: 'vendor', x: 30, z: 12 }],
@@ -47,6 +47,14 @@ describe('validateManifest', () => {
     const e = errors(validateManifest(m, plan()));
     expect(e).toMatch(/anchor x1: bld.test.box does not grant/); expect(e).toMatch(/anchor x2: .*role vendor/); expect(e).not.toContain('anchor x3');
     expect(e).toMatch(/placement h: the hotel exists only/);
+  });
+  it('rejects NPC anchors with nobody standing there or the wrong required name', () => {
+    const named = plan({ requiredAnchors: [{ capability: 'drink-vendor', anchorId: 'v', nameKey: 'laowang' }] });
+    const board = sealManifest(manifest(named, {
+      placements: [{ ...shop('a', 10, 10), assetId: 'bld.test.box' }, { ...shop('stall', 30, 10), assetId: 'an.npc.test-stall', params: {} }],
+      anchors: [{ id: 'v', placementId: 'stall', capability: 'drink-vendor', kind: 'npc', role: 'vendor', nameKey: 'xiaolin', x: 30, z: 12 }],
+    }));
+    expect(errors(validateManifest(board, named))).toMatch(/must be named laowang/);
   });
   it('detects blocked connectors and unreachable anchors', () => {
     // A viewpoint stand point in the middle of a creek with no deck is unreachable.
@@ -62,14 +70,14 @@ describe('validateManifest', () => {
   it('repairs deterministically by dropping offenders and keeps required anchors', () => {
     const required = plan({ requiredAnchors: [{ capability: 'drink-vendor', anchorId: 'v' }] });
     const raw = sealManifest(manifest(required, {
-      connectors: [], placements: [{ ...shop('stall', 30, 10), assetId: 'an.test.stall' }, shop('bad', 10, 19), shop('a', 10, 8), shop('b', 11, 9)],
+      connectors: [], placements: [{ ...shop('stall', 30, 10), assetId: 'an.npc.test-stall' }, shop('bad', 10, 19), shop('a', 10, 8), shop('b', 11, 9)],
       anchors: [{ id: 'v', placementId: 'stall', capability: 'drink-vendor', kind: 'npc', role: 'vendor', x: 30, z: 12 }],
     }));
     const fixed = repairManifest(raw, required)!;
     expect(validateManifest(fixed, required)).toEqual({ ok: true });
     expect(fixed.placements.map((pl) => pl.id)).toEqual(['stall', 'a']);
     expect(repairManifest(raw, required)).toEqual(fixed);
-    const doomed = sealManifest(manifest(required, { placements: [{ ...shop('stall', 30, 19), assetId: 'an.test.stall' }], anchors: [{ id: 'v', placementId: 'stall', capability: 'drink-vendor', kind: 'npc', role: 'vendor', x: 30, z: 22 }] }));
+    const doomed = sealManifest(manifest(required, { placements: [{ ...shop('stall', 30, 19), assetId: 'an.npc.test-stall' }], anchors: [{ id: 'v', placementId: 'stall', capability: 'drink-vendor', kind: 'npc', role: 'vendor', x: 30, z: 22 }] }));
     expect(repairManifest(doomed, required)).toBeNull();
   });
 });

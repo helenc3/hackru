@@ -15,8 +15,8 @@ async function say(page: Page, text: string) {
   const panel = page.getByTestId('dialogue-panel');
   await panel.getByRole('textbox').fill(text);
   await panel.getByRole('button', { name: 'Send Mandarin' }).click();
-  // A quest-completing turn replaces the dialogue with the result panel.
-  await expect.poll(async () => await page.getByTestId('result-panel').isVisible() || await panel.getByRole('textbox').inputValue().catch(() => 'pending') === '').toBe(true);
+  // A quest-completing turn replaces the dialogue with the result panel; a finishing button (Pay, photo spot) removes the text box.
+  await expect.poll(async () => await page.getByTestId('result-panel').isVisible() || await page.getByTestId('goal-hint').isVisible() || await panel.getByRole('textbox').inputValue().catch(() => 'pending') === '').toBe(true);
 }
 async function drink(page: Page) {
   await target(page, 'sign · ui.menu').click();

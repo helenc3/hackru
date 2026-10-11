@@ -1,8 +1,15 @@
 import { TurnEvaluationSchema, type DialogueProvider, type Intent, type Slot } from '../contracts.js';
+import { smallTalkReplies } from '../content/facts.js';
 
 /** Only documented fixture utterances; never a general language interpreter. */
 const examples: Record<string, { intent: Intent; slots: Slot[] }> = {
   '你好': { intent: 'greeting', slots: [] },
+  '我是美国人': { intent: 'small_talk', slots: [] },
+  '我从美国来': { intent: 'small_talk', slots: [] },
+  '我第一次来上海': { intent: 'small_talk', slots: [] },
+  '是的第一次来': { intent: 'small_talk', slots: [] },
+  '今天天气很好': { intent: 'small_talk', slots: [] },
+  '上海很漂亮': { intent: 'small_talk', slots: [] },
   '再见': { intent: 'farewell', slots: [] },
   '拜拜': { intent: 'farewell', slots: [] },
   '谢谢再见': { intent: 'farewell', slots: [] },
@@ -60,6 +67,6 @@ export function createFixtureDialogueProvider(): DialogueProvider {
     }
     const allowed = matched && context.allowedIntents.includes(matched.intent);
     const insult = text === '你真笨';
-    return TurnEvaluationSchema.parse({ intent: allowed ? matched.intent : 'unknown', slots: allowed ? matched.slots : [], evidenceQuote: allowed ? playerText : '', intentGrade: { score: allowed ? 0.95 : 0, confidence: allowed ? 0.95 : 0.5 }, clarity: allowed ? 0.9 : 0.3, courtesy: insult ? 0 : 0.8, targetLanguageUse: /^[A-Za-z\s]+$/.test(text) ? 'no' : allowed ? 'yes' : 'uncertain', interaction: insult ? 'insult' : allowed ? matched.intent === 'request_repeat' ? 'repeat' : 'relevant' : 'irrelevant', replyZh: '请再说一遍。', coach: { understood: allowed ? 'Recognized a documented fixture request.' : 'This fixture phrase is not recognized.', explanation: 'Fixture mode recognizes a fixed set of example phrases.', improvedExample: '请再说一遍。' } });
+    return TurnEvaluationSchema.parse({ intent: allowed ? matched.intent : 'unknown', slots: allowed ? matched.slots : [], evidenceQuote: allowed ? playerText : '', intentGrade: { score: allowed ? 0.95 : 0, confidence: allowed ? 0.95 : 0.5 }, clarity: allowed ? 0.9 : 0.3, courtesy: insult ? 0 : 0.8, targetLanguageUse: /^[A-Za-z\s]+$/.test(text) ? 'no' : allowed ? 'yes' : 'uncertain', interaction: insult ? 'insult' : allowed ? matched.intent === 'request_repeat' ? 'repeat' : 'relevant' : 'irrelevant', replyZh: allowed && matched.intent === 'small_talk' ? smallTalkReplies[context.npcId][Math.floor(context.history.length / 2) % 2]! : '请再说一遍。', coach: { understood: allowed ? 'Recognized a documented fixture request.' : 'This fixture phrase is not recognized.', explanation: 'Fixture mode recognizes a fixed set of example phrases.', improvedExample: '请再说一遍。' } });
   } };
 }

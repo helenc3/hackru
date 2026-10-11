@@ -1,0 +1,35 @@
+.gloss-popover {
+  position: fixed; z-index: 60; width: min(320px, calc(100vw - 16px));
+  padding: 14px 16px; background: var(--cream); color: var(--text);
+  border: var(--outline); border-radius: var(--radius-md); box-shadow: var(--shadow-sticker);
+}
+.gloss-popover:focus { outline: none; }
+.gloss-popover:focus-visible { outline: var(--focus); }
+.gloss-close { position: absolute; top: 6px; right: 8px; border: 0; background: none; font-size: 20px; line-height: 1; cursor: pointer; color: var(--text); }
+.gloss-line { margin: 0 24px 6px 0; font-size: 20px; line-height: 1.5; }
+.gloss-token { font: inherit; padding: 0 1px; border: 0; border-bottom: 2px dotted var(--ink-soft); background: none; color: inherit; cursor: pointer; }
+.gloss-token[aria-pressed="true"] { background: var(--lemon); border-radius: 4px; border-bottom-color: transparent; }
+.gloss-token:focus-visible { outline: var(--focus); }
+.gloss-pinyin { margin: 0 0 4px; color: var(--text-muted); }
+.gloss-translation { margin: 0 0 8px; font-style: italic; }
+.gloss-word { border-top: 2px solid var(--ink); padding-top: 8px; }
+.gloss-word h3 { margin: 0 0 4px; font-size: 18px; }
+.gloss-word-pinyin { font-weight: 400; color: var(--text-muted); }
+.gloss-word ul { margin: 0 0 10px; padding-left: 18px; }
+.gloss-hint { color: var(--text-muted); margin: 0; }
+
+.review-words { position: relative; }
+.review-panel {
+  position: absolute; right: 0; top: calc(100% + 8px); z-index: 55; width: min(360px, calc(100vw - 24px)); max-height: 60vh; overflow: auto;
+  padding: 14px 16px; background: var(--cream); color: var(--text);
+  border: var(--outline); border-radius: var(--radius-md); box-shadow: var(--shadow-sticker);
+}
+.review-panel header { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.review-panel h2 { margin: 0; font-size: 18px; }
+.review-panel ul { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 10px; }
+.review-panel li { display: grid; grid-template-columns: auto 1fr auto; gap: 2px 10px; align-items: baseline; }
+.review-hanzi { font-size: 22px; grid-row: span 2; }
+.review-pinyin { color: var(--text-muted); }
+.review-english { grid-column: 2; }
+.review-panel li small { grid-column: 1 / -1; color: var(--text-muted); }
+.review-panel li button { grid-column: 3; grid-row: 1; }

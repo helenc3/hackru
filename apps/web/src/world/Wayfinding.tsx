@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { useFrame } from '@react-three/fiber';
 import type { Mesh } from 'three';
 import type { Position, QuestTarget } from '@vibequest/shared';
@@ -12,9 +12,15 @@ export function QuestCompass({ target, position, yaw, onWalk }: { target: QuestT
   const metres = Math.round(Math.hypot(dx, dz));
   // Camera right is (cos yaw, −sin yaw) and forward is (−sin yaw, −cos yaw), matching movePlayer.
   const angle = Math.atan2(dx * Math.cos(yaw) - dz * Math.sin(yaw), -dx * Math.sin(yaw) - dz * Math.cos(yaw)) * 180 / Math.PI;
+  const [arrow, setArrow] = useState({ angle, rotation: angle });
+  if (arrow.angle !== angle) {
+    // Keep the CSS rotation continuous across ±180°, including repeated full turns.
+    const delta = ((angle - arrow.angle + 540) % 360) - 180;
+    setArrow({ angle, rotation: arrow.rotation + delta });
+  }
   const heading = CARDINALS[Math.round(((Math.atan2(dx, -dz) * 180 / Math.PI + 360) % 360) / 45) % 8];
   return <div className="quest-compass" data-testid="quest-compass" data-distance={metres} role="status" aria-label={`Quest target: ${target.english}, ${metres} metres ${heading}`}>
-    {metres > 2 && <span className="quest-compass-arrow" aria-hidden="true" style={{ transform: `rotate(${angle.toFixed(0)}deg)` }}>▲</span>}
+    {metres > 2 && <svg className="quest-compass-arrow" aria-hidden="true" viewBox="0 0 24 24" style={{ transform: `rotate(${arrow.rotation}deg)` }}><path d="M12 2 3 12h6v10h6V12h6Z" fill="currentColor" /></svg>}
     {/* Distance first: if space runs out, the English gloss is what truncates. */}
     <span className="quest-compass-text"><b lang="zh-Hans">{target.label}</b> · {metres <= 2 ? 'here' : `${metres} m ${heading}`} · {target.english}</span>
     {metres > 2 && <button type="button" className="button secondary" data-testid="walk-there" onClick={onWalk}>Walk there</button>}

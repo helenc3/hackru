@@ -12,7 +12,7 @@ import type { Runtime } from '../world/runtime';
 
 /** Meshes beyond this Chebyshev chunk radius unload; their manifests stay in the city store. */
 export const MESH_RADIUS_CHUNKS = 2;
-const LOD_STEP = 10;
+const LOD_STEP = 4;
 
 /** Sky dome and a mist floor follow the player so the streamed city never shows the void. */
 function Surroundings({ runtime }: { runtime: React.RefObject<Runtime> }) {

@@ -30,14 +30,14 @@ const PlaneTree: AssetComponent = (props) => {
     : [[0, 5.2, 0, 1.6], [1.2, 4.7, .4, 1.2], [-1.1, 4.8, -.4, 1.25], [.2, 5.9, -.3, 1.1], [-.3, 4.4, 1, 1]];
   return <group scale={s}>
     <Trunk height={4.4} radius={.28} color="#d9cbb0" />
-    <Sway still={props.still} phase={props.seed}>{lobes.map(([x, y, z, r], i) => <Blob key={i} at={[x, y, z]} r={r} color={i % 2 ? deep : main} outline={props.lod === 0 || i === 0} />)}</Sway>
+    <Sway still={props.still || props.lod > 0} phase={props.seed}>{(props.lod === 0 ? lobes : lobes.slice(0, 2)).map(([x, y, z, r], i) => <Blob key={i} at={[x, y, z]} r={r} color={i % 2 ? deep : main} outline={props.lod === 0 || i === 0} />)}</Sway>
   </group>;
 };
 const CamphorTree: AssetComponent = (props) => {
   const s = n(props, 'scale'), [main] = foliage[props.params.season as Season];
   return <group scale={s}>
     <Trunk height={2.4} radius={.3} />
-    <Sway still={props.still} phase={props.seed}>
+    <Sway still={props.still || props.lod > 0} phase={props.seed}>
       <Blob at={[0, 3.6, 0]} r={2.2} color={props.params.season === 'summer' ? '#3f8f3a' : main} />
       {props.lod === 0 && <Blob at={[.9, 3, .6]} r={1.3} color="#4fa046" outline={false} />}
     </Sway>
@@ -47,7 +47,7 @@ const WillowTree: AssetComponent = (props) => {
   const s = n(props, 'scale'), [main, deep] = foliage[props.params.season as Season];
   return <group scale={s}>
     <Trunk height={3.2} radius={.22} />
-    <Sway still={props.still} phase={props.seed}>
+    <Sway still={props.still || props.lod > 0} phase={props.seed}>
       <Blob at={[0, 4, 0]} r={1.4} color={main} />
       {Array.from({ length: props.lod === 0 ? 8 : 4 }, (_, i) => {
         const a = i / (props.lod === 0 ? 8 : 4) * Math.PI * 2;
@@ -61,9 +61,9 @@ const OsmanthusTree: AssetComponent = (props) => {
   const canopy: [number, number, number, number][] = [[0, 2.7, 0, 1.15], [.75, 2.3, .35, .85], [-.7, 2.35, -.3, .9], [.1, 3.3, -.1, .8]];
   return <group scale={s}>
     <Trunk height={2} radius={.2} />
-    <Sway still={props.still} phase={props.seed}>
-      {canopy.map(([x, y, z, r], i) => <Blob key={i} at={[x, y, z]} r={r} color={bloom ? candy.osmanthus : foliage[props.params.season as Season][0]} />)}
-      <Blob at={[0, 1.95, .15]} r={.95} color={bloom ? '#e8b64a' : '#5fb043'} outline={false} />
+    <Sway still={props.still || props.lod > 0} phase={props.seed}>
+      {(props.lod === 0 ? canopy : canopy.slice(0, 2)).map(([x, y, z, r], i) => <Blob key={i} at={[x, y, z]} r={r} color={bloom ? candy.osmanthus : foliage[props.params.season as Season][0]} />)}
+      {props.lod === 0 && <Blob at={[0, 1.95, .15]} r={.95} color={bloom ? '#e8b64a' : '#5fb043'} outline={false} />}
     </Sway>
   </group>;
 };

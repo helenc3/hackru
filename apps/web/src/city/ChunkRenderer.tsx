@@ -48,7 +48,9 @@ function Asset({ item, children, lod, still }: { item: Resolved; children?: Reac
 /** Placements attached to a parent socket render inside the parent's transform at the socket pose. */
 function Attached({ item, byParent, lod, still }: { item: Resolved; byParent: Map<string, Resolved[]>; lod: 0 | 1 | 2; still: boolean }) {
   const sockets = item.entry ? item.entry.sockets(item.params) : [];
-  return <SceneryOutlines.Provider value={lod === 0}><Asset item={item} lod={lod} still={still}>
+  // Preserve the character, without forcing its building or vendor stand to full detail.
+  const assetLod = item.entry?.id.startsWith('an.npc.') ? 0 : lod;
+  return <SceneryOutlines.Provider value={assetLod === 0}><Asset item={item} lod={assetLod} still={still}>
     {(byParent.get(item.placement.id) ?? []).map((child) => {
       const socket = sockets.find((entry) => entry.id === child.placement.attachTo!.socketId);
       if (!socket) return null;
@@ -155,6 +157,43 @@ function Batched({ version, children, ...props }: { version: unknown; children: 
 
 const dummy = new Object3D();
 const tint = new Color();
+const isTree = (item: Resolved) => item.entry?.id.startsWith('ls.tree.') === true;
+
+/** Two draws per chunk retain a tree silhouette, seasonal colour and a visible trunk. */
+function TreeProxies({ items, origin }: { items: Resolved[]; origin: Position }) {
+  const canopy = useRef<InstancedMesh>(null);
+  const trunk = useRef<InstancedMesh>(null);
+  useLayoutEffect(() => {
+    if (!canopy.current || !trunk.current) return;
+    items.forEach((item, i) => {
+      const { w, d, h } = item.size;
+      const trunkHeight = h * .6;
+      dummy.position.set(origin.x + item.placement.x, trunkHeight / 2, origin.z + item.placement.z);
+      dummy.rotation.set(0, item.placement.rotation * DEG, 0);
+      dummy.scale.set(w * .055, trunkHeight, d * .055);
+      dummy.updateMatrix();
+      trunk.current!.setMatrixAt(i, dummy.matrix);
+      dummy.position.y = h * .7;
+      dummy.scale.set(w / 2, h * .3, d / 2);
+      dummy.updateMatrix();
+      canopy.current!.setMatrixAt(i, dummy.matrix);
+      const colour = item.entry?.id === 'ls.tree.osmanthus' && item.params.bloom === true ? candy.osmanthus
+        : item.params.season === 'autumn' ? '#f0b64a' : item.params.season === 'spring' ? '#b6e88a' : candy.grassDeep;
+      canopy.current!.setColorAt(i, tint.set(colour));
+    });
+    for (const mesh of [canopy.current, trunk.current]) {
+      mesh.instanceMatrix.needsUpdate = true;
+      if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+      mesh.computeBoundingSphere();
+    }
+  }, [items, origin]);
+  if (!items.length) return null;
+  return <>
+    <instancedMesh ref={trunk} args={[undefined, undefined, items.length]}><cylinderGeometry args={[.7, 1, 1, 6]} /><Toon color={candy.bark} outline={false} /></instancedMesh>
+    <instancedMesh ref={canopy} args={[undefined, undefined, items.length]}><sphereGeometry args={[1, 8, 6]} /><Toon color="#ffffff" outline={false} /></instancedMesh>
+  </>;
+}
+
 /** One instanced draw for every distant prop/building in a chunk: footprint-sized boxes. */
 function Proxies({ items, origin }: { items: Resolved[]; origin: Position }) {
   const ref = useRef<InstancedMesh>(null);
@@ -207,7 +246,7 @@ export const ChunkRenderer = memo(function ChunkRenderer({ manifest, centre, far
       if (item.entry && d > item.entry.lod.cullDistance) continue;
       const lod = d < LOD_NEAR ? 0 : d < LOD_FAR ? 1 : 2;
       // Instanced-cost props show full detail only up close; everything distant is a proxy.
-      if (far || lod === 2 || (lod === 1 && item.entry?.cost.instanced)) proxies.push(item);
+      if (far || lod === 2 || (lod === 1 && item.entry?.cost.instanced && !isTree(item))) proxies.push(item);
       else roots.push({ item, lod });
     }
     return { byParent, roots, proxies };
@@ -222,6 +261,8 @@ export const ChunkRenderer = memo(function ChunkRenderer({ manifest, centre, far
   // Everything else joins the chunk batch (trees still fade: their sway group is its own batch).
   const own = (root: { item: Resolved; lod: number }) => hasNpc(root.item) || (root.lod === 0 && (root.item.entry?.category === 'building' || root.item.entry?.category === 'anchor'));
   const near = layout.roots.filter(own);
+  const boxProxies = useMemo(() => layout.proxies.filter((item) => !isTree(item)), [layout]);
+  const treeProxies = useMemo(() => layout.proxies.filter(isTree), [layout]);
   return <>
     <group position={[origin.x, 0, origin.z]}>
       {/* Ground, water, roads, decks and placements: one batch per chunk (split into culling cells). */}
@@ -241,9 +282,10 @@ export const ChunkRenderer = memo(function ChunkRenderer({ manifest, centre, far
         </group>)}
       </Batched>
       {near.map((root) => root.item.entry?.category === 'anchor'
-        ? <group key={root.item.placement.id} {...placementGroup(root)}><Attached item={root.item} byParent={layout.byParent} lod={hasNpc(root.item) ? 0 : root.lod} still={still} /></group>
-        : <Batched key={root.item.placement.id} version={layout} {...placementGroup(root)}><Attached item={root.item} byParent={layout.byParent} lod={hasNpc(root.item) ? 0 : root.lod} still={still} /></Batched>)}
+        ? <group key={root.item.placement.id} {...placementGroup(root)}><Attached item={root.item} byParent={layout.byParent} lod={root.lod} still={still} /></group>
+        : <Batched key={root.item.placement.id} version={layout} {...placementGroup(root)}><Attached item={root.item} byParent={layout.byParent} lod={root.lod} still={still} /></Batched>)}
     </group>
-    <Proxies items={layout.proxies} origin={origin} />
+    <Proxies items={boxProxies} origin={origin} />
+    <TreeProxies items={treeProxies} origin={origin} />
   </>;
 });

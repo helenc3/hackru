@@ -120,9 +120,14 @@ test('failed callbacks offer retry; a lost WebGL context preserves the shell', a
   await expect(page.getByRole('dialog')).toBeVisible();
   await page.keyboard.press('Escape');
   await page.locator('canvas').evaluate((canvas) => canvas.dispatchEvent(new Event('webglcontextlost', { cancelable: true })));
-  await expect(page.getByTestId('webgl-recovery')).toBeVisible();
+  await expect(page.getByTestId('webgl-reconnecting')).toBeVisible();
+  await expect(page.getByTestId('webgl-recovery')).toHaveCount(0);
+  await expect(page.locator('canvas')).toHaveCount(1);
   await expect(page.locator('[data-target-id]')).toHaveCount(0);
   await expect(page.getByTestId('reward-state')).toContainText('"xp":0');
+  await page.locator('canvas').evaluate((canvas) => canvas.dispatchEvent(new Event('webglcontextrestored')));
+  await expect(page.getByTestId('webgl-reconnecting')).toHaveCount(0);
+  await expect(page.locator('[data-target-id]').first()).toBeVisible();
 });
 
 test('world renders frames and camera-relative controls; demo laptop meets 30 fps', async ({ page }) => {

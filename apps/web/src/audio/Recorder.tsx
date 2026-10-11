@@ -1,3 +1,4 @@
+import { Button } from '../ui/primitives';
 import { useEffect, useRef, useState, type PointerEvent } from 'react';
 import type { RecorderProps } from '@vibequest/shared';
 import { AudioApiError, interruptPlayback, setAudioActivity, setConfirmation, uploadClip, useAudioActivity } from './audio-bus';
@@ -136,13 +137,13 @@ export function Recorder({ state, onAction, onTranscript }: RecorderProps) {
         <strong>{recording ? 'Listening…' : status === 'transcribing' ? 'Got it…' : 'Hold to talk'}</strong>
         <p>{recording ? 'Release or tap Stop when you finish.' : activity === 'announcing' ? 'Wait for the announcement to finish.' : activity === 'playing' ? 'Tap to interrupt and speak.' : 'Speak Mandarin. Hold the button, or tap to start and stop.'}</p>
       </div>
-      <button type="button" onPointerDown={down} onPointerUp={up} onPointerCancel={up} disabled={!recording && (busy || blocked || status === 'unsupported')}
+      <Button type="button" onPointerDown={down} onPointerUp={up} onPointerCancel={up} disabled={!recording && (busy || blocked || status === 'unsupported')}
         onKeyDown={(event) => { if (event.repeat || (event.key !== ' ' && event.key !== 'Enter')) return; event.preventDefault(); if (recording) stop(); else if (!busy) void start(); }}>
         {recording ? 'Stop recording' : problem && status !== 'unsupported' ? 'Re-record' : 'Start recording'}
-      </button>
-      {recording && <button type="button" onClick={cancel}>Cancel</button>}
+      </Button>
+      {recording && <Button type="button" onClick={cancel}>Cancel</Button>}
       {message && <p role="alert" className="recorder-message">{message}</p>}
-      {problem && state.inputPreference === 'voice' && <button type="button" onClick={() => void onAction({ type: 'setInputPreference', preference: 'typed-accessibility' }).catch(() => undefined)}>Type instead</button>}
+      {problem && state.inputPreference === 'voice' && <Button type="button" onClick={() => void onAction({ type: 'setInputPreference', preference: 'typed-accessibility' }).catch(() => undefined)}>Type instead</Button>}
     </div>
   );
 }

@@ -65,7 +65,8 @@ const comparable = (state: PublicState) => ({ missionId: state.missionId, status
 
 test('player world clears the café mission against the real server and matches the harness result', async ({ page, request }) => {
   await page.goto('/');
-  await page.getByLabel('Conversation provider').selectOption('fixture');
+  await page.getByRole('combobox', { name: 'Conversation provider' }).click();
+  await page.getByRole('option', { name: 'Fixture demonstration · scripted', exact: true }).click();
   await page.getByRole('button', { name: 'Start Practice', exact: true }).click();
   await expect(page.getByTestId('world-renderer')).toHaveAttribute('data-position-z', /./);
   await expect(page.getByText('Fixture demonstration · scripted responses')).toBeVisible();

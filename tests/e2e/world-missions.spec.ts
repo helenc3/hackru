@@ -66,7 +66,8 @@ const worldState = async (page: Page, request: APIRequestContext): Promise<Publi
 
 async function playP1(page: Page) {
   await page.goto('/');
-  await page.getByLabel('Conversation provider').selectOption('fixture');
+  await page.getByRole('combobox', { name: 'Conversation provider' }).click();
+  await page.getByRole('option', { name: 'Fixture demonstration · scripted', exact: true }).click();
   await page.getByRole('button', { name: 'Start Practice', exact: true }).click();
   await expect(page.getByTestId('world-renderer')).toHaveAttribute('data-position-z', /./);
   await walk(page, 'w', 'z', 6.1, -1);
@@ -107,7 +108,7 @@ async function playP2(page: Page, wrongFirst: boolean) {
 /** B1 from (0,0) through the paid ticket and the harbour PA; ends at (1.5, -1). */
 async function prepareBoss(page: Page) {
   await page.getByRole('button', { name: 'Enter boss mission' }).click();
-  await expect(page.getByTestId('quest-panel')).toContainText('BOSS · INDEPENDENT ATTEMPT');
+  await expect(page.getByTestId('quest-panel')).toContainText('Boss · active');
   await readSign(page, 'b1.destination-board', '海港');
   await walk(page, 'd', 'x', 1.5, 1);
   await talk(page, 'laozhou', ['我要一张去海港的票。', '海港，一张。']);

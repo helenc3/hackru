@@ -17,6 +17,7 @@ async function talk(page: Page, npc: string, text: string) {
 async function cafe(page: Page, kiosk = false) {
   await target(page, 'sign · p1.entrance-sign').click();
   await expect(page.getByRole('dialog', { name: 'Inspected sign' })).toContainText('请从广场进入');
+  await page.keyboard.press('Escape');
   await talk(page, 'xiaolin', '我要咖啡。');
   if (kiosk) { await talk(page, 'xiaolin', '不用了，谢谢。'); await talk(page, 'xiaolin', '我要水，五元，对吗？'); await target(page, 'choice · p1.go-kiosk').click(); }
   else await talk(page, 'xiaolin', '那我要水，五元，对吗？');
@@ -27,6 +28,7 @@ async function cafe(page: Page, kiosk = false) {
 }
 async function platform(page: Page, confirmation = false, wrong = false) {
   await target(page, 'sign · p2.timetable').click();
+  await page.keyboard.press('Escape');
   await talk(page, 'achen', '去江滨的车在哪个站台？');
   await target(page, 'pa · p2.platform-change').click();
   if (confirmation) await talk(page, 'achen', '是三号站台吗？');
@@ -36,6 +38,7 @@ async function platform(page: Page, confirmation = false, wrong = false) {
 }
 async function boss(page: Page, fail = false) {
   await target(page, 'sign · b1.destination-board').click();
+  await page.keyboard.press('Escape');
   await talk(page, 'laozhou', '我要一张去海港的票。');
   await expect(page.getByTestId('coach-panel')).toHaveCount(0);
   await expect(page.getByTestId('inventory-bar').getByRole('button')).toHaveCount(0);
@@ -98,6 +101,6 @@ test('rapid developer location actions dispatch serially with fresh versions', a
     buttons.find((button) => button.textContent === 'concourse')!.click();
   });
   await expect.poll(() => api.requests.filter((request) => request.path.endsWith('/actions')).length).toBe(2);
-  await expect(page.locator('.session-footer')).toContainText('Version 2');
+  expect(api.state().version).toBe(2);
   expect(api.failures).toEqual([]);
 });

@@ -8,12 +8,17 @@
     "build": "vite build"
   },
   "dependencies": {
+    "@radix-ui/react-collapsible": "1.1.21",
+    "@radix-ui/react-dialog": "1.2.0",
+    "@radix-ui/react-popover": "1.2.0",
+    "@radix-ui/react-slider": "1.5.0",
+    "@radix-ui/themes": "3.3.0",
+    "@react-three/drei": "10.7.9",
+    "@react-three/fiber": "9.8.1",
+    "@vibequest/shared": "*",
     "react": "19.3.0",
     "react-dom": "19.3.0",
-    "@react-three/fiber": "9.8.1",
-    "@react-three/drei": "10.7.9",
-    "three": "0.186.1",
-    "@vibequest/shared": "*"
+    "three": "0.186.1"
   },
   "devDependencies": {
     "@types/react": "19.3.0",

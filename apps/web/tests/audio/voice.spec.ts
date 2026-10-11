@@ -173,6 +173,7 @@ test('restarting during a pending reply drops the old audio', async ({ page }) =
   await panel.getByRole('textbox').fill('请给我一杯茶。');
   await panel.getByRole('button', { name: 'Send Mandarin' }).click();
   await expect(page.getByTestId('audio-controller')).toContainText('Preparing reply audio');
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await page.getByRole('button', { name: 'Restart mission' }).click();
   release = true;
   await page.waitForTimeout(500);
@@ -240,6 +241,7 @@ test('deferred turn: retry never waits for Gemini, the old reply stays silent, a
   await expect.poll(() => turns.length).toBe(1);
 
   // Retry while Gemini is still pending: the retry commits without waiting for the turn.
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await page.getByRole('button', { name: 'Restart mission' }).click();
   await expect.poll(() => api.remaining()).toBe(0);
   const retried = api.requests.find((request) => (request.body as { action?: { type: string } } | null)?.action?.type === 'retryMission');

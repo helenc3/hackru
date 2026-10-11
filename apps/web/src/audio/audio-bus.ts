@@ -1,8 +1,8 @@
 import { useSyncExternalStore } from 'react';
 import { ApiErrorSchema, TranscriptionResponseSchema, type TranscriptionResponse } from '@vibequest/shared';
 
-/** One local audio lane: the recorder and the player never overlap. */
-export type AudioActivity = 'idle' | 'recording' | 'playing';
+/** One local audio lane: the recorder and the player never overlap. 'playing' is NPC speech (interruptible), 'announcing' is PA (not). */
+export type AudioActivity = 'idle' | 'recording' | 'playing' | 'announcing';
 let activity: AudioActivity = 'idle';
 const listeners = new Set<() => void>();
 export function setAudioActivity(next: AudioActivity): void {
@@ -25,6 +25,11 @@ export async function finishConfirmation(): Promise<void> {
   await finish?.();
   if (confirmation === finish) confirmation = null;
 }
+
+/** Registered by the AudioController: stops NPC speech so the recorder can barge in. */
+let interrupt: (() => Promise<void>) | null = null;
+export function setInterrupt(next: (() => Promise<void>) | null): void { interrupt = next; }
+export async function interruptPlayback(): Promise<void> { await interrupt?.(); }
 
 export class AudioApiError extends Error {
   constructor(readonly status: number, readonly code: string, message: string, readonly retryable: boolean) { super(message); this.name = 'AudioApiError'; }

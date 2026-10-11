@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
-import { NpcIdSchema, type GameAction } from '@vibequest/shared';
+import { NpcIdSchema, sceneManifest, type GameAction } from '@vibequest/shared';
 import { WorldRenderer } from '../world/WorldRenderer';
 import { AudioController } from '../audio/AudioController';
 import { BackgroundMusic } from '../audio/BackgroundMusic';
@@ -76,25 +76,29 @@ export function App() {
 
   const state = session.state;
   const selectedCue = state.visibleCues.find((cue) => cue.id === sign);
+  const here = state.interactables.find((entry) => entry.id === npc)?.position;
+  const npcChoices = here ? state.interactables.filter((item) => item.kind === 'choice' && Math.hypot(item.position.x - here.x, item.position.z - here.z) <= sceneManifest.interactionRadius) : [];
 
   return <div className="game-shell" data-testid="game-shell" data-dialogue-open={Boolean(npc)}>
-    <header className="game-topbar"><a className="brand" href="#world">VibeQuest<span className="brand-dot">.</span></a><span className="language-chip"><span lang="zh-Hans">中文</span>Mandarin Chinese</span><span>{state.mode === 'boss' ? 'Boss mission' : 'Practice'} · {state.zoneId}</span>{state.status === 'active' && <button className="button secondary" disabled={session.pending && !session.turnPending} onClick={() => void onAction({ type: 'retryMission' }).catch(() => undefined)}>Restart mission</button>}<button className="button secondary" disabled={session.pending} onClick={() => { closeConversation(); session.abandon(); }}>Leave session</button></header>
-    {state.validationMode ? <div className="environment-banner">Developer validation · all XP, loot and badges are simulated. Progress stays separate from player sessions.</div> : state.providerStatus !== 'live' ? <div className="environment-banner">{state.providerStatus === 'fixture' ? 'Fixture demonstration · scripted responses' : 'Voice or AI service is degraded · retry or use the same-world fallback.'}</div> : null}
-    <main className="game-main"><div className="game-layout"><div className="game-world" id="world"><WorldRenderer key={attempt} state={state} onAction={onAction} onTalk={onTalk} />
-      <InventoryBar state={state} pending={session.pending} paused={paused} onAction={onAction} onPause={() => void onAction({ type: paused ? 'resumePractice' : 'pausePractice' }).catch(() => undefined)} />
-      {selectedCue?.text && <section className="sign-overlay" role="dialog" aria-label="Inspected sign"><button ref={signClose} className="button secondary" onClick={closeSignPanel} aria-label="Close sign">Close</button><h3 lang="zh-Hans">{selectedCue.label}</h3><p lang="zh-Hans">{selectedCue.text}</p></section>}
+    <header className="game-topbar"><a className="brand" href="#world">VibeQuest<span className="brand-dot">.</span></a><span className="language-chip"><span lang="zh-Hans">中文</span>Mandarin Chinese</span><span>{state.mode === 'boss' ? 'Boss mission' : 'Practice'} · {state.zoneId}</span>{state.validationMode ? <span className="environment-banner">Developer validation · all XP, loot and badges are simulated. Progress stays separate from player sessions.</span> : state.providerStatus !== 'live' ? <span className="environment-banner">{state.providerStatus === 'fixture' ? 'Fixture demonstration · scripted responses' : 'Voice or AI service is degraded · retry or use the same-world fallback.'}</span> : null}{state.status === 'active' && <button className="button secondary" disabled={session.pending && !session.turnPending} onClick={() => void onAction({ type: 'retryMission' }).catch(() => undefined)}>Restart mission</button>}<button className="button secondary" disabled={session.pending} onClick={() => { closeConversation(); session.abandon(); }}>Leave session</button></header>
+    <main className="game-main">
+      <div className="game-world" id="world"><WorldRenderer key={attempt} state={state} onAction={onAction} onTalk={onTalk} /></div>
+      <QuestPanel state={state} />
+      <div className="hud-bottom-left">
+        <WorldInteractions state={state} pending={session.pending} onAction={onAction} onTalk={onTalk} onShowSubtitles={setSign} />
+        <InventoryBar state={state} pending={session.pending} paused={paused} onAction={onAction} onPause={() => void onAction({ type: paused ? 'resumePractice' : 'pausePractice' }).catch(() => undefined)} />
+      </div>
       <AudioController state={state} onAction={onAction} speechId={session.turn?.speechId} />
-      {!state.validationMode && <BackgroundMusic active={state.status === 'active' && !paused} conversation={Boolean(npc)} />}
-      <WorldInteractions state={state} pending={session.pending} onAction={onAction} onTalk={onTalk} onShowSubtitles={setSign} />
-    </div><QuestPanel state={state} /></div>
-    <RecoveryPanel problem={session.problem} pending={session.pending} onRetry={session.retry} onRefresh={session.refresh} onNew={session.abandon} onDismiss={session.dismiss} />
-    {notice && <div className="action-notice" role="status">{notice}</div>}
-    {session.events.length > 0 && <section className="event-feed" aria-label="Mission updates" aria-live="polite">{session.events.slice(-3).map((event) => <p key={event.id}>{event.message}</p>)}</section>}
-    {paused && !npc && state.status === 'active' && <CoachPanel state={state} turn={session.turn} />}
-    {npc && state.status === 'active' && <DialoguePanel key={`${state.sessionId}:${state.missionId}:${npc}`} state={state} npcId={npc} pending={session.pending} turn={session.turnNpc === npc ? session.turn : null} onAction={onAction} onSubmit={session.submit} onClose={closeConversation} />}
-    <ResultPanel state={state} pending={session.pending} onAction={onAction} onExit={session.abandon} />
-    {validation && state.validationMode && ValidationHarness && <Suspense fallback={<p>Loading internal validator…</p>}><ValidationHarness state={state} onAction={onAction} onTalk={onTalk} /></Suspense>}
-    <footer className="session-footer">{state.validationMode ? 'Validation session' : 'Player session'} · {state.sessionId} · Version {state.version}<button className="button secondary" disabled={session.pending} onClick={() => void session.refresh().catch(() => undefined)}>Refresh session</button></footer>
+      {!state.validationMode && <div className="hud-music"><BackgroundMusic active={state.status === 'active' && !paused} conversation={Boolean(npc)} /></div>}
+      {selectedCue?.text && <section className="sign-overlay" role="dialog" aria-label="Inspected sign"><button ref={signClose} className="button secondary" onClick={closeSignPanel} aria-label="Close sign">Close</button><h3 lang="zh-Hans">{selectedCue.label}</h3><p lang="zh-Hans">{selectedCue.text}</p></section>}
+      <RecoveryPanel problem={session.problem} pending={session.pending} onRetry={session.retry} onRefresh={session.refresh} onNew={session.abandon} onDismiss={session.dismiss} />
+      {notice && <div className="action-notice" role="status">{notice}</div>}
+      {session.events.length > 0 && <section className="event-feed" aria-label="Mission updates" aria-live="polite">{session.events.slice(-3).map((event) => <p key={event.id}>{event.message}</p>)}</section>}
+      {paused && !npc && state.status === 'active' && <CoachPanel state={state} turn={session.turn} />}
+      {npc && state.status === 'active' && <DialoguePanel key={`${state.sessionId}:${state.missionId}:${npc}`} state={state} npcId={npc} pending={session.pending} turn={session.turnNpc === npc ? session.turn : null} choices={npcChoices} onAction={onAction} onSubmit={session.submit} onLiveTurn={session.applyTurn} onClose={closeConversation} />}
+      <ResultPanel state={state} pending={session.pending} onAction={onAction} onExit={session.abandon} />
+      {validation && state.validationMode && ValidationHarness && <Suspense fallback={<p>Loading internal validator…</p>}><ValidationHarness state={state} onAction={onAction} onTalk={onTalk} /></Suspense>}
+      <footer className="session-footer">{state.validationMode ? 'Validation session' : 'Player session'} · {state.sessionId} · Version {state.version}<button className="button secondary" disabled={session.pending} onClick={() => void session.refresh().catch(() => undefined)}>Refresh session</button></footer>
     </main>
   </div>;
 }

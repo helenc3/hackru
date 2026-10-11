@@ -89,7 +89,7 @@ describe('reservation, idempotency and audio integrity', () => {
     expect(session.state.evidence.find((entry) => entry.turnId === 'stt-turn')?.conversationSource).toBe('spoken');
     const speechId = turn.body.speechId;
     const job = session.speechJobs.get(speechId)!;
-    expect(job).toMatchObject({ sessionId: session.id, attemptId: session.state.attemptId, turnId: 'stt-turn', replyZh: '一杯茶十元。请确认饮料和价格。', status: 'pending' });
+    expect(job).toMatchObject({ sessionId: session.id, attemptId: session.state.attemptId, turnId: 'stt-turn', replyZh: '一杯茶十元。请确认：茶十元，对吗？', status: 'pending' });
     await game.act({ type: 'audioPhase', operationId: 'unknown-playback', phase: 'playing' }, 409); // stale helper version
     const action = async (actionId: string, value: unknown, status = 200) => request(game.app).post(`${path}/actions`).send({ actionId, expectedVersion: session.state.version, action: value }).expect(status);
     await action('not-ready', { type: 'audioPhase', operationId: job.operationId, phase: 'playing' }, 422);

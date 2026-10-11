@@ -109,78 +109,94 @@ export function createGameRouter(services: ServerServices): Router {
     const params = sessionParamsSchema.safeParse(request.params);
     const parsed = TurnRequestSchema.safeParse(request.body);
     if (!params.success || !parsed.success) { await sendError(response, new HttpError(400, 'INVALID_REQUEST', 'Invalid dialogue turn request.')); return; }
-    const id = params.data.id;
-    try {
-      const body = parsed.data;
-      const payload = semanticPayload('turn', { npcId: body.npcId, input: body.input });
-      const reserved = await store.withSession(id, async (session) => {
-        const cached = existing(session, body.turnId, payload);
-        if (cached) return { cached };
-        version(session, body.expectedVersion);
-        if (session.state.pendingTurn) throw new HttpError(409, 'TURN_PENDING', 'Wait for the pending turn or retry the mission.', true);
-        const nowMs = Date.now(); sync(session, nowMs);
-        const context = dialogueContext(session.state, body.npcId);
-        if (session.state.activeAudioOperationId) throw new HttpError(422, 'AUDIO_BUSY', 'Finish the current audio operation before submitting.');
-        if (session.state.cuePlaybacks.some((entry) => !entry.delivered && !entry.interrupted)) throw new HttpError(422, 'AUDIO_BUSY', 'Wait for cue playback to finish.');
-        const provenance = resolveTranscription(session, body.input, nowMs);
-        session.modelCalls = session.modelCalls.filter((time) => time > nowMs - 60_000);
-        if (session.totalModelCalls >= 30 || session.modelCalls.length >= 10) throw new HttpError(429, 'TURN_LIMIT', 'Session or per-minute turn budget reached.');
-        session.totalModelCalls++; session.modelCalls.push(nowMs);
-        let resolve!: PendingRequest['resolve']; let reject!: PendingRequest['reject'];
-        const result = new Promise<unknown>((yes, no) => { resolve = yes; reject = no; });
-        void result.catch(() => undefined); // Abandonment may precede attachment of the HTTP waiter.
-        const pending: PendingRequest = { sessionId: id, payload, attemptId: session.state.attemptId, result, resolve, reject };
-        session.pendingRequests.set(body.turnId, pending);
-        session.state.pendingTurn = { turnId: body.turnId, sessionId: id, attemptId: pending.attemptId, npcId: body.npcId, text: body.input.text, source: provenance.source, ...(body.input.transcriptionId ? { transcriptionId: body.input.transcriptionId, originalSttText: provenance.originalSttText } : {}), assisted: Boolean(session.state.flags['session.assisted']), createdAtMs: nowMs };
-        if (!session.state.timer!.pauseReasons.includes('provider')) session.state.timer!.pauseReasons.push('provider');
-        session.state.version++;
-        return { pending, context, fixture: session.state.providerStatus === 'fixture' };
-      });
-      if ('cached' in reserved && reserved.cached) { response.json(reserved.cached.pending ? await reserved.cached.pending : reserved.cached.response); return; }
-      if (!('pending' in reserved) || !reserved.pending || !reserved.context) throw new Error('Missing turn reservation.');
-      void evaluate(body, reserved.pending, reserved.context, reserved.fixture ?? false);
-      response.json(await reserved.pending.result);
-    } catch (error) { await sendError(response, error, id); }
+    try { response.json(await runTurn(services, params.data.id, parsed.data)); } catch (error) { await sendError(response, error, params.data.id); }
   });
-
-  async function evaluate(body: TurnRequest, pending: PendingRequest, context: TurnContext, fixture: boolean): Promise<void> {
-    let timeout: ReturnType<typeof setTimeout> | undefined;
-    const startedMs = Date.now();
-    // §11 turn log: no keys, player audio or provider bodies.
-    const log = (outcome: string, detail: string) => console.info(JSON.stringify({ turnId: body.turnId, elapsedMs: Date.now() - startedMs, provider: fixture ? 'fixture' : `gemini:${services.config.geminiModel}`, outcome, detail }));
-    try {
-      const provider = fixture ? fixtureDialogue : services.dialogueProvider;
-      const raw = await Promise.race([provider.evaluate(context, body.input.text), new Promise<never>((_resolve, reject) => { timeout = setTimeout(() => reject(new Error('Provider timeout')), 8_000); })]);
-      const evaluation = validateEvaluationForContext(raw, context, body.input.text);
-      await store.withSession(contextSessionId(), async (session) => {
-        if (session.state.attemptId !== pending.attemptId || session.pendingRequests.get(body.turnId) !== pending || session.state.pendingTurn?.turnId !== body.turnId) return;
-        const nowMs = Date.now();
-        const engine = applyEvaluation(session.state, body.npcId, evaluation, nowMs);
-        session.state = engine.state;
-        session.state.pendingTurn = null;
-        session.state.timer!.pauseReasons = session.state.timer!.pauseReasons.filter((reason) => reason !== 'provider');
-        session.state.version++;
-        const speechId = randomUUID();
-        registerSpeechJob(session, { id: speechId, sessionId: session.id, attemptId: pending.attemptId, turnId: body.turnId, replyZh: groundedReply(session.state, body.npcId, evaluation), voiceKey: body.npcId, operationId: speechId, status: 'pending' });
-        const outcome: TurnResponse = TurnResponseSchema.parse({ turnId: body.turnId, state: projectPublicState(session.state, nowMs), events: engine.events, npcReply: session.speechJobs.get(speechId)!.replyZh, speechId, ...(session.state.mode === 'practice' ? { ...(evaluation.coach ? { feedback: evaluation.coach } : {}), vibe: { intent: evaluation.intentGrade.score, clarity: evaluation.clarity, courtesy: evaluation.courtesy } } : {}) });
-        session.pendingRequests.delete(body.turnId);
-        session.completedRequests.set(body.turnId, { payload: pending.payload, response: outcome });
-        pending.resolve(outcome);
-        log('committed', `${evaluation.intent}/${evaluation.interaction} → ${engine.events.map((event) => event.kind).join(',') || 'no transition'}`);
-      });
-    } catch (error) {
-      log('failed', error instanceof HttpError || error instanceof EngineRuleError ? `${error.code}: ${error.message}`.slice(0, 160) : error instanceof Error ? error.message.slice(0, 160) : 'unknown');
-      await store.withSession(contextSessionId(), async (session) => {
-        if (session.state.attemptId !== pending.attemptId || session.pendingRequests.get(body.turnId) !== pending) return;
-        sync(session, Date.now());
-        session.state.pendingTurn = null;
-        session.state.timer!.pauseReasons = session.state.timer!.pauseReasons.filter((reason) => reason !== 'provider');
-        session.state.version++;
-        session.pendingRequests.delete(body.turnId);
-        pending.reject(new HttpError(503, 'PROVIDER_UNAVAILABLE', 'The provider response was unavailable or invalid. Retry with the current version.', true));
-      });
-    } finally { if (timeout) clearTimeout(timeout); }
-    function contextSessionId(): string { return pending.sessionId; }
-  }
   return router;
+}
+
+export interface TurnOptions {
+  /** HTTP turns check the client's version; server-initiated live-voice turns skip it. */
+  checkVersion?: boolean;
+  /** Live voice: the NPC already spoke. Resolves the spoken transcript instead of queuing a speech job. */
+  spokenReply?: () => Promise<string | undefined>;
+}
+
+/** One evaluated dialogue turn: reservation, provider evaluation, engine commit. Shared by HTTP and live voice. */
+export async function runTurn(services: ServerServices, id: string, body: TurnRequest, options: TurnOptions = {}): Promise<TurnResponse> {
+  const store = services.sessionStore;
+  const payload = semanticPayload('turn', { npcId: body.npcId, input: body.input });
+  const reserved = await store.withSession(id, async (session) => {
+    const cached = existing(session, body.turnId, payload);
+    if (cached) return { cached };
+    if (options.checkVersion !== false) version(session, body.expectedVersion);
+    if (session.state.pendingTurn) throw new HttpError(409, 'TURN_PENDING', 'Wait for the pending turn or retry the mission.', true);
+    const nowMs = Date.now(); sync(session, nowMs);
+    const context = dialogueContext(session.state, body.npcId);
+    if (session.state.activeAudioOperationId) throw new HttpError(422, 'AUDIO_BUSY', 'Finish the current audio operation before submitting.');
+    if (session.state.cuePlaybacks.some((entry) => !entry.delivered && !entry.interrupted)) throw new HttpError(422, 'AUDIO_BUSY', 'Wait for cue playback to finish.');
+    const provenance = resolveTranscription(session, body.input, nowMs);
+    session.modelCalls = session.modelCalls.filter((time) => time > nowMs - 60_000);
+    if (session.totalModelCalls >= 30 || session.modelCalls.length >= 10) throw new HttpError(429, 'TURN_LIMIT', 'Session or per-minute turn budget reached.');
+    session.totalModelCalls++; session.modelCalls.push(nowMs);
+    let resolve!: PendingRequest['resolve']; let reject!: PendingRequest['reject'];
+    const result = new Promise<unknown>((yes, no) => { resolve = yes; reject = no; });
+    void result.catch(() => undefined); // Abandonment may precede attachment of the waiter.
+    const pending: PendingRequest = { sessionId: id, payload, attemptId: session.state.attemptId, result, resolve, reject };
+    session.pendingRequests.set(body.turnId, pending);
+    session.state.pendingTurn = { turnId: body.turnId, sessionId: id, attemptId: pending.attemptId, npcId: body.npcId, text: body.input.text, source: provenance.source, ...(body.input.transcriptionId ? { transcriptionId: body.input.transcriptionId, originalSttText: provenance.originalSttText } : {}), assisted: Boolean(session.state.flags['session.assisted']), createdAtMs: nowMs };
+    if (!session.state.timer!.pauseReasons.includes('provider')) session.state.timer!.pauseReasons.push('provider');
+    session.state.version++;
+    return { pending, context, fixture: session.state.providerStatus === 'fixture' };
+  });
+  if ('cached' in reserved && reserved.cached) return (reserved.cached.pending ? await reserved.cached.pending : reserved.cached.response) as TurnResponse;
+  if (!('pending' in reserved) || !reserved.pending || !reserved.context) throw new Error('Missing turn reservation.');
+  void evaluate(services, body, reserved.pending, reserved.context, reserved.fixture ?? false, options);
+  return await reserved.pending.result as TurnResponse;
+}
+
+async function evaluate(services: ServerServices, body: TurnRequest, pending: PendingRequest, context: TurnContext, fixture: boolean, options: TurnOptions): Promise<void> {
+  const store = services.sessionStore;
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  const startedMs = Date.now();
+  // §11 turn log: no keys, player audio or provider bodies.
+  const log = (outcome: string, detail: string) => console.info(JSON.stringify({ turnId: body.turnId, elapsedMs: Date.now() - startedMs, provider: fixture ? 'fixture' : `gemini:${services.config.geminiModel}`, live: Boolean(options.spokenReply), outcome, detail }));
+  try {
+    const provider = fixture ? fixtureDialogue : services.dialogueProvider;
+    const raw = await Promise.race([provider.evaluate(context, body.input.text), new Promise<never>((_resolve, reject) => { timeout = setTimeout(() => reject(new Error('Provider timeout')), 8_000); })]);
+    const evaluation = validateEvaluationForContext(raw, context, body.input.text);
+    const spoken = options.spokenReply ? (await options.spokenReply())?.trim() : undefined;
+    await store.withSession(pending.sessionId, async (session) => {
+      if (session.state.attemptId !== pending.attemptId || session.pendingRequests.get(body.turnId) !== pending || session.state.pendingTurn?.turnId !== body.turnId) return;
+      const nowMs = Date.now();
+      const engine = applyEvaluation(session.state, body.npcId, evaluation, nowMs);
+      session.state = engine.state;
+      session.state.pendingTurn = null;
+      session.state.timer!.pauseReasons = session.state.timer!.pauseReasons.filter((reason) => reason !== 'provider');
+      session.state.version++;
+      const replyZh = groundedReply(session.state, body.npcId, evaluation);
+      let speech: { npcReply: string; speechId?: string };
+      if (options.spokenReply) speech = { npcReply: spoken && spoken.length <= 80 ? spoken : replyZh }; // audio already streamed live
+      else {
+        const speechId = randomUUID();
+        registerSpeechJob(session, { id: speechId, sessionId: session.id, attemptId: pending.attemptId, turnId: body.turnId, replyZh, voiceKey: body.npcId, operationId: speechId, status: 'pending' });
+        speech = { npcReply: replyZh, speechId };
+      }
+      const outcome: TurnResponse = TurnResponseSchema.parse({ turnId: body.turnId, state: projectPublicState(session.state, nowMs), events: engine.events, ...speech, ...(engine.conversationEnded ? { conversationEnded: true } : {}), ...(session.state.mode === 'practice' ? { ...(evaluation.coach ? { feedback: evaluation.coach } : {}), vibe: { intent: evaluation.intentGrade.score, clarity: evaluation.clarity, courtesy: evaluation.courtesy } } : {}) });
+      session.pendingRequests.delete(body.turnId);
+      session.completedRequests.set(body.turnId, { payload: pending.payload, response: outcome });
+      pending.resolve(outcome);
+      log('committed', `${evaluation.intent}/${evaluation.interaction} → ${engine.events.map((event) => event.kind).join(',') || 'no events'}`);
+    });
+  } catch (error) {
+    log('failed', error instanceof HttpError || error instanceof EngineRuleError ? `${error.code}: ${error.message}`.slice(0, 160) : error instanceof Error ? error.message.slice(0, 160) : 'unknown');
+    await store.withSession(pending.sessionId, async (session) => {
+      if (session.state.attemptId !== pending.attemptId || session.pendingRequests.get(body.turnId) !== pending) return;
+      sync(session, Date.now());
+      session.state.pendingTurn = null;
+      session.state.timer!.pauseReasons = session.state.timer!.pauseReasons.filter((reason) => reason !== 'provider');
+      session.state.version++;
+      session.pendingRequests.delete(body.turnId);
+      pending.reject(new HttpError(503, 'PROVIDER_UNAVAILABLE', 'The provider response was unavailable or invalid. Retry with the current version.', true));
+    });
+  } finally { if (timeout) clearTimeout(timeout); }
 }

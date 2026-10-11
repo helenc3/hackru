@@ -1,7 +1,7 @@
 import { expect, type Page, type Route } from '@playwright/test';
 import { ActionRequestSchema, CreateSessionRequestSchema, PublicStateSchema, TurnRequestSchema, TurnResponseSchema, createBaselineState, type GameAction, type MissionId, type PublicState } from '@vibequest/shared';
 
-export type Step = { action?: Partial<GameAction>; text?: string; patch?: Partial<PublicState>; reply?: string; feedback?: boolean; event?: string };
+export type Step = { action?: Partial<GameAction>; text?: string; patch?: Partial<PublicState>; reply?: string; feedback?: boolean; event?: string; end?: boolean };
 export const fixtureState = (missionId: MissionId, validation = false): PublicState => PublicStateSchema.parse({
   ...createBaselineState(missionId), sessionId: `ui-${validation ? 'validation' : 'player'}-${missionId}`, validationMode: validation,
   zoneId: missionId === 'P1' ? 'cafe' : 'concourse', objectives: [
@@ -57,7 +57,7 @@ export async function installScriptedApi(page: Page, options: { mission?: Missio
       const next = steps.shift();
       expect(next?.text).toBe(input.input.text);
       state = PublicStateSchema.parse({ ...state, ...next?.patch, version: state.version + 1 });
-      const response = TurnResponseSchema.parse({ turnId: input.turnId, state, events: [], npcReply: next?.reply ?? '好的。', ...(next?.feedback && state.mode !== 'boss' ? { feedback: { understood: 'Your request was understood.', explanation: 'A short, clear Mandarin request works here.', improvedExample: '请给我一杯水，谢谢。' }, vibe: { intent: .9, clarity: .8, courtesy: .8 } } : {}) });
+      const response = TurnResponseSchema.parse({ turnId: input.turnId, state, events: [], npcReply: next?.reply ?? '好的。', ...(next?.end ? { conversationEnded: true } : {}), ...(next?.feedback && state.mode !== 'boss' ? { feedback: { understood: 'Your request was understood.', explanation: 'A short, clear Mandarin request works here.', improvedExample: '请给我一杯水，谢谢。' }, vibe: { intent: .9, clarity: .8, courtesy: .8 } } : {}) });
       sent.set(input.turnId, response);
       return json(route, response);
     }

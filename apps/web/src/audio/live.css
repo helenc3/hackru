@@ -1,0 +1,11 @@
+.live-status { display: flex; align-items: center; gap: 10px; margin: 0 0 14px; font-size: 13px; font-weight: 700; }
+.live-status .button { margin-left: auto; padding: 7px 11px; }
+.live-mic { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--ink); background: var(--raspberry); animation: vq-live-pulse 1.2s ease-in-out infinite; }
+.live-mic.npc-speaking { background: var(--plum); animation-duration: .6s; }
+.live-mic.connecting { background: var(--lemon); }
+.live-mic.paused, .live-mic.error { background: #ccc; animation: none; }
+.bubble.partial { opacity: .55; font-weight: 500; }
+@keyframes vq-live-pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.35); } }
+.bubble.coach { align-self: flex-start; display: grid; gap: 4px; max-width: 85%; padding: 10px 14px; font-size: 12px; font-weight: 500; color: var(--text-muted); background: #fff; box-shadow: none; }
+.bubble.coach .mandarin-chip { justify-self: start; margin-top: 4px; padding: 4px 10px; border: 2px solid var(--ink); border-radius: var(--radius-pill); background: var(--lemon); color: var(--ink); font-size: 16px; font-weight: 700; }
+.thread-notice { align-self: center; margin: 0; font-size: 11px; font-weight: 700; color: var(--raspberry); }

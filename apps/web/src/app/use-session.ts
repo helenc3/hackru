@@ -119,6 +119,15 @@ export function useSession(validation: boolean) {
     });
   }, [accept, enqueue]);
 
+  /** A live-voice turn evaluated server-side over the WebSocket: same bookkeeping as a POST /turns response. */
+  const applyTurn = useCallback((npcId: string, response: TurnResponse) => {
+    const id = NpcIdSchema.parse(npcId);
+    const token = generation.current;
+    accept(response.state, token);
+    if (response.state.version >= (current.current?.version ?? 0)) { setTurn(response); setTurnNpc(id); }
+    setEvents((previous) => [...previous, ...response.events.filter((event) => !previous.some((known) => known.id === event.id))].slice(-8));
+  }, [accept]);
+
   const abandon = useCallback(() => {
     generation.current++; current.current = null; setState(null); setTurn(null); setEvents([]); setProblem(null);
     tail.current = Promise.resolve(); setPending(0); activeTurn.current = null; setTurnPending(false);
@@ -131,6 +140,6 @@ export function useSession(validation: boolean) {
     return () => clearInterval(interval);
   }, [state?.sessionId, state?.timer, state?.status, pending, problem, refresh]);
 
-  return { state, pending: pending > 0, turnPending, problem, turn, turnNpc, events, resumeId, start, refresh, onAction, submit, abandon,
+  return { state, pending: pending > 0, turnPending, problem, turn, turnNpc, events, resumeId, start, refresh, onAction, submit, applyTurn, abandon,
     retry: async () => { await retry.current?.(); }, dismiss: () => setProblem(null) };
 }

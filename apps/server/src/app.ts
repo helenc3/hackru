@@ -35,7 +35,7 @@ export function createApp(options: AppOptions = {}): Express {
       },
       segments: {
         engine: 'implemented',
-        dialogue: config.geminiApiKey ? 'live' : 'unconfigured',
+        dialogue: config.anthropicApiKey || config.geminiApiKey ? 'live' : 'unconfigured',
         speech: config.elevenlabsApiKey ? 'live' : 'unconfigured',
       },
     });

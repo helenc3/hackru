@@ -14,7 +14,7 @@ export const ZoneIdSchema = z.enum(['plaza', 'cafe', 'kiosk', 'concourse', 'plat
 export const NpcIdSchema = z.enum(['xiaolin', 'achen', 'laozhou']);
 export const CueIdSchema = z.enum(['p1.entrance-sign', 'p1.station-directions', 'p2.timetable', 'p2.platform-change', 'b1.destination-board', 'b1.harbor-change']);
 export const ChoiceIdSchema = z.enum(['p1.enter-plaza-door', 'p1.try-closed-door', 'p1.pay-cafe', 'p1.go-kiosk', 'p1.pay-kiosk', 'p2.board-1', 'p2.board-2', 'p2.board-3', 'b1.pay-ticket', 'b1.board-1', 'b1.board-2', 'b1.board-3']);
-export const IntentSchema = z.enum(['order_drink', 'accept_substitute', 'cancel_order', 'confirm_drink_price', 'ask_direction', 'confirm_platform', 'request_repeat', 'buy_ticket', 'confirm_ticket', 'greeting', 'unknown']);
+export const IntentSchema = z.enum(['order_drink', 'accept_substitute', 'cancel_order', 'confirm_drink_price', 'ask_direction', 'confirm_platform', 'request_repeat', 'buy_ticket', 'confirm_ticket', 'greeting', 'farewell', 'unknown']);
 export const GameActionTypeSchema = z.enum(['moveZone', 'inspect', 'playCue', 'finishCue', 'audioPhase', 'choose', 'useItem', 'pausePractice', 'resumePractice', 'setInputPreference', 'retryMission', 'startMission']);
 export const DESTINATION_ALIASES = {
   jiangbin: ['江滨', '江濱', 'Jiangbin', 'Riverside'],
@@ -119,7 +119,7 @@ export const ActionResponseSchema = z.strictObject({ state: PublicStateSchema, e
 export type ActionResponse = z.infer<typeof ActionResponseSchema>;
 export const StateResponseSchema = z.strictObject({ state: PublicStateSchema });
 export type StateResponse = z.infer<typeof StateResponseSchema>;
-export const TurnResponseSchema = z.strictObject({ turnId: identifier, state: PublicStateSchema, events: z.array(GameEventSchema).max(20), npcReply: z.string().min(1).max(80), speechId: identifier.optional(), feedback: CoachFeedbackSchema.optional(), vibe: z.strictObject({ intent: unit, clarity: unit, courtesy: unit }).optional() }).superRefine((response, context) => {
+export const TurnResponseSchema = z.strictObject({ turnId: identifier, state: PublicStateSchema, events: z.array(GameEventSchema).max(20), npcReply: z.string().min(1).max(80), speechId: identifier.optional(), feedback: CoachFeedbackSchema.optional(), vibe: z.strictObject({ intent: unit, clarity: unit, courtesy: unit }).optional(), conversationEnded: z.literal(true).optional() }).superRefine((response, context) => {
   if (response.state.mode === 'boss' && response.state.status === 'active') {
     if (response.feedback !== undefined) context.addIssue({ code: 'custom', path: ['feedback'], message: 'Active boss response omits coaching.' });
     if (response.vibe !== undefined) context.addIssue({ code: 'custom', path: ['vibe'], message: 'Active boss response omits evaluation scores.' });
@@ -137,7 +137,7 @@ export const SlotSchema = z.discriminatedUnion('key', [
 export type Slot = z.infer<typeof SlotSchema>;
 export const INTENT_SLOT_KEYS: Record<Intent, readonly Slot['key'][]> = {
   order_drink: ['drink'], accept_substitute: ['drink'], cancel_order: [], confirm_drink_price: ['drink', 'priceCny'], ask_direction: ['destination'],
-  confirm_platform: ['platform'], request_repeat: [], buy_ticket: ['destination', 'quantity'], confirm_ticket: ['destination', 'quantity'], greeting: [], unknown: [],
+  confirm_platform: ['platform'], request_repeat: [], buy_ticket: ['destination', 'quantity'], confirm_ticket: ['destination', 'quantity'], greeting: [], farewell: [], unknown: [],
 };
 export const TurnEvaluationSchema = z.strictObject({
   intent: IntentSchema, slots: z.array(SlotSchema).max(2), evidenceQuote: z.string().max(500),
@@ -307,7 +307,7 @@ export const InternalStateSchema = z.strictObject({
   if (state.mode === 'boss' && state.timer?.pauseReasons.some((reason) => reason === 'practice-coach' || reason === 'freeze')) context.addIssue({ code: 'custom', path: ['timer', 'pauseReasons'], message: 'Boss cannot use practice pauses.' });
 });
 export type InternalState = z.infer<typeof InternalStateSchema>;
-export type EngineResult = { state: InternalState; events: GameEvent[] };
+export type EngineResult = { state: InternalState; events: GameEvent[]; conversationEnded?: true };
 export const CreateGameOptionsSchema = z.strictObject({ sessionId: identifier, attemptId: identifier, missionId: MissionIdSchema.default('P1'), initialTier: z.union([z.literal(0), z.literal(1)]), validationMode: z.boolean().default(false), inputPreference: InputPreferenceSchema.default('voice'), providerStatus: ProviderStatusSchema });
 export type CreateGameOptions = z.infer<typeof CreateGameOptionsSchema>;
 

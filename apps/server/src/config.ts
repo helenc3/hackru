@@ -1,3 +1,4 @@
+import { characterDescriptions } from '@vibequest/shared';
 import { z } from 'zod';
 
 const booleanEnvironmentSchema = z
@@ -18,9 +19,6 @@ const environmentSchema = z.object({
   ELEVENLABS_TTS_MODEL: z.string().trim().min(1).default('eleven_v4_turbo'),
   ELEVENLABS_PA_MODEL: z.string().trim().min(1).default('eleven_v4'),
   ELEVENLABS_STT_MODEL: z.string().trim().min(1).default('scribe_v2'),
-  ELEVENLABS_VOICE_XIAOLIN: z.string().trim().min(1).optional(),
-  ELEVENLABS_VOICE_ACHEN: z.string().trim().min(1).optional(),
-  ELEVENLABS_VOICE_LAOZHOU: z.string().trim().min(1).optional(),
   ENABLE_DEMO_FIXTURES: booleanEnvironmentSchema,
   ENABLE_VALIDATION_HARNESS: booleanEnvironmentSchema,
 });
@@ -74,9 +72,9 @@ export function loadConfig(environment: NodeJS.ProcessEnv = process.env): Server
     elevenlabsPaModel: env.ELEVENLABS_PA_MODEL,
     elevenlabsSttModel: env.ELEVENLABS_STT_MODEL,
     voiceIds: {
-      xiaolin: env.ELEVENLABS_VOICE_XIAOLIN,
-      achen: env.ELEVENLABS_VOICE_ACHEN,
-      laozhou: env.ELEVENLABS_VOICE_LAOZHOU,
+      xiaolin: characterDescriptions.find((npc) => npc.id === 'xiaolin')!.voice.id,
+      achen: characterDescriptions.find((npc) => npc.id === 'achen')!.voice.id,
+      laozhou: characterDescriptions.find((npc) => npc.id === 'laozhou')!.voice.id,
     },
     enableDemoFixtures: env.ENABLE_DEMO_FIXTURES,
     enableValidationHarness: env.ENABLE_VALIDATION_HARNESS,

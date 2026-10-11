@@ -5,16 +5,16 @@ import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { ElevenLabsClient } from '@elevenlabs/elevenlabs-js';
-import { cues } from '@vibequest/shared';
-import { APPROVED_VOICE_IDS, DEFAULT_PA_VOICE_ID, DEFAULT_VOICE_IDS, voiceFor } from '../apps/server/src/providers/elevenlabs/live.js';
+import { cues, audioVoices } from '@vibequest/shared';
+import { APPROVED_VOICE_IDS, voiceFor } from '../apps/server/src/providers/elevenlabs/live.js';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const audioDir = `${root}apps/web/public/audio`;
 const manifestPath = `${root}fixtures/audio/pa-manifest.json`;
 // Use reviewed character voices and authored Hanzi directly.
-const paVoiceId = process.env.ELEVENLABS_VOICE_PA || DEFAULT_PA_VOICE_ID;
-const directionsVoiceId = voiceFor({ xiaolin: process.env.ELEVENLABS_VOICE_XIAOLIN }, 'xiaolin');
-const setupVoiceId = process.env.ELEVENLABS_VOICE_SETUP || DEFAULT_VOICE_IDS.xiaolin;
+const paVoiceId = audioVoices.pa.id;
+const directionsVoiceId = voiceFor({}, 'xiaolin');
+const setupVoiceId = audioVoices.setup.id;
 for (const voiceId of [paVoiceId, setupVoiceId]) {
   if (!APPROVED_VOICE_IDS.has(voiceId)) throw new Error('Choose a human-approved voice from docs/MANDARIN_VOICES.md.');
 }

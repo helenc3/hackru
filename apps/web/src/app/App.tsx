@@ -2,6 +2,7 @@ import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { NpcIdSchema, sceneManifest, type GameAction } from '@vibequest/shared';
 import { WorldRenderer } from '../world/WorldRenderer';
 import { AudioController } from '../audio/AudioController';
+import { BackgroundMusic } from '../audio/BackgroundMusic';
 import { StartPanel } from '../ui/StartPanel';
 import { DialoguePanel } from '../ui/DialoguePanel';
 import { QuestPanel } from '../ui/QuestPanel';
@@ -9,7 +10,6 @@ import { InventoryBar } from '../ui/InventoryBar';
 import { ResultPanel } from '../ui/ResultPanel';
 import { RecoveryPanel } from '../ui/RecoveryPanel';
 import { CoachPanel } from '../ui/CoachPanel';
-import { BootstrapPreview } from './BootstrapPreview';
 import { WorldInteractions } from '../ui/WorldInteractions';
 import { useApiHealth } from './use-api-health';
 import { useSession } from './use-session';
@@ -71,7 +71,6 @@ export function App() {
   </>;
 
   if (!session.state) {
-    if (health?.segments?.engine === 'unimplemented' && !validationRequested) return <BootstrapPreview>{starter}</BootstrapPreview>;
     return <main className="welcome-screen"><a className="brand" href="/">VibeQuest<span className="brand-dot">.</span></a><span className="language-chip"><span lang="zh-Hans">中文</span>Mandarin Chinese</span><h1>Every street has a story.</h1>{starter}<p className="welcome-footer">One neighborhood. Three missions. Mandarin leads the way.</p></main>;
   }
 
@@ -90,6 +89,7 @@ export function App() {
         <InventoryBar state={state} pending={session.pending} paused={paused} onAction={onAction} onPause={() => void onAction({ type: paused ? 'resumePractice' : 'pausePractice' }).catch(() => undefined)} />
       </div>
       <AudioController state={state} onAction={onAction} speechId={session.turn?.speechId} />
+      {!state.validationMode && <div className="hud-music"><BackgroundMusic active={state.status === 'active' && !paused} conversation={Boolean(npc)} /></div>}
       {selectedCue?.text && <section className="sign-overlay" role="dialog" aria-label="Inspected sign"><button ref={signClose} className="button secondary" onClick={closeSignPanel} aria-label="Close sign">Close</button><h3 lang="zh-Hans">{selectedCue.label}</h3><p lang="zh-Hans">{selectedCue.text}</p></section>}
       <RecoveryPanel problem={session.problem} pending={session.pending} onRetry={session.retry} onRefresh={session.refresh} onNew={session.abandon} onDismiss={session.dismiss} />
       {notice && <div className="action-notice" role="status">{notice}</div>}

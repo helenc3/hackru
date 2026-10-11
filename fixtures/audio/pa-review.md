@@ -1,30 +1,43 @@
 # PA / directions clip review
 
-Status: **review pending human listen.** The results below are a machine round trip
-(ElevenLabs TTS `eleven_multilingual_v2`, voice `EXAVITQu4vr4xnSDxMaL` "Sarah" →
-ElevenLabs STT `scribe_v2`, `language_code=zh`), run 2026-10-10 with
-`scripts/generate-pa.ts --verify`. A matching transcript suggests intelligibility; it
-is not proof of natural pronunciation. Punctuation differences are ignored.
+Subsequent human comparison review approved nine voices in
+[docs/MANDARIN_VOICES.md](../../docs/MANDARIN_VOICES.md) and rejected IPA entirely.
+Current game assignments now use approved voices with direct Hanzi input:
+Coco Li for 小林's directions and the setup check; Adrian for both PA cues.
+All eight newly generated files matched authored text through `scribe_v2`, ignoring
+punctuation. The manifest records their current hashes and voice IDs. These new
+renders retain pending listening status; voice approval does not certify every line.
 
-| Asset | Result | Heard (STT) |
-|---|---|---|
-| p1.station-directions.tier-0 | exact | 走到车站，售票处在右边。 |
-| p1.station-directions.tier-1 | **differs** | 从演唱走到车站，进去后，售票处在右边。 |
-| p1.station-directions.tier-2 | **differs** | 从延长走到车站，进去后，售票处在右边。 |
-| p2.platform-change.tier-0 | exact | 江滨的列车改到三号站台。 |
-| p2.platform-change.tier-1 | exact | 请注意，开往江滨的列车改到三号站台，不是二号站台。 |
-| p2.platform-change.tier-2 | exact | 请注意，开往江滨的列车改到三号站台，不是二号站台。二号站台的车去机场。 |
-| b1.harbor-change.tier-1 | exact | 开往海港的列车改到二号站台，一号站台的列车不再发车。 |
+Live assignments are Coco Li for 小林, James Gao for 阿陈, and Adam Li for 老周.
+Hanzi is required; pinyin/IPA conversion is not used. The observations below are
+historical and concern earlier configurations.
 
-All quest-critical content (江滨, 海港, 机场, 一/二/三号站台) round-trips exactly in both PA cues.
+Status: **v4 machine verification passed; human tone review pending.**
 
-Known issue: sentence-initial 广场 in the P1 directions clips was heard as 演唱/延长 on two
-separate generations, so the voice likely mispronounces it. A human listener should check it.
-If confirmed, try another voice (`ELEVENLABS_VOICE_PA=<id> … --force`) or rephrase via the
-cue owner (Segment-001 content). The destination and counter location are unaffected.
+On 2026-10-10 the human identified incorrect tones, including 第二号站台,
+and requested a solution covering arbitrary live shopkeeper dialogue.
+Full pinyin failed content transcription across all eight clips; joined-word
+pinyin also misread a sample. Targeted substitutions cannot solve general
+dialogue and have been removed from the generation path.
 
-`p1.station-directions` is a spoken-directions cue (小林), generated with the announcer voice.
-Swap to 小林's NPC voice once Segment-005 assigns one.
+All eight static assets were regenerated with `eleven_v4`, original Sarah/George
+voices, `language_code=zh`, and unchanged authored Chinese. All eight matched
+their authored text through `scribe_v2`, ignoring punctuation. Manifest hashes
+and synthesis inputs describe these final files.
+
+Live dialogue defaults to `eleven_v4_turbo` with the original NPC voices. Both
+v4 variants were tested with Sarah on “请到第二号站台。一杯茶十元，两杯咖啡三十元。”
+and transcribed exactly. The speech smoke script additionally checks all three
+NPCs with platform numbers, café prices, and ticket prices.
+
+ElevenLabs documents v4 as applying native target-language pronunciation when
+the output language differs from the source voice:
+https://elevenlabs.io/docs/overview/capabilities/text-to-speech/eleven-v4
+This is a model-level improvement, not a deterministic guarantee of every tone.
+STT checks intelligibility and content; it cannot certify correct tones. A human
+listening review is still required, especially for short replies and polyphones.
+
+The following historical observations concern the earlier model configuration:
 
 ## Live voice loop observations (2026-10-10)
 

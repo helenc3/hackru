@@ -80,7 +80,7 @@ function anchorLabels(city: CityHandle, position: Position): Landmark[] {
  * `preview` renders a local seeded city behind the welcome screen; it is inert and must not look like
  * the live world to tests or assistive tech. `manifests` gives a static city (fixtures/tests).
  */
-export function WorldRenderer({ state, onAction, onTalk, preview = false, manifests }: RendererProps & { preview?: boolean; manifests?: readonly ChunkManifest[] }) {
+export function WorldRenderer({ state, onAction, onTalk, preview = false, manifests, conversationOpen = false }: RendererProps & { preview?: boolean; manifests?: readonly ChunkManifest[]; conversationOpen?: boolean }) {
   const city = useCity(preview ? null : state, { manifests });
   const [hasWebGl, setHasWebGl] = useState(webGlIsAvailable);
   const [position, setPosition] = useState(() => initialPosition(state));
@@ -215,7 +215,7 @@ export function WorldRenderer({ state, onAction, onTalk, preview = false, manife
     {hasWebGl ? <CanvasBoundary onFailure={() => { runtime.current.keys.clear(); runtime.current.path = []; runtime.current.active = false; setHasWebGl(false); }}><Canvas dpr={testProfile().lightweight ? .5 : [1, 1.5]} camera={{ position: [state.position.x, 8.5, state.position.z + 9], fov: 52, near: .1, far: 150 }} gl={{ antialias: !testProfile().lightweight, powerPreference: 'high-performance' }}
       fallback={<CompatibilityRecovery />}>
       <ContextLossHandler onFailure={() => { runtime.current.keys.clear(); runtime.current.path = []; runtime.current.active = false; setHasWebGl(false); }} />
-      <CityScene city={city} runtime={runtime} position={position} /><Cue at={nearby[0]?.position} /><Motion runtime={runtime} root={root} labels={labels} marks={marks} city={city} state={state} tick={setPosition} sync={sync} /><DestinationMarker runtime={runtime} />
+      <CityScene city={city} runtime={runtime} position={position} /><Cue at={nearby[0]?.position} /><Motion conversationOpen={conversationOpen} still={still} runtime={runtime} root={root} labels={labels} marks={marks} city={city} state={state} tick={setPosition} sync={sync} /><DestinationMarker runtime={runtime} />
       <FarRiver river={river} runtime={runtime} />{!preview && state.questTarget && <QuestBeacon target={state.questTarget.position} still={still} />}
     </Canvas></CanvasBoundary> : <CompatibilityRecovery />}
     {hasWebGl && <>

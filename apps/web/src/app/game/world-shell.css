@@ -140,6 +140,10 @@
   box-shadow: none;
 }
 
+.game-world .quest-compass {
+  left: calc(50% - var(--conversation-offset, 0%));
+}
+
 .settings-popover {
   max-height: calc(100vh - 100px);
   overflow-y: auto;

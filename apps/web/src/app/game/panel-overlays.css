@@ -21,6 +21,7 @@
   animation: vq-pop .28s var(--bounce);
 }
 
+
 .result-panel {
   background: #eaf8f3;
   border: var(--outline);
@@ -78,6 +79,7 @@
 }
 
 .dialogue-panel {
+  transition: height .7s cubic-bezier(.22, 1, .36, 1);
   position: absolute;
   z-index: 20;
   top: 14px;
@@ -91,4 +93,8 @@
   background: linear-gradient(180deg, #fff3fa 0%, #f4eeff 100%);
   box-shadow: 8px 8px 0 var(--ink);
   animation: vq-pop .28s var(--bounce);
+}
+
+.dialogue-content {
+  display: flow-root;
 }

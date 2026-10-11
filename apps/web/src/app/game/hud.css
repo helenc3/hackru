@@ -14,6 +14,13 @@
   box-shadow: var(--shadow-sticker);
   padding: 14px 16px;
   font-size: 12px;
+  transition: transform .45s cubic-bezier(.22, 1, .36, 1), visibility .45s;
+}
+
+.game-shell[data-dialogue-open="true"] .quest-panel {
+  transform: translateX(calc(-100% - 40px));
+  visibility: hidden;
+  pointer-events: none;
 }
 
 .quest-panel header {

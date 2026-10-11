@@ -30,6 +30,22 @@ export function DialoguePanel({ state, npc, pending, turn, onAction, onSubmit, o
   const [outgoing, setOutgoing] = useState<string | null>(null);
   const composing = useRef(false);
   const firstButton = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [panelHeight, setPanelHeight] = useState<number>();
+  useEffect(() => {
+    const panel = panelRef.current, content = contentRef.current;
+    if (!panel || !content) return;
+    const observer = new ResizeObserver(() => {
+      const style = getComputedStyle(panel);
+      const chrome = parseFloat(style.paddingTop) + parseFloat(style.paddingBottom) + parseFloat(style.borderTopWidth) + parseFloat(style.borderBottomWidth);
+      const height = Math.ceil(content.getBoundingClientRect().height + chrome);
+      // Keep the room earned by the conversation when temporary controls disappear.
+      setPanelHeight((previous) => Math.max(previous ?? 0, height));
+    });
+    observer.observe(content);
+    return () => observer.disconnect();
+  }, []);
   const sendRef = useRef<() => Promise<void>>(async () => undefined);
   // Real-time lane: practice missions with live providers stream speech both ways; anything else uses the batch recorder.
   const [live, setLive] = useState<{ status: LiveStatus; message?: string; retryable?: boolean } | null>(null);
@@ -107,10 +123,11 @@ export function DialoguePanel({ state, npc, pending, turn, onAction, onSubmit, o
   sendRef.current = send;
   const lastNpc = thread.map((line) => line.role).lastIndexOf('npc');
 
-  return <section className="dialogue-panel" role="dialog" aria-modal="false" aria-labelledby="dialogue-title" data-testid="dialogue-panel" onKeyDown={(event) => {
+  return <section ref={panelRef} style={{ height: panelHeight }} className="dialogue-panel" role="dialog" aria-modal="false" aria-labelledby="dialogue-title" data-testid="dialogue-panel" onKeyDown={(event) => {
     // The world owner also ignores editable targets. Keep gameplay keys within the panel.
     if (event.key !== 'Escape') event.stopPropagation();
   }}>
+    <div ref={contentRef} className="dialogue-content">
     <header><div><span className="eyebrow">CONVERSATION</span><h2 id="dialogue-title" lang="zh-Hans">{name}</h2><span className="mood-label" data-mood={state.npcMood[npc.role]}>{roleNames[npc.role]} · {moodWords[state.npcMood[npc.role]]}</span></div><button ref={firstButton} className="button secondary" onClick={() => onClose()} aria-label="Close conversation">Close · Esc</button></header>
     {(thread.length > 0 || outgoing) && <div className="chat-thread" aria-live="polite">
       {thread.map((line, index) => line.role === 'coach'
@@ -151,5 +168,6 @@ export function DialoguePanel({ state, npc, pending, turn, onAction, onSubmit, o
     <NpcActions state={state} anchorId={npc.anchorId} extra={turn?.actions} pending={pending} onAction={onAction} onClose={() => onClose()} onEnd={finish} />
     </>}
     <CoachPanel state={state} turn={turn} />
+    </div>
   </section>;
 }

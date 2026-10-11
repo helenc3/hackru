@@ -92,7 +92,7 @@ export function App() {
   const guide = state.directions ? state.interactables.find((item) => item.id === state.directions?.fromAnchorId && item.kind === 'npc') : undefined;
 
   return <div className="game-shell" data-testid="game-shell" data-dialogue-open={Boolean(npc)}>
-    <header className="game-topbar"><a className="brand" href="#world">Speak Your Way<span className="brand-dot">.</span></a><span>Quest {state.missionId.slice(1)} · {state.zoneId}</span>{state.validationMode ? <span className="environment-banner">Developer validation · all XP, loot and badges are simulated. Progress stays separate from player sessions.</span> : state.providerStatus !== 'live' ? <span className="environment-banner">{state.providerStatus === 'fixture' ? 'Fixture demonstration · scripted responses' : 'Voice or AI service is degraded · retry or use the same-world fallback.'}</span> : null}<div className="topbar-controls">
+    <header className="game-topbar"><a className="brand" href="#world">Speak Your Way<span className="brand-dot">.</span></a>{state.validationMode ? <span className="environment-banner">Developer validation · all XP, loot and badges are simulated. Progress stays separate from player sessions.</span> : state.providerStatus !== 'live' ? <span className="environment-banner">{state.providerStatus === 'fixture' ? 'Fixture demonstration · scripted responses' : 'Voice or AI service is degraded · retry or use the same-world fallback.'}</span> : null}<div className="topbar-controls">
       <LookupPanel />
       <ReviewPanel />
       {!state.validationMode && <BackgroundMusic active={state.status === 'active'} conversation={Boolean(npc)} />}
@@ -114,8 +114,8 @@ export function App() {
       </details>
       </div></header>
     <main className="game-main">
-      <div className="game-world" id="world"><WorldRenderer key={attempt} state={state} onAction={onAction} onTalk={onTalk} /></div>
-      <QuestPanel state={state} results={results} onReview={openReview} />
+      <div className="game-world" id="world"><WorldRenderer key={attempt} conversationOpen={Boolean(npc)} state={state} onAction={onAction} onTalk={onTalk} /></div>
+      <QuestPanel state={state} results={results} onReview={openReview} conversationOpen={Boolean(npc)} />
       <div className="hud-bottom-left">
         <InventoryBar state={state} pending={session.pending} onAction={onAction} />
       </div>

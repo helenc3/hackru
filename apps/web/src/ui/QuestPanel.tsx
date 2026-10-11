@@ -9,9 +9,9 @@ export const missionInstructions: Record<MissionId, string> = {
   Q3: 'Head east to the 黄浦江 (Huangpu River) promenade — follow the arrow at the top of the screen or press Walk there. A passer-by waits at the viewing deck; ask them to take your photo and they will show you where to stand.',
 };
 
-export function QuestPanel({ state, results, onReview }: { state: PublicState; results: Partial<Record<MissionId, PublicState>>; onReview: (missionId: MissionId) => void }) {
+export function QuestPanel({ state, results, onReview, conversationOpen = false }: { state: PublicState; results: Partial<Record<MissionId, PublicState>>; onReview: (missionId: MissionId) => void; conversationOpen?: boolean }) {
   const [open, setOpen] = useState(true);
-  return <aside className="quest-panel" aria-label="Current quest" data-testid="quest-panel" data-collapsed={!open}>
+  return <aside className="quest-panel" aria-label="Current quest" data-testid="quest-panel" data-collapsed={!open} inert={conversationOpen}>
     <header><span className="eyebrow">QUEST {MissionIdSchema.options.indexOf(state.missionId) + 1} OF 3</span><button type="button" className="button secondary" aria-expanded={open} onClick={() => setOpen((value) => !value)}>{open ? 'Hide' : 'Show'}</button></header>
     <h2>{missionTitles[state.missionId]}</h2>
     {open && <>

@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { Group, Vector3, Vector2, Raycaster, Plane } from 'three';
+import { Group, Vector3, Vector2, Raycaster, Plane, PerspectiveCamera } from 'three';
 import { WORLD_RULES, type Position, type PublicState } from '@vibequest/shared';
 import { distance, movePlayer, zoneAt } from './navigation';
 import type { CityHandle } from '../city/use-city';
@@ -12,15 +12,17 @@ import { DEFAULT_PITCH, orbitDistance } from './camera';
 
 export type Landmark = { id?: string; label: string; x: number; z: number };
 
-export function Motion({ runtime, root, labels, marks, city, state, tick, sync }: {
+export function Motion({ runtime, root, labels, marks, city, state, tick, sync, conversationOpen = false, still = false }: {
   runtime: React.RefObject<Runtime>; root: React.RefObject<HTMLElement | null>;
   labels: React.RefObject<(HTMLSpanElement | null)[]>; marks: readonly Landmark[]; city: CityHandle; state: PublicState;
+  conversationOpen?: boolean; still?: boolean;
   tick: (position: Position) => void; sync: (position: Position) => void;
 }) {
   const avatar = useRef<Group>(null);
   const gait = useRef<Gait>({ moving: false, speed: 0 });
   const clock = useRef({ ui: 0, frames: 0, elapsed: 0, wasMoving: false });
   const projected = useRef(new Vector3());
+  const framing = useRef(0);
   const ray = useRef(new Raycaster());
   const ground = useRef(new Plane(new Vector3(0, 1, 0), 0));
   const activity = useAudioActivity();
@@ -100,6 +102,16 @@ export function Motion({ runtime, root, labels, marks, city, state, tick, sync }
     const orbit = orbitDistance(pitch);
     camera.position.set(r.position.x + Math.sin(r.yaw) * orbit * Math.cos(pitch), .7 + orbit * Math.sin(pitch), r.position.z + Math.cos(r.yaw) * orbit * Math.cos(pitch));
     camera.lookAt(r.position.x, .7, r.position.z);
+    // Shift the optical center without resizing the world or changing the orbit.
+    // A 20% view offset places the player at 30% of the full viewport width.
+    const targetFraming = conversationOpen ? .2 : 0;
+    framing.current = still ? targetFraming : framing.current + (targetFraming - framing.current) * (1 - Math.exp(-10 * delta));
+    if (Math.abs(framing.current - targetFraming) < .0001) framing.current = targetFraming;
+    root.current?.style.setProperty('--conversation-offset', `${framing.current * 100}%`);
+    if (camera instanceof PerspectiveCamera) {
+      if (framing.current === 0) camera.clearViewOffset();
+      else camera.setViewOffset(size.width, size.height, size.width * framing.current, 0, size.width, size.height);
+    }
     camera.updateMatrixWorld();
     marks.forEach((mark, i) => {
       const node = labels.current[i];

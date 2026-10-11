@@ -1,10 +1,12 @@
-import { useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useState } from 'react';
 import { DataTexture, NearestFilter, RedFormat } from 'three';
 import { testProfile } from './test-profile';
 import { Outlines } from '@react-three/drei';
 
 /** Shared "Toon Spike × Powerpuff × Genshin" look: ink outlines, 3-step cel ramp, candy palette. */
 export const INK = '#2a1838';
+/** Scenery assemblies can suppress hulls without changing every catalog component. */
+export const SceneryOutlines = createContext(true);
 export const candy = {
   ink: INK, inkSoft: '#4b3561', lavender: '#c9b8ff', peach: '#ffd1a8', sky: '#8fd3ff',
   sand: '#f7e3b5', paving: '#f2c99a', grass: '#9fe07a', grassDeep: '#6cc24a',
@@ -34,9 +36,10 @@ export function gradientMap(): DataTexture {
 export function Toon({ color, outline = true, thickness = 2.4, emissive, emissiveIntensity = 0, transparent, opacity }: {
   color: string; outline?: boolean; thickness?: number; emissive?: string; emissiveIntensity?: number; transparent?: boolean; opacity?: number;
 }) {
+  const sceneryOutlines = useContext(SceneryOutlines);
   return <>
     <meshToonMaterial color={color} gradientMap={gradientMap()} emissive={emissive ?? '#000000'} emissiveIntensity={emissiveIntensity} transparent={transparent} opacity={opacity} />
-    {outline && !testProfile().lightweight && <Outlines color={INK} thickness={thickness} />}
+    {outline && sceneryOutlines && !testProfile().lightweight && <Outlines color={INK} thickness={thickness} />}
   </>;
 }
 

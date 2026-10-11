@@ -3,11 +3,11 @@ import { BufferAttribute, BufferGeometry, Color, Matrix4, Mesh, Object3D, type G
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { catalogEntry, chunkOrigin, resolveParams, type CatalogEntry, type ChunkManifest, type DistrictKind, type ParamValues, type Placement, type Position, type Road } from '@vibequest/shared';
 import { ASSET_COMPONENTS } from './assets';
-import { candy, Toon } from '../world/toon';
+import { candy, SceneryOutlines, Toon } from '../world/toon';
 
 /** Distance bands (m) for detail levels; beyond FAR only instanced proxies remain. */
-export const LOD_NEAR = 25;
-export const LOD_FAR = 55;
+export const LOD_NEAR = 18;
+export const LOD_FAR = 40;
 const DEG = Math.PI / 180;
 
 export const districtGround: Record<DistrictKind, string> = {
@@ -48,7 +48,7 @@ function Asset({ item, children, lod, still }: { item: Resolved; children?: Reac
 /** Placements attached to a parent socket render inside the parent's transform at the socket pose. */
 function Attached({ item, byParent, lod, still }: { item: Resolved; byParent: Map<string, Resolved[]>; lod: 0 | 1 | 2; still: boolean }) {
   const sockets = item.entry ? item.entry.sockets(item.params) : [];
-  return <Asset item={item} lod={lod} still={still}>
+  return <SceneryOutlines.Provider value={lod === 0}><Asset item={item} lod={lod} still={still}>
     {(byParent.get(item.placement.id) ?? []).map((child) => {
       const socket = sockets.find((entry) => entry.id === child.placement.attachTo!.socketId);
       if (!socket) return null;
@@ -56,7 +56,7 @@ function Attached({ item, byParent, lod, still }: { item: Resolved; byParent: Ma
         <Attached item={child} byParent={byParent} lod={lod} still={still} />
       </group>;
     })}
-  </Asset>;
+  </Asset></SceneryOutlines.Provider>;
 }
 
 // ---------------------------------------------------------------- static batching
@@ -234,15 +234,15 @@ export const ChunkRenderer = memo(function ChunkRenderer({ manifest, centre, far
         {manifest.roads.map((road) => { const r = roadRect(road); return <mesh key={road.id} rotation={[-Math.PI / 2, 0, 0]} position={[r.x, road.kind === 'avenue' ? -.01 : -.012, r.z]}><planeGeometry args={[r.w, r.d]} /><Toon color={roadColor[road.kind]} outline={false} /></mesh>; })}
         {/* Level walkable decks (CITY_GENERATION §7): collision treats them as walkable over water. */}
         {manifest.bridges.map((bridge) => <mesh key={bridge.id} position={[(bridge.rect.minX + bridge.rect.maxX) / 2, .06, (bridge.rect.minZ + bridge.rect.maxZ) / 2]} userData={{ clearView: 'solid' }}>
-          <boxGeometry args={[bridge.rect.maxX - bridge.rect.minX, .12, bridge.rect.maxZ - bridge.rect.minZ]} /><Toon color="#c9b79c" thickness={1.6} />
+          <boxGeometry args={[bridge.rect.maxX - bridge.rect.minX, .12, bridge.rect.maxZ - bridge.rect.minZ]} /><Toon color="#c9b79c" thickness={1.6} outline={Math.hypot(origin.x + (bridge.rect.minX + bridge.rect.maxX) / 2 - centre.x, origin.z + (bridge.rect.minZ + bridge.rect.maxZ) / 2 - centre.z) < LOD_NEAR} />
         </mesh>)}
         {layout.roots.filter((root) => !own(root)).map((root) => <group key={root.item.placement.id} {...placementGroup(root)}>
           <Attached item={root.item} byParent={layout.byParent} lod={root.lod} still={still} />
         </group>)}
       </Batched>
       {near.map((root) => root.item.entry?.category === 'anchor'
-        ? <group key={root.item.placement.id} {...placementGroup(root)}><Attached item={root.item} byParent={layout.byParent} lod={0} still={still} /></group>
-        : <Batched key={root.item.placement.id} version={root.item} {...placementGroup(root)}><Attached item={root.item} byParent={layout.byParent} lod={0} still={still} /></Batched>)}
+        ? <group key={root.item.placement.id} {...placementGroup(root)}><Attached item={root.item} byParent={layout.byParent} lod={hasNpc(root.item) ? 0 : root.lod} still={still} /></group>
+        : <Batched key={root.item.placement.id} version={layout} {...placementGroup(root)}><Attached item={root.item} byParent={layout.byParent} lod={hasNpc(root.item) ? 0 : root.lod} still={still} /></Batched>)}
     </group>
     <Proxies items={layout.proxies} origin={origin} />
   </>;

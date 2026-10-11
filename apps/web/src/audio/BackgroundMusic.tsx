@@ -20,8 +20,10 @@ export function BackgroundMusic({ active, conversation }: { active: boolean; con
       loading = true;
       try {
         player.current ??= new BackgroundMusicPlayer();
-        // Resume inside a gesture before the score's network request completes.
-        await player.current.context.resume();
+        // Resume inside a gesture before the score's network request completes. Without an audio
+        // device (CI runners) Firefox never settles this promise, so it must not gate setup:
+        // scheduling already waits for the context to be running.
+        void player.current.context.resume().catch(() => undefined);
         const response = await fetch('/music/song.json', { signal: controller.signal });
         if (!response.ok) throw new Error('Music unavailable');
         const score = await response.json() as MusicScore;

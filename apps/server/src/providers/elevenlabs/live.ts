@@ -1,5 +1,5 @@
 import { ElevenLabsClient } from '@elevenlabs/elevenlabs-js';
-import type { NpcId, SpeechProvider } from '@vibequest/shared';
+import { characterDescriptions, audioVoices, type NpcId, type SpeechProvider } from '@vibequest/shared';
 import { HttpError } from '../../errors.js';
 
 /**
@@ -12,12 +12,8 @@ export const APPROVED_VOICE_IDS = new Set([
   '4VZIsMPtgggwNg7OXbPY', 'DowyQ68vDpgFYdWVGjc3', '5mZxJZhSmJTjL7GoYfYI',
 ]);
 
-export const DEFAULT_VOICE_IDS: Record<NpcId, string> = {
-  xiaolin: 'Ca5bKgudqKJzq8YRFoAz', // Coco Li: calm, young café owner
-  achen: '4VZIsMPtgggwNg7OXbPY', // James Gao: friendly station worker
-  laozhou: 'hZTuv9Zqrq4yHYrEmF1r', // Adam Li: deep, steady ticket agent
-};
-export const DEFAULT_PA_VOICE_ID = 'agczkAUlHLowaNnL72Cc'; // Adrian: Mandarin narration
+export const DEFAULT_VOICE_IDS = Object.fromEntries(characterDescriptions.map((npc) => [npc.id, npc.voice.id])) as Record<NpcId, string>;
+export const DEFAULT_PA_VOICE_ID = audioVoices.pa.id;
 
 export const MAX_CLIP_BYTES = 3 * 1024 * 1024;
 const MAX_REPLY_CHARS = 80;

@@ -1,13 +1,23 @@
+import { z } from 'zod';
 import { CueDefinitionSchema, NpcDefinitionSchema, type CueDefinition, type NpcDefinition } from '../contracts.js';
 import { sceneManifest } from './scene-manifest.js';
 import { missions } from './missions.js';
 
 export { missions };
-export const npcs: readonly NpcDefinition[] = [
-  { id: 'xiaolin', nameZh: '小林', persona: 'Warm, encouraging café owner. Reply in short Mandarin phrases grounded in the available drinks and prices. Keep the conversation moving toward one goal: the customer names a drink, confirms its price, then pays. After greetings or unclear turns, ask what they would like to drink.', initialPatience: 5, zoneId: 'cafe', position: { x: -10, z: 4 }, voiceKey: 'xiaolin', allowedIntents: ['order_drink', 'accept_substitute', 'cancel_order', 'confirm_drink_price', 'ask_direction', 'request_repeat', 'greeting', 'farewell', 'unknown'] },
-  { id: 'achen', nameZh: '阿陈', persona: 'Helpful, matter-of-fact station worker. Give concise Mandarin directions from the current platform facts.', initialPatience: 4, zoneId: 'concourse', position: { x: -3, z: 0 }, voiceKey: 'achen', allowedIntents: ['ask_direction', 'confirm_platform', 'request_repeat', 'greeting', 'farewell', 'unknown'] },
-  { id: 'laozhou', nameZh: '老周', persona: 'Busy, formal ticket agent. Ask for missing destination or quantity in Mandarin; never offer English coaching in the boss.', initialPatience: 3, zoneId: 'concourse', position: { x: 3, z: 0 }, voiceKey: 'laozhou', allowedIntents: ['buy_ticket', 'confirm_ticket', 'ask_direction', 'confirm_platform', 'request_repeat', 'greeting', 'farewell', 'unknown'] },
-].map((npc) => NpcDefinitionSchema.parse(npc));
+// Voice metadata belongs to authored characters, outside the frozen wire contract.
+const voicedNpcSchema = NpcDefinitionSchema.extend({ voice: z.object({ id: z.string().min(1), description: z.string().min(1) }) });
+export const characterDescriptions: readonly (NpcDefinition & { voice: { id: string; description: string } })[] = [
+  { id: 'xiaolin', nameZh: '小林', persona: 'Warm, encouraging café owner. Reply in short Mandarin phrases grounded in the available drinks and prices. Keep the conversation moving toward one goal: the customer names a drink, confirms its price, then pays. After greetings or unclear turns, ask what they would like to drink.', initialPatience: 5, zoneId: 'cafe', position: { x: -10, z: 4 }, voiceKey: 'xiaolin', voice: { id: 'Ca5bKgudqKJzq8YRFoAz', description: 'Coco Li — Calm, Young and Trustworthy' }, allowedIntents: ['order_drink', 'accept_substitute', 'cancel_order', 'confirm_drink_price', 'ask_direction', 'request_repeat', 'greeting', 'farewell', 'unknown'] },
+  { id: 'achen', nameZh: '阿陈', persona: 'Helpful, matter-of-fact station worker. Give concise Mandarin directions from the current platform facts.', initialPatience: 4, zoneId: 'concourse', position: { x: -3, z: 0 }, voiceKey: 'achen', voice: { id: '4VZIsMPtgggwNg7OXbPY', description: 'James Gao — Calm, Friendly and Warm' }, allowedIntents: ['ask_direction', 'confirm_platform', 'request_repeat', 'greeting', 'farewell', 'unknown'] },
+  { id: 'laozhou', nameZh: '老周', persona: 'Busy, formal ticket agent. Ask for missing destination or quantity in Mandarin; never offer English coaching in the boss.', initialPatience: 3, zoneId: 'concourse', position: { x: 3, z: 0 }, voiceKey: 'laozhou', voice: { id: 'hZTuv9Zqrq4yHYrEmF1r', description: 'Adam Li — Deep, Steady and Calm' }, allowedIntents: ['buy_ticket', 'confirm_ticket', 'ask_direction', 'confirm_platform', 'request_repeat', 'greeting', 'farewell', 'unknown'] },
+].map((npc) => voicedNpcSchema.parse(npc));
+
+export const npcs: readonly NpcDefinition[] = characterDescriptions.map((npc) => NpcDefinitionSchema.parse(Object.fromEntries(Object.entries(npc).filter(([key]) => key !== 'voice'))));
+
+export const audioVoices = {
+  pa: { id: 'agczkAUlHLowaNnL72Cc', description: 'Adrian — Mandarin PA narration' },
+  setup: { ...characterDescriptions.find((npc) => npc.id === 'xiaolin')!.voice },
+} as const;
 
 const cueText = [
   { id: 'p1.entrance-sign', missionId: 'P1', kind: 'sign', textZh: '请从广场进入。这扇门关闭了。', englishMeaning: 'Please enter from the plaza. This door is closed.', factSnapshotId: 'p1.cafe' },

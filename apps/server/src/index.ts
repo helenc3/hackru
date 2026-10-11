@@ -1,11 +1,15 @@
 import { createApp } from './app.js';
 import { loadConfig } from './config.js';
+import { attachLiveRelay } from './live/relay.js';
+import { createServices } from './services.js';
 
 const config = loadConfig();
-const app = createApp({ config });
+const services = createServices(config);
+const app = createApp({ config, services });
 const server = app.listen(config.port, config.host, () => {
   console.info(`VibeQuest server listening at http://${config.host}:${config.port}`);
 });
+attachLiveRelay(server, services);
 
 server.on('error', () => {
   console.error('VibeQuest server could not start. Check the configured port.');

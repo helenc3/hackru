@@ -1,6 +1,6 @@
 import { Button, GameDialog, Dialog } from '../ui/primitives';
 import { lazy, Suspense, useCallback, useEffect, useState } from 'react';
-import { NpcIdSchema, type GameAction } from '@vibequest/shared';
+import { NpcIdSchema, sceneManifest, type GameAction } from '@vibequest/shared';
 import { WorldRenderer } from '../world/WorldRenderer';
 import { AudioController } from '../audio/AudioController';
 import { BackgroundMusic } from '../audio/BackgroundMusic';
@@ -69,8 +69,10 @@ export function App() {
 
   const state = session.state;
   const selectedCue = state.visibleCues.find((cue) => cue.id === sign);
+  const here = state.interactables.find((entry) => entry.id === npc)?.position;
+  const npcChoices = here ? state.interactables.filter((item) => item.kind === 'choice' && Math.hypot(item.position.x - here.x, item.position.z - here.z) <= sceneManifest.interactionRadius) : [];
 
-  return <div className="game-shell" data-testid="game-shell" data-dialogue-open={Boolean(npc)}>
+  return <div className="game-shell" data-testid="game-shell" data-state-version={state.version} data-dialogue-open={Boolean(npc)}>
     <header className="game-topbar"><a className="brand" href="#world">VibeQuest</a><QuestPanel state={state} /><div className="topbar-tools"><GameMenus key={state.sessionId} pending={session.pending} restartPending={session.pending && !session.turnPending} active={state.status === 'active'} onRestart={() => void onAction({ type: 'retryMission' }).catch(() => undefined)} onLeave={() => { closeConversation(); session.abandon(); }} onRefresh={() => void session.refresh().catch(() => undefined)} /><InventoryBar state={state} pending={session.pending} paused={paused} onAction={onAction} onPause={() => void onAction({ type: paused ? 'resumePractice' : 'pausePractice' }).catch(() => undefined)} /></div></header>
     {state.validationMode ? <div className="environment-banner">Developer validation · all XP, loot and badges are simulated. Progress stays separate from player sessions.</div> : state.providerStatus !== 'live' ? <div className="environment-banner">{state.providerStatus === 'fixture' ? 'Fixture demonstration · scripted responses' : 'Voice or AI service is degraded · retry or use the same-world fallback.'}</div> : null}
     <main className="game-main"><div className="game-layout"><div className="game-world" id="world"><WorldRenderer key={attempt} state={state} onAction={onAction} onTalk={onTalk} />
@@ -81,8 +83,9 @@ export function App() {
     </div></div>
     <RecoveryPanel problem={session.problem} pending={session.pending} onRetry={session.retry} onRefresh={session.refresh} onNew={session.abandon} onDismiss={session.dismiss} />
     {notice && <div className="action-notice" role="status">{notice}</div>}
+    {!npc && session.events.length > 0 && <aside className="mission-notice" aria-label="Mission updates" role="status">{session.events.at(-1)?.message}</aside>}
     {paused && !npc && state.status === 'active' && <CoachPanel state={state} turn={session.turn} />}
-    {npc && state.status === 'active' && <DialoguePanel key={`${state.sessionId}:${state.missionId}:${npc}`} state={state} npcId={npc} pending={session.pending} turn={session.turnNpc === npc ? session.turn : null} onAction={onAction} onSubmit={session.submit} onClose={closeConversation} />}
+    {npc && state.status === 'active' && <DialoguePanel key={`${state.sessionId}:${state.missionId}:${npc}`} state={state} npcId={npc} pending={session.pending} turn={session.turnNpc === npc ? session.turn : null} choices={npcChoices} onAction={onAction} onSubmit={session.submit} onLiveTurn={session.applyTurn} onClose={closeConversation} />}
     <ResultPanel state={state} pending={session.pending} onAction={onAction} onExit={session.abandon} />
     {validation && state.validationMode && ValidationHarness && <Suspense fallback={<p>Loading internal validator…</p>}><ValidationHarness state={state} onAction={onAction} onTalk={onTalk} /></Suspense>}
 

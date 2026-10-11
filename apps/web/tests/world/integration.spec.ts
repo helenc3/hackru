@@ -7,6 +7,7 @@ test('shared app sign panel pauses movement and Escape restores world focus', as
   ] });
   await page.goto('/');
   await page.getByRole('button', { name: 'Start Practice', exact: true }).click();
+  await page.getByRole('button', { name: "Let's play", exact: true }).click();
   const world = page.getByTestId('world-renderer');
   await expect(world).toHaveAttribute('data-position-z', /./);
   await page.getByRole('button', { name: '入口告示 · Read sign' }).click();

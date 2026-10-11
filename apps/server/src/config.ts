@@ -9,8 +9,11 @@ const environmentSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   HOST: z.string().trim().min(1).default('127.0.0.1'),
   PORT: z.coerce.number().int().min(1).max(65535).optional(),
+  ANTHROPIC_API_KEY: z.string().trim().min(1).optional(),
+  ANTHROPIC_MODEL: z.string().trim().min(1).default('claude-opus-5-5'),
   GEMINI_API_KEY: z.string().trim().min(1).optional(),
   GEMINI_MODEL: z.string().trim().min(1).default('gemini-3.8-flash'),
+  GEMINI_LIVE_MODEL: z.string().trim().min(1).default('gemini-3.8-live'),
   ELEVENLABS_API_KEY: z.string().trim().min(1).optional(),
   ELEVENLABS_TTS_MODEL: z.string().trim().min(1).default('eleven_v4_turbo'),
   ELEVENLABS_PA_MODEL: z.string().trim().min(1).default('eleven_v4'),
@@ -27,8 +30,11 @@ export interface ServerConfig {
   nodeEnv: 'development' | 'test' | 'production';
   host: string;
   port: number;
+  anthropicApiKey: string | undefined;
+  anthropicModel: string;
   geminiApiKey: string | undefined;
   geminiModel: string;
+  geminiLiveModel: string;
   elevenlabsApiKey: string | undefined;
   elevenlabsTtsModel: string;
   elevenlabsPaModel: string;
@@ -58,8 +64,11 @@ export function loadConfig(environment: NodeJS.ProcessEnv = process.env): Server
     nodeEnv: env.NODE_ENV,
     host: env.HOST, // Hosted deployments set HOST=0.0.0.0; local default stays loopback.
     port: env.PORT ?? (env.NODE_ENV === 'production' ? 4173 : 3001),
+    anthropicApiKey: env.ANTHROPIC_API_KEY,
+    anthropicModel: env.ANTHROPIC_MODEL,
     geminiApiKey: env.GEMINI_API_KEY,
     geminiModel: env.GEMINI_MODEL,
+    geminiLiveModel: env.GEMINI_LIVE_MODEL,
     elevenlabsApiKey: env.ELEVENLABS_API_KEY,
     elevenlabsTtsModel: env.ELEVENLABS_TTS_MODEL,
     elevenlabsPaModel: env.ELEVENLABS_PA_MODEL,

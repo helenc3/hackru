@@ -36,6 +36,7 @@ const counter = (page: Page, name: string) => page.evaluate((key) => Number((win
 async function openPanel(page: Page) {
   await page.goto('/');
   await page.getByRole('button', { name: 'Start Practice', exact: true }).click();
+  await page.getByRole('button', { name: "Let's play", exact: true }).click();
   await page.getByRole('button', { name: '小林 · Talk', exact: true }).click();
   return page.getByTestId('dialogue-panel');
 }
@@ -127,8 +128,8 @@ test('reply audio waits for the job, plays once, and replay never renews its lif
   await panel.getByRole('button', { name: 'Send Mandarin' }).click();
   const controls = page.getByTestId('audio-controller');
   await expect(controls).toContainText('Playing reply');
-  // One local audio lane: no recording while the reply plays.
-  await expect(panel.getByRole('button', { name: 'Start recording' })).toBeDisabled();
+  // NPC speech is interruptible: the mic stays live while the reply plays (see barge-in test).
+  await expect(panel.getByRole('button', { name: 'Start recording' })).toBeEnabled();
   await page.evaluate(() => { (window as unknown as Record<string, boolean>).__holdPlayback = false; });
   await expect(controls).toContainText('Audio ready');
   expect(polls).toBe(2);
@@ -136,6 +137,27 @@ test('reply audio waits for the job, plays once, and replay never renews its lif
   await expect.poll(() => counter(page, '__plays')).toBe(2);
   await expect(controls.getByRole('button', { name: 'Replay' })).toBeEnabled();
   expect(phases(api).map((action) => `${action.operationId}:${action.phase}`)).toEqual(['speech-1:playing', 'speech-1:idle']);
+});
+
+test('pressing the mic interrupts the reply and records only after the speech operation ends', async ({ page }) => {
+  await fakeMedia(page);
+  const api = await installScriptedApi(page);
+  await speechTurns(page, api);
+  await page.route('**/api/sessions/*/speech/*', (route) => route.fulfill({ status: 200, contentType: 'audio/mpeg', headers: { 'X-Asset-Duration-Ms': '900' }, body: Buffer.from('ID3fake') }));
+  await transcribeAs(page, '谢谢');
+  const panel = await openPanel(page);
+  await panel.getByRole('button', { name: 'Use typed Mandarin' }).click();
+  await page.evaluate(() => { (window as unknown as Record<string, boolean>).__holdPlayback = true; });
+  await panel.getByRole('textbox').fill('请给我一杯茶。');
+  await panel.getByRole('button', { name: 'Send Mandarin' }).click();
+  const controls = page.getByTestId('audio-controller');
+  await expect(controls).toContainText('Playing reply');
+  await panel.getByRole('button', { name: 'Start recording' }).click();
+  await expect(panel.getByTestId('recorder')).toContainText('Listening…');
+  await expect(controls).toContainText('Audio stopped');
+  await panel.getByRole('button', { name: 'Stop recording' }).click();
+  await expect.poll(() => phases(api).map((action) => `${action.operationId === 'speech-1' ? 'speech' : 'mic'}:${action.phase}`)).toEqual(['speech:playing', 'speech:idle', 'mic:recording', 'mic:transcribing', 'mic:confirming']);
+  expect(api.failures).toEqual([]);
 });
 
 test('restarting during a pending reply drops the old audio', async ({ page }) => {
@@ -152,6 +174,7 @@ test('restarting during a pending reply drops the old audio', async ({ page }) =
   await panel.getByRole('textbox').fill('请给我一杯茶。');
   await panel.getByRole('button', { name: 'Send Mandarin' }).click();
   await expect(page.getByTestId('audio-controller')).toContainText('Preparing reply audio');
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await page.getByRole('button', { name: 'Restart mission' }).click();
   release = true;
   await page.waitForTimeout(500);
@@ -173,6 +196,7 @@ test('PA plays the reviewed asset and reports finishCue only after it ends', asy
   await page.route('**/audio/*.mp3', (route) => route.fulfill({ contentType: 'audio/mpeg', body: Buffer.from('ID3fake') }));
   await page.goto('/');
   await page.getByRole('button', { name: 'Start Practice', exact: true }).click();
+  await page.getByRole('button', { name: "Let's play", exact: true }).click();
   await page.evaluate(() => { (window as unknown as Record<string, boolean>).__holdPlayback = true; });
   await page.getByRole('button', { name: 'Listen' }).click();
   const controls = page.getByTestId('audio-controller');
@@ -219,6 +243,7 @@ test('deferred turn: retry never waits for Gemini, the old reply stays silent, a
   await expect.poll(() => turns.length).toBe(1);
 
   // Retry while Gemini is still pending: the retry commits without waiting for the turn.
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await page.getByRole('button', { name: 'Restart mission' }).click();
   await expect.poll(() => api.remaining()).toBe(0);
   const retried = api.requests.find((request) => (request.body as { action?: { type: string } } | null)?.action?.type === 'retryMission');

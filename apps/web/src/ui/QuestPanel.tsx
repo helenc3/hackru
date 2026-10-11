@@ -10,7 +10,7 @@ export function QuestPanel({ state }: { state: PublicState }) {
   const seconds = remaining === null ? null : Math.ceil(remaining / 1000);
   const titles = { P1: 'Café detour', P2: 'The platform changed', B1: 'Make the connection' };
   return <aside className="quest-panel" aria-label="Mission objectives" data-testid="quest-panel">
-    <div className="current-goal"><strong>{titles[state.missionId]}</strong><span>{state.objectives.find((objective) => !objective.complete)?.label ?? 'Mission complete'}</span></div>
+    <div className="current-goal" data-completed-objectives={state.objectives.filter((objective) => objective.complete).length}><strong>{titles[state.missionId]}</strong><span>{state.objectives.find((objective) => !objective.complete)?.label ?? 'Mission complete'}</span></div>
     <Badge className="mission-state">{state.mode === 'boss' ? 'Boss' : 'Practice'} · {state.status}</Badge>
     {seconds !== null && <span className="mission-time" role="timer" aria-label="Mission time remaining">{Math.floor(seconds / 60)}:{String(seconds % 60).padStart(2, '0')}</span>}
   </aside>;

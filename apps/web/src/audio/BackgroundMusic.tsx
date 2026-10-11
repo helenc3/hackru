@@ -62,7 +62,7 @@ export function BackgroundMusic({ active, conversation }: { active: boolean; con
   useEffect(() => {
     if (!ready) return;
     const silent = muted || !active || activity === 'recording';
-    const ducked = conversation || activity === 'playing';
+    const ducked = conversation || activity === 'playing' || activity === 'announcing';
     const level = (silent ? 0 : ducked ? .045 : .24) * music;
     player.current?.setLevel(level, first.current ? 8 : silent ? .12 : ducked ? .35 : 2.5);
     first.current = false;

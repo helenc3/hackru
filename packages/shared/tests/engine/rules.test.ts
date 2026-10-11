@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { createGame, applyAction, applyEvaluation, projectPublicState, synchronizeGame, dialogueContext, groundedReply } from '../../src/engine/index.js';
+import { groundedReplies } from '../../src/content/facts.js';
 import { createFixtureDialogueProvider, parseFixturePrice } from '../../src/engine/fixture-dialogue.js';
 import { missionFor } from '../../src/content/missions.js';
 import { MissionDefinitionSchema, InternalStateSchema, TurnEvaluationSchema, type InternalState, type TurnEvaluation } from '../../src/contracts.js';
@@ -43,6 +44,10 @@ describe('mission graph and authoritative rules', () => {
     expect(() => applyAction(state, { type: 'moveZone', zoneId: 'cafe' }, 0)).toThrow('position');
     expect(() => applyAction(state, { type: 'moveZone', zoneId: 'cafe', position: { x: 0, z: 0 } }, 0)).toThrow('outside');
     expect(() => applyAction(state, { type: 'moveZone', zoneId: 'cafe', position: { x: -10, z: 4 } }, 0)).toThrow('speed');
+    // One 300 ms sync step (1.2 units) arriving 190 ms after the last accepted move is latency jitter, not a teleport.
+    const step = applyAction(state, { type: 'moveZone', zoneId: 'plaza', position: { x: -0.4, z: 10 } }, 200).state;
+    expect(applyAction(step, { type: 'moveZone', zoneId: 'plaza', position: { x: -1.6, z: 10 } }, 390).state.position.x).toBe(-1.6);
+    expect(() => applyAction(step, { type: 'moveZone', zoneId: 'plaza', position: { x: -2.9, z: 10 } }, 390)).toThrow('speed');
     const moved = applyAction(state, { type: 'moveZone', zoneId: 'cafe', position: { x: -10, z: 4 } }, 3000).state;
     moved.flags['p1.price-confirmed'] = true;
     expect(() => applyAction(moved, { type: 'playCue', cueId: 'p1.station-directions', channel: 'validation-text' }, 3000)).toThrow('validation');
@@ -94,6 +99,61 @@ describe('mission graph and authoritative rules', () => {
     for (let count = 0; count < 5; count++) { state.version++; state = await evaluated(state, '请再说一遍。', 'laozhou'); }
     expect(state.npcState.laozhou.patience).toBe(1);
     expect(state.npcState.laozhou.history.length).toBeLessThanOrEqual(12);
+  });
+  it('confirms with a bare agreement or price once a drink is chosen, but never from a drink alone', async () => {
+    let state = fresh('P1'); state.nodeId = 'p1.order'; state.zoneId = 'cafe'; state.position = { x: -10, z: 4 };
+    state = await evaluated(state, '我要茶'); state.pendingTurn = null;
+    expect(state.nodeId).toBe('p1.receipt'); expect(state.flags['p1.price-confirmed']).toBe(false);
+    const again = await evaluated(state, '我要茶');
+    expect(again.flags['p1.price-confirmed']).toBe(false); expect(again.npcState.xiaolin.history.at(-1)?.text).toBe(groundedReplies.teaPrice);
+    expect((await evaluated(state, '好的')).flags['p1.price-confirmed']).toBe(true);
+    expect((await evaluated(state, '茶九元')).flags['p1.price-confirmed']).toBe(false);
+  });
+  it('farewell pays at the counter once the price is confirmed, ends the conversation, and is inert elsewhere and in the boss', async () => {
+    let state = fresh('P1'); state.nodeId = 'p1.order'; state.zoneId = 'cafe'; state.position = { x: -10, z: 4 };
+    const early = applyEvaluation(reservation(state, '再见'), 'xiaolin', await createFixtureDialogueProvider().evaluate(dialogueContext(state, 'xiaolin'), '再见'), 0);
+    expect(early.conversationEnded).toBe(true); expect(early.state.nodeId).toBe('p1.order'); expect(early.events).toEqual([]);
+    expect(early.state.npcState.xiaolin.history.at(-1)?.text).toBe(groundedReplies.farewellCafe);
+    state = await evaluated(state, '我要茶'); state.pendingTurn = null;
+    const unpaid = applyEvaluation(reservation(state, '拜拜'), 'xiaolin', await createFixtureDialogueProvider().evaluate(dialogueContext(state, 'xiaolin'), '拜拜'), 0);
+    expect(unpaid.conversationEnded).toBe(true); expect(unpaid.state.nodeId).toBe('p1.receipt'); expect(unpaid.state.flags['p1.receipt']).toBeUndefined();
+    state = await evaluated(state, '茶十元'); state.pendingTurn = null; expect(state.flags['p1.price-confirmed']).toBe(true);
+    const paid = applyEvaluation(reservation(state, '谢谢，再见。'), 'xiaolin', await createFixtureDialogueProvider().evaluate(dialogueContext(state, 'xiaolin'), '谢谢，再见。'), 0);
+    expect(paid.conversationEnded).toBe(true); expect(paid.state.nodeId).toBe('p1.station-arrival'); expect(paid.state.flags['p1.receipt']).toBe(true);
+    expect(paid.state.npcState.xiaolin.history.at(-1)?.text).toBe(groundedReplies.farewellPaid); expect(paid.state.xp).toBe(0);
+    expect(() => applyAction({ ...paid.state, pendingTurn: null }, { type: 'choose', choiceId: 'p1.pay-cafe' }, 0)).toThrow();
+    const boss = fresh('B1'); boss.zoneId = 'concourse';
+    const bossTurn = applyEvaluation(reservation(boss, '再见', 'laozhou'), 'laozhou', await createFixtureDialogueProvider().evaluate(dialogueContext(boss, 'laozhou'), '再见'), 0);
+    expect(bossTurn.conversationEnded).toBe(true); expect(bossTurn.state.nodeId).toBe(boss.nodeId); expect(bossTurn.state.status).toBe('active'); expect(bossTurn.events).toEqual([]);
+    expect(bossTurn.state.npcState.laozhou.history.at(-1)?.text).toBe(groundedReplies.farewell);
+  });
+  it('penalizes English or unclear input in practice without acting on it, and floors XP at zero', () => {
+    const state = fresh('P1'); state.nodeId = 'p1.order'; state.zoneId = 'cafe'; state.position = { x: -10, z: 4 }; state.xp = 7;
+    const english: TurnEvaluation = { intent: 'order_drink', slots: [{ key: 'drink', value: 'tea' }], evidenceQuote: 'tea', intentGrade: { score: 1, confidence: 1 }, clarity: 1, courtesy: 1, targetLanguageUse: 'no', interaction: 'relevant', replyZh: '好的，一杯茶。', coach: { understood: 'tea', explanation: 'Say it in Mandarin.', improvedExample: '我要一杯茶。' } };
+    const first = applyEvaluation(reservation(state, 'I want tea'), 'xiaolin', english, 0);
+    expect(first.state.nodeId).toBe('p1.order'); expect(first.state.xp).toBe(2); expect(first.state.npcState.xiaolin.patience).toBe(4);
+    expect(first.state.npcState.xiaolin.history.at(-1)?.text).toBe('请说中文。您可以说：我要一杯茶。');
+    expect(first.events.map((event) => event.message)).toEqual(['Hint: 茶 means tea; 水 means water.', '小林 didn\'t understand English: -5 XP. Try it in Mandarin.']);
+    const second = applyEvaluation(reservation({ ...first.state, pendingTurn: null }, 'tea please'), 'xiaolin', english, 0);
+    expect(second.state.xp).toBe(0);
+    const mandarin = applyEvaluation(reservation({ ...second.state, pendingTurn: null }, '我要一杯茶'), 'xiaolin', { ...english, evidenceQuote: '我要一杯茶', targetLanguageUse: 'yes' }, 0);
+    expect(mandarin.state.nodeId).toBe('p1.receipt'); expect(mandarin.state.xp).toBe(0);
+    const boss = fresh('B1'); boss.zoneId = 'concourse';
+    const bossTurn = applyEvaluation(reservation(boss, 'one ticket to Harbor', 'laozhou'), 'laozhou', { ...english, intent: 'buy_ticket', slots: [{ key: 'destination', value: 'haigang' }], evidenceQuote: 'Harbor', coach: null }, 0);
+    expect(bossTurn.events).toEqual([]); expect(bossTurn.state.npcState.laozhou.patience).toBe(2); expect(bossTurn.state.npcState.laozhou.history.at(-1)?.text).toBe(groundedReplies.clarification);
+  });
+  it('surfaces the node vocabulary once after a miss in practice, marks it assisted, and stays silent in the boss', async () => {
+    const state = fresh('P1'); state.nodeId = 'p1.order'; state.zoneId = 'cafe'; state.position = { x: -10, z: 4 };
+    const unknown: TurnEvaluation = { intent: 'unknown', slots: [], evidenceQuote: '', intentGrade: { score: 0, confidence: 0.2 }, clarity: 0.3, courtesy: 0.8, targetLanguageUse: 'yes', interaction: 'relevant', replyZh: '什么？', coach: null };
+    const first = applyEvaluation(reservation(state, '我想一个那个'), 'xiaolin', unknown, 0);
+    expect(first.events.map((event) => event.message)).toEqual(['Hint: 茶 means tea; 水 means water.']);
+    expect(first.state.flags['p1.order-hint-level']).toBe(2); expect(first.state.flags['session.assisted']).toBe(true); expect(first.state.inventory.hint).toBe(0);
+    expect(first.state.npcState.xiaolin.history.at(-1)?.text).toBe('我没听懂。您要茶还是水？');
+    const second = applyEvaluation(reservation({ ...first.state, pendingTurn: null }, '那个'), 'xiaolin', unknown, 0);
+    expect(second.events).toEqual([]);
+    const boss = fresh('B1'); boss.zoneId = 'concourse';
+    const bossMiss = applyEvaluation(reservation(boss, '那个', 'laozhou'), 'laozhou', unknown, 0);
+    expect(bossMiss.events).toEqual([]); expect(bossMiss.state.flags['session.assisted']).toBeUndefined(); expect(bossMiss.state.npcState.laozhou.history.at(-1)?.text).toBe(groundedReplies.clarification);
   });
   it('withholds audio transcripts and evaluator fields from active boss, and grounds invented replies', () => {
     const state = fresh('B1', false); state.flags['b1.ticket'] = true;

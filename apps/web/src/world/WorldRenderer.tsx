@@ -79,8 +79,10 @@ export function WorldRenderer({ state, onAction, onTalk }: RendererProps) {
     syncPromise.current = (async () => {
       try {
         while (r.pending && generation === r.generation) {
-          const value = r.pending; r.pending = null;
-          await flushPosition(value);
+          // Send the position as of now, not as of queueing: the server clocks arrival, so a
+          // stale sample (long frame, slow previous request) shortens the next interval it sees.
+          r.pending = null;
+          await flushPosition({ ...r.position });
         }
       } catch (cause) {
         if (generation === r.generation) { r.pending = null; setError(cause instanceof Error ? cause.message : 'Position could not sync. Try again.'); }

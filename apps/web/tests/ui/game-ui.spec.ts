@@ -173,7 +173,7 @@ test('mission restart completes during a pending provider turn and ignores its l
   await start(page); const panel = await typedPanel(page);
   await panel.getByRole('textbox').fill('我要水。');
   await panel.getByRole('button', { name: 'Send Mandarin' }).click();
-  await expect(panel).toContainText('Waiting for the server');
+  await expect(panel).toContainText('is thinking');
   await page.getByRole('button', { name: 'Settings', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Restart mission' })).toBeEnabled();
   await page.getByRole('button', { name: 'Restart mission' }).click();
@@ -242,4 +242,12 @@ test('audio check plays the prerecorded Mandarin Rutgers clip', async ({ page })
   await page.getByRole('button', { name: 'Check audio', exact: true }).click();
   await expect(page.getByTestId('start-panel')).toContainText('Playing “罗格斯大学”');
   expect(await page.evaluate(() => (window as unknown as { checkedAudioSource: string }).checkedAudioSource)).toBe('/audio/rutgers-university-zh.mp3');
+});
+
+test('a goodbye turn closes the conversation by itself', async ({ page }) => {
+  await installScriptedApi(page, { steps: [{ text: '再见。', reply: '好的，再见！', end: true }] });
+  await start(page); const panel = await typedPanel(page);
+  await panel.getByRole('textbox').fill('再见。'); await panel.getByRole('button', { name: 'Send Mandarin' }).click();
+  await expect(page.getByTestId('dialogue-panel')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: '小林 · Talk', exact: true })).toBeEnabled();
 });

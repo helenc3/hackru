@@ -17,6 +17,7 @@ async function talk(page: Page, npc: string, text: string) {
 async function cafe(page: Page, kiosk = false) {
   await target(page, 'sign · p1.entrance-sign').click();
   await expect(page.getByRole('dialog', { name: 'Inspected sign' })).toContainText('请从广场进入');
+  await page.keyboard.press('Escape');
   await talk(page, 'xiaolin', '我要咖啡。');
   if (kiosk) { await talk(page, 'xiaolin', '不用了，谢谢。'); await talk(page, 'xiaolin', '我要水，五元，对吗？'); await target(page, 'choice · p1.go-kiosk').click(); }
   else await talk(page, 'xiaolin', '那我要水，五元，对吗？');
@@ -27,6 +28,7 @@ async function cafe(page: Page, kiosk = false) {
 }
 async function platform(page: Page, confirmation = false, wrong = false) {
   await target(page, 'sign · p2.timetable').click();
+  await page.keyboard.press('Escape');
   await talk(page, 'achen', '去江滨的车在哪个站台？');
   await target(page, 'pa · p2.platform-change').click();
   if (confirmation) await talk(page, 'achen', '是三号站台吗？');
@@ -36,6 +38,7 @@ async function platform(page: Page, confirmation = false, wrong = false) {
 }
 async function boss(page: Page, fail = false) {
   await target(page, 'sign · b1.destination-board').click();
+  await page.keyboard.press('Escape');
   await talk(page, 'laozhou', '我要一张去海港的票。');
   await expect(page.getByTestId('coach-panel')).toHaveCount(0);
   await expect(page.getByTestId('inventory-bar').getByRole('button')).toHaveCount(0);
@@ -49,6 +52,7 @@ for (const kiosk of [false, true]) test(`validation café ${kiosk ? 'kiosk' : 's
   const api = await installScriptedApi(page, { validation: true, steps: cafeSteps(kiosk) });
   await page.goto(`${devUrl}/__validation`);
   await page.getByRole('button', { name: 'Start validation session' }).click();
+  await page.getByRole('button', { name: "Let's play", exact: true }).click();
   await cafe(page, kiosk);
   await expect(page.getByTestId('result-panel')).toContainText('SIMULATED RESULT');
   expect(api.remaining()).toBe(0); expect(api.failures).toEqual([]);
@@ -57,6 +61,7 @@ for (const kiosk of [false, true]) test(`validation café ${kiosk ? 'kiosk' : 's
 for (const confirmation of [false, true]) test(`validation platform ${confirmation ? 'confirmation' : 'direct'} route repairs wrong boarding`, async ({ page, devUrl }) => {
   const api = await installScriptedApi(page, { mission: 'P2', validation: true, steps: platformSteps(confirmation, true) });
   await page.goto(`${devUrl}/__validation`); await page.getByRole('button', { name: 'Start validation session' }).click();
+  await page.getByRole('button', { name: "Let's play", exact: true }).click();
   await platform(page, confirmation, true);
   expect(api.remaining()).toBe(0); expect(api.failures).toEqual([]);
 });
@@ -64,6 +69,7 @@ for (const fail of [false, true]) test(`validation boss ${fail ? 'fails and retr
   const steps: Step[] = [...bossSteps(fail), ...(fail ? [{ action: { type: 'retryMission' as const }, patch: { ...missionPatch('B1', 180), sessionId: 'ui-validation-B1', badges: [] } }] : [])];
   const api = await installScriptedApi(page, { mission: 'B1', validation: true, steps });
   await page.goto(`${devUrl}/__validation`); await page.getByRole('button', { name: 'Start validation session' }).click();
+  await page.getByRole('button', { name: "Let's play", exact: true }).click();
   await boss(page, fail);
   if (fail) { await expect(page.getByTestId('result-panel')).not.toContainText('Station Navigator'); await page.getByRole('button', { name: 'Retry mission' }).click(); await expect(page.getByTestId('result-panel')).toHaveCount(0); }
   else await expect(page.getByTestId('result-panel')).toContainText('Simulated badge: Station Navigator');
@@ -75,6 +81,7 @@ test('one validation session completes all three missions through the shared API
     ...platformSteps(), { action: { type: 'startMission', missionId: 'B1' }, patch: missionPatch('B1', 180) }, ...bossSteps(),
   ] });
   await page.goto(`${devUrl}/__validation`); await page.getByRole('button', { name: 'Start validation session' }).click();
+  await page.getByRole('button', { name: "Let's play", exact: true }).click();
   await cafe(page); await page.getByRole('button', { name: 'Next practice mission' }).click();
   await platform(page); await page.getByRole('button', { name: 'Enter boss mission' }).click(); await boss(page);
   expect(api.remaining()).toBe(0); expect(api.failures).toEqual([]);
@@ -91,6 +98,7 @@ test('validation entry needs server permission and cannot resume a player sessio
 test('rapid developer location actions dispatch serially with fresh versions', async ({ page, devUrl }) => {
   const api = await installScriptedApi(page, { validation: true });
   await page.goto(`${devUrl}/__validation`); await page.getByRole('button', { name: 'Start validation session' }).click();
+  await page.getByRole('button', { name: "Let's play", exact: true }).click();
   await expect(page.getByTestId('validation-harness')).toBeVisible();
   await page.getByTestId('validation-harness').evaluate((panel) => {
     const buttons = [...panel.querySelectorAll('button')];
@@ -98,6 +106,6 @@ test('rapid developer location actions dispatch serially with fresh versions', a
     buttons.find((button) => button.textContent === 'concourse')!.click();
   });
   await expect.poll(() => api.requests.filter((request) => request.path.endsWith('/actions')).length).toBe(2);
-  await expect(page.locator('.session-footer')).toContainText('Version 2');
+  expect(api.state().version).toBe(2);
   expect(api.failures).toEqual([]);
 });

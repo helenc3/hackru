@@ -37,7 +37,7 @@ export const anchorsEntries: readonly CatalogEntry[] = [
     districts: ['shopping', 'historic', 'waterfront', 'park'],
     params: {
       style: { type: 'enum', values: ['teahouse', 'modern'], default: 'teahouse', description: 'Tiled roof and lanterns, or flat canopy and glass.' },
-      nameKey: { type: 'text', catalog: 'shop-name', default: 'cafe', description: 'Shop name board.' },
+      nameKey: { type: 'text', catalog: 'shop-name', default: 'drink-shop', description: 'Shop name board.' },
       width: { type: 'number', min: 3, max: 5, default: 4, step: 0.5, description: 'Counter frontage in metres.' },
     },
     placement: 'sidewalk',

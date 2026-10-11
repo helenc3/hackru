@@ -10,7 +10,7 @@ export const TEXT_CATALOG = {
     cafe: ['咖啡馆', 'Café'], tea: ['茶馆', 'Teahouse'], noodles: ['面馆', 'Noodle shop'], dumplings: ['小笼包', 'Soup dumplings'],
     bakery: ['面包店', 'Bakery'], convenience: ['便利店', 'Convenience store'], fruit: ['水果店', 'Fruit shop'], books: ['书店', 'Bookshop'],
     flowers: ['花店', 'Florist'], pharmacy: ['药店', 'Pharmacy'], clothes: ['服装店', 'Clothing shop'], market: ['菜市场', 'Wet market'],
-    drinks: ['饮料', 'Drinks'], snacks: ['小吃', 'Snacks'], restaurant: ['饭店', 'Restaurant'], bank: ['银行', 'Bank'],
+    drinks: ['饮料', 'Drinks'], 'drink-shop': ['饮料店', 'Drink shop'], snacks: ['小吃', 'Snacks'], restaurant: ['饭店', 'Restaurant'], bank: ['银行', 'Bank'],
   }),
   'road-name': rows({
     nanjing: ['南京路', 'Nanjing Road'], huaihai: ['淮海路', 'Huaihai Road'], fuzhou: ['福州路', 'Fuzhou Road'], jiujiang: ['九江路', 'Jiujiang Road'],

@@ -11,6 +11,11 @@ import { createRng } from './rng.js';
 import { overlaps, repairManifest, roadRect, rotateRect, validateManifest } from './validate.js';
 /** npc-name keys reserved for the planner's quest givers (spawn vendor 老王, guide 小李). */
 const QUEST_GIVERS = ['laowang', 'xiaoli'];
+/** Shop signs name what the building sells; generic shops draw from ordinary retail. */
+const SHOP_SIGNS: Record<string, readonly string[]> = {
+  'bld.cafe.small': ['tea', 'bakery'], 'bld.restaurant.noodle': ['noodles'], 'bld.restaurant.dimsum': ['dumplings'], 'bld.market.hall': ['market', 'fruit'],
+};
+const RETAIL_SIGNS = ['bakery', 'fruit', 'books', 'flowers', 'pharmacy', 'clothes', 'convenience', 'snacks', 'bank'];
 
 // Seeded fallback composer (CITY_GENERATION §4, §6, §9). Uses only approved catalog entries, keeps
 // every planner-owned field verbatim, and places required quest anchors exactly where the plan says.
@@ -83,7 +88,8 @@ export function generateFallbackChunk(worldId: string, seed: string, coord: Chun
         case 'boolean': out[key] = rng() < 0.5; break;
         case 'text': {
           const keys = Object.keys(TEXT_CATALOG[spec.catalog]).filter((k) => spec.catalog !== 'npc-name' || !QUEST_GIVERS.includes(k));
-          out[key] = spec.catalog === 'menu' ? 'drinks' : pick(keys) ?? spec.default; break;
+          // Notices and vendor names keep their entry's sensible default; random notices put 禁止游泳 on a guard booth.
+          out[key] = spec.catalog === 'menu' ? 'drinks' : spec.catalog === 'notice' || (spec.catalog === 'shop-name' && entry.capabilities.includes('drink-vendor')) ? spec.default : pick(keys) ?? spec.default; break;
         }
       }
     }
@@ -177,7 +183,10 @@ export function generateFallbackChunk(worldId: string, seed: string, coord: Chun
       if (!entry) continue;
       const p = rotatePoint(socket.x, socket.z, parent.rotation);
       const x = parent.x + p.x, z = parent.z + p.z;
-      const id = place(entry, randomParams(entry, overrides), x, z, ((parent.rotation + socket.facing) % 360) as Rot, { attachTo: { placementId: parentId, socketId: socket.id }, required });
+      const [label, spec] = Object.entries(entry.params).find(([, s]) => s.type === 'text' && (s.catalog === 'shop-name' || s.catalog === 'notice')) ?? [];
+      const sign = spec?.type === 'text' && spec.catalog === 'notice' ? pick(['open', 'welcome']) : pick(SHOP_SIGNS[parent.assetId] ?? RETAIL_SIGNS);
+      const signed = label && !(label in overrides) ? { ...overrides, [label]: sign! } : overrides;
+      const id = place(entry, randomParams(entry, signed), x, z, ((parent.rotation + socket.facing) % 360) as Rot, { attachTo: { placementId: parentId, socketId: socket.id }, required });
       if (id) return id;
     }
     return null;

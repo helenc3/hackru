@@ -2,7 +2,7 @@
   "actionId": "fixture-action-001",
   "expectedVersion": 0,
   "action": {
-    "type": "inspect",
-    "targetId": "fixture-anchor.menu"
+    "type": "setInputPreference",
+    "preference": "typed-accessibility"
   }
 }

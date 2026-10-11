@@ -42,17 +42,17 @@ test('shift-click glosses an NPC reply, saves a word for review across reloads, 
   const annotated = await mockDictionary(page);
   await enter(page);
 
-  // Shift+click on the Talk button's Chinese name explains it instead of opening the conversation.
-  await shiftClick(page, await charPoint(page.getByRole('button', { name: '老王 · Talk', exact: true }), '王'));
+  // Talk as usual (E beside the NPC); Shift+click on the NPC's Chinese name explains it without closing anything.
+  await page.getByTestId('world-renderer').focus(); await page.keyboard.press('e');
+  const panel = page.getByTestId('dialogue-panel');
+  await expect(panel).toBeVisible();
+  await shiftClick(page, await charPoint(panel.locator('#dialogue-title'), '王'));
   const popover = page.getByTestId('gloss-popover');
   await expect(popover.getByTestId('gloss-word')).toContainText('wáng');
-  await expect(page.getByTestId('dialogue-panel')).toHaveCount(0);
   await page.keyboard.press('Escape');
   await expect(popover).toHaveCount(0);
+  await expect(panel).toBeVisible();
 
-  // A plain click still talks.
-  await page.getByRole('button', { name: '老王 · Talk', exact: true }).click();
-  const panel = page.getByTestId('dialogue-panel');
   if (await panel.getByRole('button', { name: 'Use typed Mandarin', exact: true }).count()) await panel.getByRole('button', { name: 'Use typed Mandarin', exact: true }).click();
   await panel.getByRole('textbox').fill('我要水。');
   await panel.getByRole('button', { name: 'Send Mandarin' }).click();

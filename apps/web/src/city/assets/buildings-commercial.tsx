@@ -112,7 +112,7 @@ function RestaurantNoodle({ params }: AssetProps) {
     <Box at={[-0.6, 0.55, d / 2 + 0.2]} dims={[w - 2, 1.1, 0.4]} color={candy.bark} />
     <Box at={[-0.6, 2.55, d / 2 + 0.15]} dims={[w - 1.8, 0.3, 0.3]} color={candy.silver} />
     <Face x={w / 2 - 0.8} y={1.1} w={1} h={2.2} d={d} color={INK} />
-    {params.floors === 2 && <Windows w={w} d={d} y={storeyHeight(2) - 1.5} count={2} />}
+    {Array.from({ length: (params.floors as number) - 1 }, (_, i) => <Windows key={i} w={w} d={d} y={storeyHeight(i + 2) - 1.5} count={2} />)}
   </Shell>;
 }
 

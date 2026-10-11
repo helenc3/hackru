@@ -77,7 +77,7 @@ test('fixture reply audio failure degrades to the Mandarin subtitle without bloc
   await expect.poll(async () => (await playerState(page, request)).purchases.length).toBe(1);
 });
 
-test('server restart expires the stored session and a fresh start reopens the same world', async ({ page }) => {
+test('server restart forgets the expired session and a fresh start creates a new world', async ({ page }) => {
   const base = `http://127.0.0.1:${RESTART_PORT}`;
   const env: NodeJS.ProcessEnv = { ...process.env, NODE_ENV: 'production', PORT: String(RESTART_PORT), ENABLE_DEMO_FIXTURES: 'true', ENABLE_VALIDATION_HARNESS: 'false' };
   for (const key of Object.keys(env)) if (/GEMINI|ELEVENLABS|ANTHROPIC/.test(key)) delete env[key];
@@ -102,18 +102,14 @@ test('server restart expires the stored session and a fresh start reopens the sa
     await halt();
     await boot();
     await page.reload();
-    await page.getByRole('button', { name: 'Continue Session' }).click();
-    const recovery = page.getByTestId('recovery-panel');
-    await expect(recovery).toContainText('This session has expired.');
-    await expect(recovery).toContainText('SESSION_NOT_FOUND');
-    await recovery.getByRole('button', { name: 'Start a fresh session' }).click();
+    await expect(page.getByRole('button', { name: 'Start exploring' })).toBeEnabled();
     await expect(page.getByRole('button', { name: 'Continue Session' })).toHaveCount(0);
 
-    // The restarted server holds no manifests: the browser restores the pinned spawn box before movement.
+    // Sessions and terrain share the server lifetime; a restart creates a new city.
     await page.getByLabel('Conversation provider').selectOption('fixture');
     await page.getByRole('button', { name: 'Start exploring' }).click();
     await expect.poll(async () => Number(await page.getByTestId('world-renderer').getAttribute('data-chunks')), { timeout: 60000 }).toBeGreaterThanOrEqual(9);
-    await expect(page.getByTestId('world-renderer')).toHaveAttribute('data-world-id', worldId!);
+    await expect(page.getByTestId('world-renderer')).not.toHaveAttribute('data-world-id', worldId!);
     const fresh = await sessionId(page);
     expect(fresh).toBeTruthy();
     expect(fresh).not.toBe(old);
@@ -160,6 +156,7 @@ test('replayed action and turn IDs are idempotent, reused IDs conflict, and one 
 
 test('a stale expectedVersion returns STALE_VERSION and the UI resynchronizes', async ({ page, request }) => {
   await startWorld(page, 'fixture');
+  const panel = await reachVendor(page, request);
   const id = (await sessionId(page))!;
   const shown = await serverState(request, id);
 
@@ -173,7 +170,7 @@ test('a stale expectedVersion returns STALE_VERSION and the UI resynchronizes', 
   expect(staleBody.error).toMatchObject({ code: 'STALE_VERSION', retryable: true });
   expect(staleBody.state.version).toBe(ahead.version);
 
-  await page.getByRole('button', { name: /^Pause/ }).click();
+  await panel.getByRole('button', { name: 'Use voice', exact: true }).click();
   const recovery = page.getByTestId('recovery-panel');
   await expect(recovery).toContainText('Your session needs a refresh.');
   await expect(recovery).toContainText('STALE_VERSION');

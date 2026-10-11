@@ -38,8 +38,7 @@ export function ResultPanel({ state, live, pending, onAction, onExit, onClose }:
     {state.badges.map((badge) => <span className="earned-badge" key={badge}>{state.validationMode ? 'Simulated badge: ' : 'Badge: '}{badge === 'shanghai-explorer' ? 'Shanghai Explorer' : badge}</span>)}
     <div className="result-actions">
       {canAct && !review && state.status === 'cleared' && next && <button className="button primary" disabled={pending} onClick={() => start(next)}>Next quest</button>}
-      {canAct && state.status === 'cleared' && <button className="button secondary" disabled={pending} onClick={() => start(state.missionId)}>Play again</button>}
-      {canAct && state.status === 'failed' && <button className="button primary" disabled={pending} onClick={() => review ? start(state.missionId) : void onAction({ type: 'retryMission' }).catch(() => undefined)}>Try again</button>}
+      {canAct && state.status === 'failed' && <button className="button primary" disabled={pending} onClick={() => start(state.missionId)}>Try again</button>}
       {canAct && <button className="button secondary" disabled={pending} onClick={onExit}>Return to start</button>}
       <button className="button secondary" disabled={pending} onClick={onClose}>{canAct ? 'Close' : 'Back to quest'}</button>
     </div>

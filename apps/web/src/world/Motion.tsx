@@ -9,7 +9,7 @@ import { initialPosition, type Runtime } from './runtime';
 import { useAudioActivity } from '../audio/audio-bus';
 import { DEFAULT_PITCH, orbitDistance } from './camera';
 
-export type Landmark = { label: string; x: number; z: number };
+export type Landmark = { id?: string; label: string; x: number; z: number };
 
 export function Motion({ runtime, root, labels, marks, city, state, tick, sync }: {
   runtime: React.RefObject<Runtime>; root: React.RefObject<HTMLElement | null>;

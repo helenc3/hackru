@@ -22,7 +22,7 @@ export function createBaselineState(missionId: MissionId = 'Q1'): PublicState {
 }
 
 export const baselineStates = { Q1: createBaselineState('Q1'), Q2: createBaselineState('Q2'), Q3: createBaselineState('Q3') };
-export const baselineActionRequest = ActionRequestSchema.parse({ actionId: 'fixture-action-001', expectedVersion: 0, action: { type: 'inspect', targetId: 'fixture-anchor.menu' } });
+export const baselineActionRequest = ActionRequestSchema.parse({ actionId: 'fixture-action-001', expectedVersion: 0, action: { type: 'setInputPreference', preference: 'typed-accessibility' } });
 export const baselineActionResponse = ActionResponseSchema.parse({ state: createBaselineState(), events: [] });
 export const baselineTurnRequest = TurnRequestSchema.parse({ turnId: 'fixture-turn-001', expectedVersion: 0, npcId: 'vendor', anchorId: 'fixture-anchor.vendor', input: { text: '请给我一杯茶。', source: 'stt', transcriptionId: 'fixture-transcription-001' } });
 export const baselinePracticeTurnResponse = TurnResponseSchema.parse({ turnId: 'fixture-turn-001', state: createBaselineState(), events: [], npcReply: '好嘞，茶十块。', speechId: 'fixture-speech-001', feedback: { understood: 'You asked for tea.', explanation: 'Your request was clear.', improvedExample: '请给我一杯茶，谢谢。' }, vibe: { intent: 0.95, clarity: 0.9, courtesy: 0.9 } });

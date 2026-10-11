@@ -1,7 +1,7 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { type CreateSessionRequest, type GameAction, type GameEvent, type PublicState, type TurnRequest, type TurnResponse } from '@vibequest/shared';
 import { act, createSession, getState, sendTurn, SessionClientError } from './session-client';
-import { rememberedWorldId, rememberWorld } from '../city/chunk-cache';
+import { rememberWorld } from '../city/chunk-cache';
 
 export type UiProblem = { code: string; message: string; retryable: boolean; expired: boolean };
 const storageKey = (validation: boolean) => validation ? 'vibequest.validation-session.v1' : 'vibequest.player-session.v1';
@@ -13,7 +13,8 @@ export type NpcTarget = { anchorId: string; role: TurnRequest['npcId']; name: st
 export function useSession(validation: boolean) {
   const [state, setState] = useState<PublicState | null>(null);
   const current = useRef<PublicState | null>(null);
-  const [resumeId, setResumeId] = useState(() => stored(validation));
+  const [resumeId, setResumeId] = useState<string | null>(null);
+  const [checkingSession, setCheckingSession] = useState(true);
   const [pending, setPending] = useState(0);
   const [turnPending, setTurnPending] = useState(false);
   const activeTurn = useRef<string | null>(null);
@@ -46,6 +47,33 @@ export function useSession(validation: boolean) {
     setProblem({ code: failure.code, message: failure.message, retryable: failure.retryable, expired });
   }, [accept, validation]);
 
+  // A remembered identifier is only a candidate until the server confirms it.
+  useEffect(() => {
+    let live = true;
+    const token = generation.current;
+    const id = stored(validation);
+    const check = async () => {
+      try {
+        if (!id) return;
+        const saved = await getState(id);
+        if (!live || token !== generation.current) return;
+        if (saved.validationMode !== validation) {
+          remember(validation, null);
+          return;
+        }
+        setResumeId(saved.sessionId);
+      } catch (error) {
+        if (!live || token !== generation.current) return;
+        if (error instanceof SessionClientError && error.status === 404) remember(validation, null);
+        else report(error, token);
+      } finally {
+        if (live) setCheckingSession(false);
+      }
+    };
+    void check();
+    return () => { live = false; };
+  }, [validation, report]);
+
   const enqueue = useCallback((task: (token: number) => Promise<void>, token = generation.current): Promise<void> => {
     setPending((count) => count + 1);
     const execution = tail.current.catch(() => undefined).then(async () => {
@@ -67,38 +95,28 @@ export function useSession(validation: boolean) {
     await enqueue(async (token) => accept(await getState(id), token));
   }, [accept, enqueue, resumeId]);
 
-  /** Reuses the remembered city (its saved terrain restores identically); a new city is reset by the caller first. */
+  /** The server selects the world for a new session. */
   const start = useCallback(async (options: CreateSessionRequest) => {
     if (pending) return;
     const token = ++generation.current;
     current.current = null; setState(null); setTurn(null); setEvents([]);
-    const worldId = validation ? undefined : rememberedWorldId();
-    await enqueue(async (active) => accept(await createSession({ ...options, validationMode: validation, ...(worldId ? { worldId } : {}) }), active), token);
+    await enqueue(async (active) => accept(await createSession({ ...options, validationMode: validation }), active), token);
   }, [accept, enqueue, pending, validation]);
 
   const onAction = useCallback(async (action: GameAction) => {
-    // A mission retry must not wait behind a provider call. Invalidate old UI callbacks
-    // and fetch the server's reserved version before requesting a fresh attempt.
-    const interrupted = action.type === 'retryMission' && activeTurn.current !== null;
-    if (interrupted) {
-      generation.current++; tail.current = Promise.resolve(); setPending(0);
-      activeTurn.current = null; setTurnPending(false); retry.current = null;
-      setTurn(null); setTurnNpc(null); setEvents([]);
-    }
     const scope = generation.current;
     const actionId = crypto.randomUUID();
     // Build the version at dispatch, after earlier movement/audio/turn actions commit.
     let input: Parameters<typeof act>[1] | undefined;
     await enqueue(async (token) => {
-      if (interrupted && current.current) accept(await getState(current.current.sessionId), token);
       const snapshot = current.current;
-      if (!snapshot || snapshot.status !== 'active' && !['retryMission', 'startMission', 'setInputPreference', 'audioPhase'].includes(action.type)) throw new SessionClientError(422, 'NO_ACTIVE_SESSION', 'Start or resume a session before interacting.', false);
+      if (!snapshot || snapshot.status !== 'active' && !['startMission', 'setInputPreference', 'audioPhase'].includes(action.type)) throw new SessionClientError(422, 'NO_ACTIVE_SESSION', 'Start or resume a session before interacting.', false);
       input = { actionId, expectedVersion: snapshot.version, action };
       const response = await act(snapshot.sessionId, input);
       if (token !== generation.current) return;
       accept(response.state, token);
       setEvents((previous) => [...previous, ...response.events.filter((event) => !previous.some((known) => known.id === event.id))].slice(-8));
-      if (action.type === 'retryMission' || action.type === 'startMission') { setTurn(null); setTurnNpc(null); setEvents(response.events); }
+      if (action.type === 'startMission') { setTurn(null); setTurnNpc(null); setEvents(response.events); }
     }, scope);
   }, [accept, enqueue]);
 
@@ -138,6 +156,6 @@ export function useSession(validation: boolean) {
     retry.current = null; remember(validation, null); setResumeId(null);
   }, [validation]);
 
-  return { state, pending: pending > 0, turnPending, problem, turn, turnNpc, events, resumeId, start, refresh, onAction, submit, applyTurn, abandon,
+  return { state, pending: pending > 0 || checkingSession, turnPending, problem, turn, turnNpc, events, resumeId, start, refresh, onAction, submit, applyTurn, abandon,
     retry: async () => { await retry.current?.(); }, dismiss: () => setProblem(null) };
 }

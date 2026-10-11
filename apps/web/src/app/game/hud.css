@@ -1,4 +1,4 @@
-/* Overlays. z-order: panels (dialogue/sign/result) above HUD above world. */
+/* Overlays. z-order: panels (dialogue/result) above HUD above world. */
 
 .quest-panel {
   position: absolute;
@@ -33,12 +33,6 @@
   font-size: 10px;
 }
 
-.quest-panel .objective-list {
-  gap: 10px;
-  margin: 14px 0 8px;
-  font-size: 12px;
-}
-
 .quest-panel .mission-clock {
   font-size: 24px;
   margin: 12px 0;
@@ -51,12 +45,6 @@
 .quest-panel[data-collapsed=true] {
   width: auto;
   max-width: 270px;
-}
-
-.quest-progress {
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--plum);
 }
 
 .hud-bottom-left {
@@ -74,10 +62,6 @@
 
 .hud-bottom-left > * {
   pointer-events: auto;
-}
-
-.interaction-dock > div:empty {
-  display: none;
 }
 
 .inventory-bar {

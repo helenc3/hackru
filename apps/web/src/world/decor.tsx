@@ -2,7 +2,7 @@ import { useLayoutEffect, useMemo, useRef, type ReactNode } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { Billboard, GradientTexture, Sparkles } from '@react-three/drei';
 import { BackSide, CanvasTexture, Color, Matrix4, Object3D, type BufferGeometry, type Group, type InstancedMesh, type MeshBasicMaterial } from 'three';
-import type { Position, PublicState } from '@vibequest/shared';
+import type { Position } from '@vibequest/shared';
 import { candy, INK, Toon, useReducedMotion } from './toon';
 
 /** Purely decorative, non-colliding scenery. Nothing here touches gameplay state. */
@@ -222,22 +222,7 @@ export function Trees({ still }: { still: boolean }) {
   return <>{treeSpots.map(([x, z], index) => <Tree key={index} x={x} z={z} index={index} still={still} />)}</>;
 }
 
-/** Chunky ink post with a lemon board (sign) or a teal horn speaker (PA); same spot as before. */
-export function Sign({ target, phase, still }: { target: PublicState['interactables'][number]; phase: number; still: boolean }) {
-  const head = useRef<Group>(null);
-  useFrame(({ clock }) => { if (!still && head.current) head.current.rotation.y = .02 * Math.sin(clock.elapsedTime * 1.3 + phase); });
-  return <group position={[target.position.x, 0, target.position.z]} userData={{ clearView: 'solid' }}>
-    <mesh position={[.6, .7, 0]}><boxGeometry args={[.14, 1.4, .14]} /><Toon color={candy.inkSoft} /></mesh>
-    <group ref={head} position={[.6, 1.4, 0]}>
-      {target.kind === 'sign'
-        ? <mesh><boxGeometry args={[1, .6, .1]} /><Toon color={candy.lemon} thickness={3} /></mesh>
-        : <>
-          <mesh position={[0, 0, -.02]} rotation={[Math.PI / 2, 0, 0]}><cylinderGeometry args={[.1, .1, .22, 10]} /><Toon color={candy.teal} outline={false} /></mesh>
-          <mesh position={[0, 0, .2]} rotation={[-Math.PI / 2, 0, 0]}><coneGeometry args={[.24, .3, 12]} /><Toon color={candy.teal} /></mesh>
-        </>}
-    </group>
-  </group>;
-}
+
 
 const PETALS = 110;
 const rand = (n: number) => { const s = Math.sin(n * 127.1 + 311.7) * 43758.5453; return s - Math.floor(s); };

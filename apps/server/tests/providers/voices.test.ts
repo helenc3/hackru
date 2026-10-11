@@ -2,6 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { DEFAULT_VOICE_IDS, voiceFor } from '../../src/providers/elevenlabs/live.js';
 
 describe('reviewed Mandarin voice selection', () => {
+  it('uses the named character gender rather than the role override', () => {
+    expect(voiceFor({ vendor: 'Ca5bKgudqKJzq8YRFoAz' }, 'npc:laowang')).toBe('hZTuv9Zqrq4yHYrEmF1r');
+    expect(voiceFor({}, 'npc:xiaomei')).toBe('Ca5bKgudqKJzq8YRFoAz');
+    expect(voiceFor({}, 'npc:ayi')).toBe('r6qgCCGI7RWKXCagm158');
+    expect(() => voiceFor({}, 'npc:unknown')).toThrow();
+  });
   it('assigns distinct approved voices to the three NPC roles', () => {
     expect(voiceFor({}, 'vendor')).toBe('Ca5bKgudqKJzq8YRFoAz');
     expect(voiceFor({}, 'guide')).toBe('4VZIsMPtgggwNg7OXbPY');

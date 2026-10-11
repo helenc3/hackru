@@ -11,7 +11,7 @@ and keeps XP, loot, badges, and objectives unearned. Do not use it as the produc
 session engine.
 
 - `public-states.json`: one public fixture per quest (Q1–Q3), with an empty world.
-- `action-request.json`, `action-response.json`: inspection boundary examples.
+- `action-request.json`, `action-response.json`: input preference boundary examples.
 - `turn-request.json`: Mandarin text plus an example transcription ID.
 - `practice-turn-response.json`: NPC Mandarin, feedback, and Vibe dimensions.
 - `transcription-response.json`, `transcription-record.json`: session/attempt-bound

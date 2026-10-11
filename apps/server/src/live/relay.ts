@@ -1,5 +1,5 @@
 import { GoogleGenAI, Modality, type LiveServerMessage, type Session } from '@google/genai';
-import { NpcIdSchema, EngineRuleError, dialogueContext, pendingGoalAction, type NpcId, type TurnContext, type TurnResponse } from '@vibequest/shared';
+import { NpcIdSchema, EngineRuleError, dialogueContext, npcIdentity, pendingGoalAction, type NpcId, type TurnContext, type TurnResponse } from '@vibequest/shared';
 import { randomUUID } from 'node:crypto';
 import type { Server } from 'node:http';
 import { WebSocketServer, type WebSocket } from 'ws';
@@ -35,6 +35,7 @@ export function createLiveBridge(options: {
   note: (turn: TurnResponse) => Promise<string | undefined> | string | undefined;
   /** True when the turn leaves only a button to finish the task: the session ends like a goodbye. */
   ends?: (turn: TurnResponse) => boolean;
+  speak?: (text: string) => Promise<void>;
 }): Bridge {
   let inputText = '';
   let outputText = '';
@@ -55,14 +56,16 @@ export function createLiveBridge(options: {
     const outputsBefore = outputs;
     options.send({ type: 'playerTranscript', text, final: true });
     const spokenReply = afterModelTurn ? () => Promise.resolve(lastOutput) : nextOutput;
-    options.turn(text, spokenReply).then((turn) => {
+    options.turn(text, spokenReply).then(async (turn) => {
+      if (closed) return;
+      if (options.speak) await options.speak(turn.npcReply);
       if (closed) return;
       options.send({ type: 'turn', turn });
       if (turn.conversationEnded || options.ends?.(turn)) {
         // The spoken goodbye already completed while the engine evaluated: close now. Otherwise let it finish (next completed model turn), else cap.
         // A goodbye closes the panel; a finishing button ('goal') leaves it open on the button.
         const reason = turn.conversationEnded ? 'farewell' : 'goal';
-        if (afterModelTurn || outputs > outputsBefore) { close(reason); return; }
+        if (options.speak || afterModelTurn || outputs > outputsBefore) { close(reason); return; } // with speak, the line already played
         const timer = setTimeout(() => close(reason), FAREWELL_WAIT_MS);
         waiters.push(() => { clearTimeout(timer); close(reason); });
         return;
@@ -88,7 +91,7 @@ export function createLiveBridge(options: {
       if (closed) return;
       const content = message.serverContent;
       // gemini-3.8-live never flags `finished`; the model answering means the utterance ended, so evaluate now instead of after its reply.
-      if (message.data) { options.send({ type: 'audio', data: message.data }); startTurn(false); }
+      if (message.data) { if (!options.speak) options.send({ type: 'audio', data: message.data }); startTurn(false); }
       if (!content) return;
       if (content.interrupted) { options.send({ type: 'interrupted' }); completeOutput(outputText); }
       if (content.inputTranscription?.text) {
@@ -166,7 +169,11 @@ export function attachLiveRelay(server: Server, services: ServerServices, option
   });
 
   async function open(ws: WebSocket, sessionId: string, npcIdRaw: string, anchorIdRaw: string): Promise<void> {
-    const send = (event: ServerEvent) => { if (ws.readyState === ws.OPEN) ws.send(JSON.stringify(event)); };
+    let speechEpoch = 0;
+    const send = (event: ServerEvent) => {
+      if (event.type === 'interrupted') speechEpoch++;
+      if (ws.readyState === ws.OPEN) ws.send(JSON.stringify(event));
+    };
     const fail = (code: string, message: string) => { send({ type: 'error', code, message, retryable: false }); ws.close(4000, code); };
     const npcId = NpcIdSchema.safeParse(npcIdRaw);
     if (!npcId.success) return fail('INVALID_REQUEST', 'Unknown NPC.');
@@ -175,10 +182,14 @@ export function attachLiveRelay(server: Server, services: ServerServices, option
     const apiKey = services.config.geminiApiKey;
     if (!apiKey) return fail('LIVE_UNAVAILABLE', 'Live voice is not configured on this server.');
     let context: TurnContext;
+    let voiceKey: string = npcId.data;
     try {
       context = await store.withSession(sessionId, async (session) => {
         if (session.state.providerStatus !== 'live') throw new HttpError(422, 'LIVE_UNAVAILABLE', 'Live voice needs a live-provider session.');
-        return dialogueContext(session.state, npcId.data, anchorId, services.worlds.view(session.state.worldId));
+        const world = services.worlds.view(session.state.worldId);
+        const nameKey = world.anchor(anchorId)?.nameKey;
+        if (npcIdentity(nameKey)) voiceKey = `npc:${nameKey}`;
+        return dialogueContext(session.state, npcId.data, anchorId, world);
       });
     } catch (error) {
       return fail(error instanceof HttpError || error instanceof EngineRuleError ? error.code : 'LIVE_UNAVAILABLE', error instanceof Error ? error.message : 'Live voice is unavailable.');
@@ -193,6 +204,15 @@ export function attachLiveRelay(server: Server, services: ServerServices, option
     const bridge = createLiveBridge({
       send,
       ends: (turn) => Boolean(pendingGoalAction(turn.state.npcActions, turn.state.inventory.cny, npcId.data)),
+      speak: async (text) => {
+        const epoch = speechEpoch;
+        if (!services.speechProvider.synthesizePcm) throw new HttpError(503, 'SPEECH_UNAVAILABLE', 'Mandarin speech is temporarily unavailable.', true);
+        const audio = await services.speechProvider.synthesizePcm(text, voiceKey);
+        if (torn || epoch !== speechEpoch) return;
+        for (let offset = 0; offset < audio.length; offset += 16_384) {
+          send({ type: 'audio', data: Buffer.from(audio.subarray(offset, offset + 16_384)).toString('base64') });
+        }
+      },
       live: {
         sendAudio: (data) => gemini?.sendRealtimeInput({ audio: { data, mimeType: 'audio/pcm;rate=16000' } }),
         sendNote: (text) => gemini?.sendClientContent({ turns: [{ role: 'user', parts: [{ text }] }], turnComplete: false }),

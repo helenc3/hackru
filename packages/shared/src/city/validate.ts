@@ -5,6 +5,7 @@ import {
 } from './contracts.js';
 import { CATALOG_VERSION, catalogEntry, resolveParams } from './catalog/index.js';
 import { canonicalJson, sealManifest, verifyManifestHash } from './hash.js';
+import { npcIdentity } from './npc-identity.js';
 
 // Conventions (shared with planner, fallback and renderer):
 // - Chunk-local x grows east, z grows south; north edge is z = 0, south z = 40, west x = 0, east x = 40.
@@ -175,6 +176,13 @@ function inspect(manifest: ChunkManifest, plan: ChunkPlan, options: Options): Is
       if (!entry.attachesTo?.length) { bad(`${entry.id} cannot attach to sockets`); continue; }
       if (!parent) { bad(`attach parent ${placement.attachTo.placementId} missing or declared later`); continue; }
       if (!socket || !entry.attachesTo.includes(socket.kind)) { bad(`incompatible socket ${placement.attachTo.socketId}`); continue; }
+      if (entry.id === 'an.npc.vendor' && !parent.entry.id.startsWith('an.vendor.')) { bad('vendor character requires a drink stand or shop parent'); continue; }
+      if (entry.id === 'an.npc.vendor' && parent.entry.id === 'an.vendor.convenience') { bad('vendor character requires a visible drink stall or cafe counter'); continue; }
+      const offset = rotateRect({ minX: socket.x, maxX: socket.x, minZ: socket.z, maxZ: socket.z }, parent.placement.rotation);
+      if (Math.hypot(placement.x - parent.placement.x - offset.minX, placement.z - parent.placement.z - offset.minZ) > 0.02
+        || placement.rotation !== (parent.placement.rotation + socket.facing) % 360) {
+        bad('attachment pose differs from its rendered socket'); continue;
+      }
     } else if (entry.placement === 'socket') { bad(`${entry.id} must attach to a socket`); continue; }
     const f = resolved.footprint;
     if (!placement.attachTo && (f.minX < -1e-6 || f.minZ < -1e-6 || f.maxX > CHUNK_SIZE + 1e-6 || f.maxZ > CHUNK_SIZE + 1e-6)) { bad('footprint leaves the chunk'); continue; }
@@ -193,6 +201,17 @@ function inspect(manifest: ChunkManifest, plan: ChunkPlan, options: Options): Is
     kept.push(resolved); byId.set(placement.id, resolved);
   }
 
+  // Characters reserve their full body footprint even when their collision is empty (vendors).
+  // Attribute violations to scenery so repair removes the obstruction rather than the NPC.
+  for (const npc of kept.filter((r) => r.entry.id.startsWith('an.npc.'))) {
+    for (const other of kept) {
+      if (other === npc || other.placement.id === npc.placement.attachTo?.placementId) continue;
+      if (other.solids.some((solid) => overlaps(npc.footprint, solid))) {
+        issues.push({ message: `placement ${other.placement.id}: overlaps NPC ${npc.placement.id}`, placementId: other.placement.id });
+      }
+    }
+  }
+
   // Anchors: capability comes from the bound placement's catalog entry.
   const anchorIds = new Set<string>();
   for (const anchor of manifest.anchors) {
@@ -206,11 +225,23 @@ function inspect(manifest: ChunkManifest, plan: ChunkPlan, options: Options): Is
     const role = ROLE_FOR[anchor.capability as keyof typeof ROLE_FOR];
     if (role && (anchor.kind !== 'npc' || anchor.role !== role)) { bad(`${anchor.capability} anchors are npc anchors with role ${role}`); continue; }
     if (!role && anchor.role) { bad('only NPC capabilities carry a role'); continue; }
-    if (anchor.kind === 'npc') {
-      // Someone must actually stand there: the bound placement is a figure, or carries one in a socket (vendor counters).
-      const figure = bound.entry.id.startsWith('an.npc.') ? bound : kept.find((k) => k.placement.attachTo?.placementId === bound.placement.id && k.entry.id.startsWith('an.npc.'));
-      if (!figure) { bad(`${bound.entry.id} has no NPC figure`); continue; }
-      if (anchor.nameKey && figure.placement.params.nameKey !== anchor.nameKey) { bad(`figure is named ${String(figure.placement.params.nameKey)}, not ${anchor.nameKey}`); continue; }
+    if (role && (bound.entry.id.startsWith('an.npc.') || bound.entry.id.startsWith('an.vendor.'))) {
+      const figure = bound.entry.id.startsWith('an.npc.') ? bound : kept.find((r) =>
+        r.entry.id === `an.npc.${role}` && r.placement.attachTo?.placementId === bound.placement.id);
+      if (!npcIdentity(anchor.nameKey) || (figure && resolveParams(figure.entry, figure.placement.params).nameKey !== anchor.nameKey)) {
+        bad('NPC name must match its character identity');
+      }
+    }
+    if (role === 'vendor' && bound.entry.id === 'an.vendor.convenience') {
+      bad('vendor interaction requires a visible drink stall or cafe counter');
+    }
+    if (role === 'vendor' && bound.entry.id.startsWith('an.vendor.') && !kept.some((r) =>
+      r.entry.id === 'an.npc.vendor' && r.placement.attachTo?.placementId === bound.placement.id)) {
+      bad('vendor anchor requires an attached vendor character');
+    }
+    if (bound.entry.id === 'an.helper.info-board' && ![...byId.values()].some((r) =>
+      r.entry.id === 'an.npc.guide' && r.placement.attachTo?.placementId === bound.placement.id)) {
+      bad('info board NPC anchor requires an attached guide character');
     }
   }
   for (const required of plan.requiredAnchors) {
@@ -243,7 +274,17 @@ export function repairManifest(manifest: ChunkManifest, plan: ChunkPlan): ChunkM
     connectors: plan.connectors, water: plan.water, roads: [...plan.roads, ...manifest.roads.filter((r) => !plannerRoads.has(r.id))],
   });
   const required = new Set(plan.requiredAnchors.map((a) => a.anchorId));
-  const protectedPlacements = () => new Set(current.anchors.filter((a) => required.has(a.id)).map((a) => a.placementId));
+  const protectedPlacements = () => {
+    const ids = new Set(current.anchors.filter((a) => required.has(a.id)).map((a) => a.placementId));
+    let grew = true;
+    while (grew) {
+      grew = false;
+      for (const p of current.placements) if (p.attachTo && ids.has(p.attachTo.placementId) && !ids.has(p.id)) {
+        ids.add(p.id); grew = true;
+      }
+    }
+    return ids;
+  };
   for (let round = 0; round < CITY_LIMITS.maxPlacements + CITY_LIMITS.maxAnchors + 4; round++) {
     const issues = inspect(current, plan, {});
     if (!issues.length) return current;
@@ -260,6 +301,11 @@ export function repairManifest(manifest: ChunkManifest, plan: ChunkPlan): ChunkM
         dropPlacements.add(victim.id);
       }
     }
+    // A vendor and its stand are one assembly: removing either removes both.
+    for (const p of current.placements) if (p.assetId === 'an.npc.vendor' && p.attachTo && dropPlacements.has(p.id)) {
+      dropPlacements.add(p.attachTo.placementId);
+    }
+    if ([...dropPlacements].some((id) => keep.has(id))) return null;
     // Cascade: attachments of dropped parents, anchors bound to dropped placements.
     let grew = true;
     while (grew) { grew = false; for (const p of current.placements) if (p.attachTo && dropPlacements.has(p.attachTo.placementId) && !dropPlacements.has(p.id)) { dropPlacements.add(p.id); grew = true; } }

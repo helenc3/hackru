@@ -47,6 +47,14 @@ async function game(speech: SpeechProvider = countingSpeech()) {
     await act({ type: 'audioPhase', operationId, phase: 'idle' });
     return response.body as { text: string; transcriptionId: string };
   };
+  // Set up a cleared quest to exercise artifact invalidation on legitimate progression.
+  const nextQuest = async () => {
+    await services.sessionStore.withSession(state.sessionId, async (record) => {
+      record.state.status = 'cleared'; record.state.unlockedMissionIds = ['Q1', 'Q2'];
+      record.state.completedMissionIds = ['Q1'];
+    });
+    await act({ type: 'startMission', missionId: 'Q2' });
+  };
   const session = async () => (await services.sessionStore.get(state.sessionId))!;
   // The spawn vendor is already within interaction reach.
   const atCafe = async () => undefined;
@@ -59,7 +67,7 @@ async function game(speech: SpeechProvider = countingSpeech()) {
     }
     throw new Error('speech never resolved');
   };
-  return { app, services, act, turn, upload, record, session, atCafe, speechGet, until200, get state() { return state; } };
+  return { app, services, act, turn, upload, record, nextQuest, session, atCafe, speechGet, until200, get state() { return state; } };
 }
 
 const conversationSources = async (g: Awaited<ReturnType<typeof game>>) =>
@@ -121,14 +129,14 @@ describe('Segment-005 transcription', () => {
     expect((await g.session()).transcriptions.size).toBe(0);
   });
 
-  it('discards a transcript that finishes after mission retry', async () => {
+  it('discards a transcript that finishes after advancing to the next quest', async () => {
     let release!: (text: string) => void;
     const slow: SpeechProvider = { synthesize: async () => silentMp3Frame(), transcribe: () => new Promise((resolve) => { release = resolve; }) };
     const g = await game(slow);
     await g.act({ type: 'audioPhase', operationId: 'rec-1', phase: 'recording' });
     const pending = g.upload('rec-1').then((response) => response);
     await new Promise((resolve) => setTimeout(resolve, 20));
-    await g.act({ type: 'retryMission' });
+    await g.nextQuest();
     release('请给我一杯茶。');
     const response = await pending;
     expect(response.status).toBe(409);
@@ -167,7 +175,7 @@ describe('Segment-005 speech jobs', () => {
     expect((await g.session()).state.version).toBe(version);
   });
 
-  it('rejects unknown, foreign and retried-attempt speech IDs', async () => {
+  it('rejects unknown, foreign and previous-quest speech IDs', async () => {
     let release!: (audio: Uint8Array) => void;
     const g = await game({ synthesize: () => new Promise((resolve) => { release = resolve; }), transcribe: async () => '你好' });
     await g.atCafe();
@@ -176,7 +184,7 @@ describe('Segment-005 speech jobs', () => {
     const other = await game();
     await request(other.app).get(`/api/sessions/${other.state.sessionId}/speech/${reply.speechId}`).expect(404);
     await g.speechGet(reply.speechId).expect(202);
-    await g.act({ type: 'retryMission' });
+    await g.nextQuest();
     release(silentMp3Frame()); // late audio must not attach to the new attempt
     await new Promise((resolve) => setTimeout(resolve, 20));
     expect((await g.speechGet(reply.speechId).expect(410)).body.error.code).toBe('SPEECH_INVALIDATED');

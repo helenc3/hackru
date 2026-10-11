@@ -43,6 +43,12 @@ async function orderedTea(state: InternalState) {
   return (await say(state, '我要茶')).state;
 }
 
+it('keeps scenery signs out of the projected interactions', () => {
+  const state = projectPublicState(game(), NOW, fakeWorld);
+  expect(state.interactables.some((target) => target.id === 'a.menu')).toBe(false);
+  expect(state.interactables.some((target) => target.id === 'a.vendor')).toBe(true);
+});
+
 describe('Q1 buy a drink', () => {
   it('is one goal: coffee is sold out in dialogue, the priced drink enables Pay, the first purchase completes it', async () => {
     let state = game();
@@ -80,14 +86,9 @@ describe('Q1 buy a drink', () => {
     confirmed.position = { x: 10, z: 1 };
     expect(() => act(confirmed, { type: 'choose', choiceId: 'q1.pay', anchorId: 'a.vendor' })).toThrow('Move closer');
   });
-  it('rejects insufficient funds without changing state, and repeat purchases never re-grant the reward', async () => {
-    let state = act(await orderedTea(game()), { type: 'choose', choiceId: 'q1.pay', anchorId: 'a.vendor' });
-    state = skipPacing(act(state, { type: 'retryMission' }));
-    state = (await say(state, '我要水')).state;
-    state = act(state, { type: 'choose', choiceId: 'q1.pay', anchorId: 'a.vendor' });
-    expect(state).toMatchObject({ status: 'cleared', xp: 100, inventory: { cny: 5, drinks: ['tea', 'water'] } });
-    expect(state.purchases).toHaveLength(2);
-    const broke = await orderedTea(skipPacing(act(state, { type: 'retryMission' })));
+  it('rejects insufficient funds without changing state', async () => {
+    const broke = await orderedTea(game());
+    broke.inventory.cny = 5;
     expect(() => act(broke, { type: 'choose', choiceId: 'q1.pay', anchorId: 'a.vendor' })).toThrow('Not enough money');
     expect(broke.inventory.cny).toBe(5);
     const bye = await say(broke, '谢谢，再见');
@@ -109,6 +110,14 @@ describe('Q1 buy a drink', () => {
     const bye = await say(ordered, '谢谢，再见');
     expect(bye.conversationEnded).toBe(true);
     expect(turnActions(bye.state, 'a.vendor', true)).toEqual([{ kind: 'pay', anchorId: 'a.vendor', drink: 'tea', priceCny: 10 }, { kind: 'end-conversation' }]);
+  });
+  it('only starts the next quest after completion and never restarts the current quest', async () => {
+    expect(() => act(game(), { type: 'startMission', missionId: 'Q1' })).toThrow('Only the next quest');
+    expect(() => act(game(), { type: 'startMission', missionId: 'Q2' })).toThrow('Only the next quest');
+    const cleared = act(await orderedTea(game()), { type: 'choose', choiceId: 'q1.pay', anchorId: 'a.vendor' });
+    expect(() => act(cleared, { type: 'startMission', missionId: 'Q1' })).toThrow('Only the next quest');
+    expect(() => act(cleared, { type: 'startMission', missionId: 'Q3' })).toThrow('Only the next quest');
+    expect(act(cleared, { type: 'startMission', missionId: 'Q2' })).toMatchObject({ missionId: 'Q2', status: 'active', xp: 100 });
   });
   it('clarifies ambiguous requests and cancels without progress', async () => {
     const state = game();
@@ -375,7 +384,7 @@ describe('NPC patience', () => {
     state.position = { x: 5, z: 1 }; // beside the guide
     const failed = await chat(state, NPC_PATIENCE_LIMIT, 'guide', 'a.guide');
     expect(failed.state.status).toBe('failed');
-    const retried = act(failed.state, { type: 'retryMission' });
+    const retried = act(failed.state, { type: 'startMission', missionId: 'Q2' }); // a failed quest may start again
     expect(retried).toMatchObject({ status: 'active', missionId: 'Q2', xp, inventory, completedMissionIds: ['Q1'] });
     expect(retried.flags['q2.exchanges']).toBeUndefined();
     expect(retried.npcState.guide.history).toEqual([]);

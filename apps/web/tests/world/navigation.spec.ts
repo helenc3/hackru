@@ -41,16 +41,14 @@ test('click-to-walk routes around water over the bridge using walkable steps', (
 test('nearby targets use anchor IDs with bounded range and the shared action shapes', () => {
   const at = (x: number, z: number) => ({ x, z });
   const state: Pick<PublicState, 'interactables'> = { interactables: [
-    { id: 'a.menu', kind: 'sign', label: '菜单', position: at(20, 6), cueId: 'q1.menu' },
     { id: 'a.vendor', kind: 'npc', role: 'vendor', label: '老王', position: at(21, 6) },
     { id: 'a.pay', kind: 'choice', label: '付款', position: at(22, 6), choiceId: 'q1.pay' },
     { id: 'a.spot', kind: 'photo-spot', label: '拍照点', position: at(10, 10) },
     { id: 'a.hotel', kind: 'landmark', label: '上海大酒店', position: at(20, 6) },
   ] };
-  expect(nearbyTargets(state, at(20, 6)).map((target) => target.id)).toEqual(['a.menu', 'a.vendor', 'a.pay']);
-  expect(nearbyTargets(state, at(20, 8.001)).map((target) => target.id)).not.toContain('a.menu');
-  const [menu, vendor, pay, spot, hotel] = state.interactables;
-  expect(targetAction(menu!)).toEqual({ type: 'inspect', targetId: 'a.menu' });
+  expect(nearbyTargets(state, at(20, 6)).map((target) => target.id)).toEqual(['a.vendor', 'a.pay']);
+  expect(nearbyTargets(state, at(20, 8.001))).toEqual([]);
+  const [vendor, pay, spot, hotel] = state.interactables;
   expect(targetAction(vendor!)).toBeNull();
   expect(targetAction(pay!)).toEqual({ type: 'choose', choiceId: 'q1.pay', anchorId: 'a.pay' });
   expect(targetAction(spot!, { id: 'p1', passerbyAnchorId: 'a.p', viewpointAnchorId: 'a.view', spot: at(10, 10), status: 'accepted', attempts: 0 })).toEqual({ type: 'choose', choiceId: 'q3.start-photo', anchorId: 'a.view' });

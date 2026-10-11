@@ -1,5 +1,6 @@
 export * from './contracts.js';
 export * from './text-catalog.js';
+export * from './npc-identity.js';
 export * from './catalog/index.js';
 export * from './rng.js';
 export * from './planner.js';

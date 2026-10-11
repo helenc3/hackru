@@ -73,7 +73,8 @@ export const anchorsEntries: readonly CatalogEntry[] = [
     placement: 'ground',
     footprint: () => ({ w: 6, d: 5, h: 3.6 }),
     collision: () => solid(box(6, 5)),
-    sockets: () => [socket('npc', 'npc', 1.6, 0, 2), socket('sign', 'sign', 0, 3, 2.55)],
+    // The shop shell is solid: keep the vendor's entire body outside the front wall.
+    sockets: () => [socket('npc', 'npc', 1.6, 0, 3.1), socket('sign', 'sign', 0, 3, 2.55)],
     clearance: { front: 1.8, side: 0 }, capabilities: ['drink-vendor'],
     lod: { levels: 2, cullDistance: 110 }, cost: { triangles: 1_200, drawCalls: 12, instanced: false }, review: 'approved',
   },
@@ -123,7 +124,7 @@ export const anchorsEntries: readonly CatalogEntry[] = [
   npc('passerby', ['photo-passerby'], 'Friendly passer-by who will take a photo for the player; strolls near viewpoints.', 'xiaomei'),
   {
     id: 'an.sign.menu', version: 1, component: 'MenuSign', category: 'anchor',
-    description: 'Readable A-frame menu board placed beside a vendor; inspecting it gives reading evidence.',
+    description: 'Decorative A-frame menu board placed beside a vendor.',
     districts: ['shopping', 'historic', 'waterfront', 'park', 'office', 'residential'],
     params: { textKey: { type: 'text', catalog: 'menu', default: 'drinks', description: 'Reviewed menu text.' } },
     placement: 'sidewalk',

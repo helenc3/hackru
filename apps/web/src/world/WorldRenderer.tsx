@@ -67,7 +67,7 @@ function anchorLabels(city: CityHandle, position: Position): Landmark[] {
     const origin = chunkOrigin(manifest.coord);
     for (const anchor of manifest.anchors) {
       const row = anchor.nameKey ? text(anchor.kind === 'npc' ? 'npc-name' : 'landmark', anchor.nameKey) : undefined;
-      if (row && (anchor.kind === 'landmark' || anchor.kind === 'npc')) out.push({ label: row.zh, x: origin.x + anchor.x, z: origin.z + anchor.z });
+      if (row && (anchor.kind === 'landmark' || anchor.kind === 'npc')) out.push({ id: anchor.id, label: row.zh, x: origin.x + anchor.x, z: origin.z + anchor.z });
     }
   }
   return out.slice(0, 24);
@@ -218,13 +218,12 @@ export function WorldRenderer({ state, onAction, onTalk, preview = false, manife
       <FarRiver river={river} runtime={runtime} />{!preview && state.questTarget && <QuestBeacon target={state.questTarget.position} still={still} />}
     </Canvas></CanvasBoundary> : <CompatibilityRecovery />}
     {hasWebGl && <>
-      <div className="district-labels" aria-hidden="true">{marks.map((mark, i) => <span key={`${mark.label}@${mark.x},${mark.z}`} ref={(node) => { labels.current[i] = node; }} className="district-landmark" lang="zh-Hans">{mark.label}</span>)}</div>
+      <div className="district-labels" aria-hidden="true">{marks.map((mark, i) => <span key={`${mark.label}@${mark.x},${mark.z}`} ref={(node) => { labels.current[i] = node; }} className="district-landmark" lang="zh-Hans"><span className="marker-distance" lang="en">{Math.round(Math.hypot(mark.x - position.x, mark.z - position.z))} m</span><span>{mark.label}</span>{!preview && !busy && state.status === 'active' && nearby[0]?.kind === 'npc' && nearby[0].id === mark.id && <kbd className="npc-interact-key" lang="en" aria-label="Press E to talk">E</kbd>}</span>)}</div>
       <div className="world-caption"><span className="live-dot" />Shanghai<span>Third-person navigation</span></div>
       {loading && <div className="world-note" role="status" data-testid="city-loading">Building the neighbourhood…</div>}
       {city.error && !preview && <div className="world-note" role="status" data-testid="city-error">{city.error}</div>}
       {!preview && state.status === 'active' && state.questTarget && <QuestCompass target={state.questTarget} position={position} yaw={runtime.current.yaw} onWalk={() => requestWalk(state.questTarget!.position)} />}
-      <div className="district-nearby" aria-label="Nearby interactions">{nearby.map((target, i) => <button key={target.id} disabled={busy || state.status !== 'active'} onClick={() => void interact(target.id)} data-target-id={target.id}><span lang="zh-Hans">{target.label}</span>{i === 0 ? ' · E' : ''}</button>)}</div>
-      <div className="world-note">WASD / arrows or click to walk · Drag sideways to orbit, up / down to tilt · E to interact</div>
+      <div className="district-nearby" aria-label="Nearby interactions">{nearby.filter((target) => target.kind !== 'npc').map((target) => <button key={target.id} disabled={busy || state.status !== 'active'} onClick={() => void interact(target.id)} data-target-id={target.id}><span lang="zh-Hans">{target.label}</span>{target.id === nearby[0]?.id ? ' · E' : ''}</button>)}</div>
     </>}
   </section>;
 }

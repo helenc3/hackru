@@ -1,34 +1,5 @@
-.interaction-dock h2, .interaction-dock > p {
-  display: none;
-}
-
-.interaction-dock > div, .choice-dock, .validation-controls {
+.choice-dock, .validation-controls {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
-}
-
-.cue-actions {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.sign-overlay > button {
-  float: right;
-}
-
-.sign-overlay h3 {
-  font-size: 14px;
-  margin-bottom: 14px;
-}
-
-.sign-overlay p {
-  font-size: 21px;
-  font-weight: 700;
-  line-height: 1.8;
-  white-space: pre-line;
 }

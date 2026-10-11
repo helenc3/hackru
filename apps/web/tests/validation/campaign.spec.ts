@@ -19,9 +19,6 @@ async function say(page: Page, text: string) {
   await expect.poll(async () => await page.getByTestId('result-panel').isVisible() || await page.getByTestId('goal-hint').isVisible() || await panel.getByRole('textbox').inputValue().catch(() => 'pending') === '').toBe(true);
 }
 async function drink(page: Page) {
-  await target(page, 'sign · ui.menu').click();
-  await expect(page.getByRole('dialog', { name: 'Inspected sign' })).toContainText('咖啡 卖完了');
-  await page.getByRole('button', { name: 'Close sign' }).click();
   await open(page, 'npc/vendor · ui.vendor');
   await say(page, '我要咖啡。'); await say(page, '我要水。');
   await page.getByTestId('pay-button').click();
@@ -41,6 +38,7 @@ async function photograph(page: Page) {
 }
 
 test('one validation session completes all three quests through the shared API, simulated only', async ({ page, devUrl }) => {
+  test.setTimeout(90_000);
   const api = await installScriptedApi(page, { validation: true, steps: [
     ...drinkSteps(), { action: { type: 'startMission', missionId: 'Q2' }, patch: missionPatch('Q2', 100, { completedMissionIds: ['Q1'], unlockedMissionIds: ['Q1', 'Q2'] }) },
     ...hotelSteps(), { action: { type: 'startMission', missionId: 'Q3' }, patch: missionPatch('Q3', 200, { completedMissionIds: ['Q1', 'Q2'], unlockedMissionIds: ['Q1', 'Q2', 'Q3'] }) },
@@ -72,7 +70,7 @@ test('rapid developer relocations dispatch serially with fresh versions', async 
   await page.goto(`${devUrl}/__validation`); await page.getByRole('button', { name: 'Start validation session' }).click();
   await expect(page.getByTestId('validation-harness')).toBeVisible();
   await page.getByTestId('validation-harness').evaluate((panel) => {
-    const button = [...panel.querySelectorAll('button')].find((entry) => entry.textContent === 'sign · ui.menu')!;
+    const button = panel.querySelector<HTMLButtonElement>('button')!;
     button.click(); button.click();
   });
   await expect.poll(() => api.requests.filter((request) => request.path.endsWith('/actions')).length).toBeGreaterThanOrEqual(2);

@@ -9,7 +9,7 @@ import { waterfrontEntries } from './waterfront.js';
 import { anchorsEntries } from './anchors.js';
 
 /** Bump when any entry's geometry, params, or sockets change; cached manifests record it. */
-export const CATALOG_VERSION = 'catalog-1';
+export const CATALOG_VERSION = 'catalog-2';
 export const CATALOG: readonly CatalogEntry[] = [...buildingsResidentialEntries, ...buildingsCommercialEntries, ...storefrontEntries, ...streetEntries, ...landscapeEntries, ...waterfrontEntries, ...anchorsEntries];
 const byId = new Map<string, CatalogEntry>(CATALOG.map((entry) => [entry.id, entry]));
 if (byId.size !== CATALOG.length) throw new Error('Duplicate catalog asset ID.');

@@ -1,3 +1,4 @@
+import { GENERATOR_VERSION } from '../../src/city/contracts.js';
 import type { CatalogEntry, ChunkManifest, ChunkPlan, ParamValues } from '../../src/city/contracts.js';
 
 // Tiny stand-in catalog for validator/world-view/directions unit tests (vi.mock'd into catalog/index.js).
@@ -13,7 +14,7 @@ export const FAKE_CATALOG: CatalogEntry[] = [
     sockets: () => [{ id: 'sign', kind: 'sign', x: 0, y: 2, z: 2, facing: 0 }], clearance: { front: 1, side: 0 } }),
   entry({ id: 'sf.test.sign', category: 'storefront', placement: 'socket', attachesTo: ['sign'], collision: () => ({ solids: [], walkable: [] }), footprint: () => ({ w: 1, d: 0.2, h: 1 }) }),
   entry({ id: 'sf.test.awning', category: 'storefront', placement: 'socket', attachesTo: ['awning'], collision: () => ({ solids: [], walkable: [] }) }),
-  entry({ id: 'an.npc.test-stall', category: 'anchor', capabilities: ['drink-vendor'], footprint: () => ({ w: 2, d: 2, h: 2 }), collision: () => ({ solids: [box(2, 2)], walkable: [] }) }),
+  entry({ id: 'an.test.stall', category: 'anchor', capabilities: ['drink-vendor'], footprint: () => ({ w: 2, d: 2, h: 2 }), collision: () => ({ solids: [box(2, 2)], walkable: [] }) }),
   entry({ id: 'an.hotel.grand', category: 'anchor', capabilities: ['hotel-landmark'], footprint: () => ({ w: 8, d: 8, h: 10 }), collision: () => ({ solids: [box(8, 8)], walkable: [] }) }),
   entry({ id: 'an.test.landmark', category: 'anchor', capabilities: [], footprint: () => ({ w: 1, d: 1, h: 1 }), collision: () => ({ solids: [], walkable: [] }) }),
   entry({ id: 'an.test.viewpoint', category: 'anchor', placement: 'water-edge', capabilities: ['river-viewpoint'], footprint: () => ({ w: 1, d: 1, h: 1 }), collision: () => ({ solids: [], walkable: [] }) }),
@@ -48,7 +49,7 @@ export function plan(over: Partial<ChunkPlan> = {}): ChunkPlan {
 }
 export function manifest(p: ChunkPlan, over: Partial<ChunkManifest> = {}): Omit<ChunkManifest, 'contentHash'> {
   return {
-    worldId: 'w-test', coord: p.coord, district: p.district, catalogVersion: 'test-catalog', generatorVersion: 1, seed: 's',
+    worldId: 'w-test', coord: p.coord, district: p.district, catalogVersion: 'test-catalog', generatorVersion: GENERATOR_VERSION, seed: 's',
     source: 'fixture', questContext: { missionId: 'Q1', weights: { 'drink-vendor': 1, 'direction-helper': 1, 'hotel-landmark': 1, 'river-viewpoint': 1, 'photo-passerby': 1 } }, connectors: p.connectors, roads: p.roads, water: p.water, bridges: [],
     placements: [], anchors: [], missingCapabilities: [], ...over,
   };

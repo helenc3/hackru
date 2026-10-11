@@ -1,5 +1,6 @@
 import { expect, type APIRequestContext, type Page } from '@playwright/test';
-import { chunkOf, GOAL_WARMUP_EXCHANGES, planChunk, seedFromWorldId, type ChunkManifest, type GameAction, type Position, type PublicState } from '@vibequest/shared';
+import { walkingPath } from '../../apps/web/src/world/navigation';
+import { GENERATION_RULES, GOAL_WARMUP_EXCHANGES, chunkOf, chunkKey, createWorldView, planChunk, seedFromWorldId, type ChunkManifest, type GameAction, type Position, type PublicState } from '@vibequest/shared';
 
 export const HARNESS = process.env.E2E_HARNESS_URL ?? 'http://127.0.0.1:4175';
 export const SESSION_KEY = 'vibequest.player-session.v1';
@@ -15,7 +16,84 @@ export async function walkToQuestTarget(page: Page) {
   await expect.poll(async () => Number(await compass.getAttribute('data-distance')), { timeout: 150_000, intervals: [500] }).toBeLessThanOrEqual(1);
 }
 
+/** Hold one movement key until the avatar passes `destination` on `axis`; the camera starts at yaw 0 (W = −z, D = +x). */
+async function walkAxis(page: Page, axis: 'x' | 'z', destination: number) {
+  const world = page.getByTestId('world-renderer');
+  await world.focus();
+  const start = Number(await world.getAttribute(`data-position-${axis}`));
+  if (Math.abs(destination - start) < 0.2) return;
+  const direction = Math.sign(destination - start);
+  const key = axis === 'x' ? (direction > 0 ? 'd' : 'a') : (direction > 0 ? 's' : 'w');
+  const code = `Key${key.toUpperCase()}`;
+  // Release inside the animation loop so protocol latency cannot overshoot; a stall fails fast.
+  const stopped = world.evaluate((root, options) => new Promise<void>((resolve, reject) => {
+    const read = () => Number(root.getAttribute(`data-position-${options.axis}`));
+    const deadline = performance.now() + Math.abs(options.destination - read()) / 3 * 1000 + 20000;
+    let last = read(), lastMoved = performance.now();
+    const release = () => root.dispatchEvent(new KeyboardEvent('keyup', { code: options.code, bubbles: true }));
+    const watch = () => {
+      const position = read();
+      if (Math.abs(position - last) > 0.05) { last = position; lastMoved = performance.now(); }
+      if (position * options.direction >= options.destination * options.direction - 0.2) { release(); resolve(); }
+      else if (performance.now() >= deadline || performance.now() - lastMoved > 8000) { release(); reject(new Error(`Walking ${options.code} toward ${options.axis}=${options.destination} stopped at ${position}`)); }
+      else requestAnimationFrame(watch);
+    };
+    requestAnimationFrame(watch);
+  }), { code, axis, destination, direction });
+  await page.keyboard.down(key);
+  try { await stopped; } finally { await page.keyboard.up(key); }
+}
+
+/** Walk an axis-aligned route; each waypoint changes x then z. */
+export async function walkRoute(page: Page, waypoints: Position[]) {
+  const world = page.getByTestId('world-renderer');
+  const id = await sessionId(page);
+  const state = await serverState(page.request, id!);
+  const destinations: Position[] = [];
+  let previous = { x: Number(await world.getAttribute('data-position-x')), z: Number(await world.getAttribute('data-position-z')) };
+  for (const point of waypoints) {
+    const segments = Math.max(1, Math.ceil(Math.hypot(point.x - previous.x, point.z - previous.z) / 40));
+    for (let i = 1; i <= segments; i++) destinations.push({ x: previous.x + (point.x - previous.x) * i / segments, z: previous.z + (point.z - previous.z) * i / segments });
+    previous = point;
+  }
+  for (const point of destinations) {
+    const start = { x: Number(await world.getAttribute('data-position-x')), z: Number(await world.getAttribute('data-position-z')) };
+    const from = chunkOf(start), to = chunkOf(point);
+    const coords = [];
+    for (let cz = Math.min(from.cz, to.cz) - 1; cz <= Math.max(from.cz, to.cz) + 1; cz++)
+      for (let cx = Math.min(from.cx, to.cx) - 1; cx <= Math.max(from.cx, to.cx) + 1; cx++) coords.push({ cx, cz });
+    const chunks: ChunkManifest[] = [];
+    for (let i = 0; i < coords.length; i += GENERATION_RULES.batchSize) {
+      const response = await page.request.post(`/api/sessions/${id}/chunks`, { data: { coords: coords.slice(i, i + GENERATION_RULES.batchSize), urgent: true } });
+      expect(response.status()).toBe(200);
+      chunks.push(...(await response.json()).chunks);
+    }
+    const view = createWorldView(state.worldId, seedFromWorldId(state.worldId), new Map(chunks.map((chunk) => [chunkKey(chunk.coord), chunk])));
+    const path = walkingPath(view, start, point, 40_000);
+    expect(path.length, `No walking route from ${JSON.stringify(start)} to ${JSON.stringify(point)}`).toBeGreaterThan(0);
+    // Compress collinear grid steps while preserving turns around solid props.
+    const turns = path.filter((here, i) => {
+      const before = i ? path[i - 1]! : start, after = path[i + 1];
+      return !after || Math.abs((here.x - before.x) * (after.z - here.z) - (here.z - before.z) * (after.x - here.x)) > 0.001;
+    });
+    for (const step of turns) { await walkAxis(page, 'x', step.x); await walkAxis(page, 'z', step.z); }
+  }
+}
+
 export async function interact(page: Page, targetId: string) {
+  const world = page.getByTestId('world-renderer');
+  const id = await sessionId(page);
+  const state: PublicState = (await (await page.request.get(`/api/sessions/${id}`)).json()).state;
+  const target = state.interactables.find((entry) => entry.id === targetId);
+  expect(target, `Missing target ${targetId}`).toBeTruthy();
+  if (target!.kind === 'npc') {
+    await expect(page.getByLabel('Press E to talk')).toBeVisible();
+    await world.focus();
+    await page.keyboard.press('e');
+    await expect(page.getByTestId('dialogue-panel')).toBeVisible();
+    await expect(page.getByTestId('dialogue-panel')).toContainText(target!.label);
+    return;
+  }
   const button = page.locator(`[data-target-id="${targetId}"]`);
   await expect(button).toBeEnabled({ timeout: 15000 });
   await button.click();
@@ -57,7 +135,7 @@ export async function startWorld(page: Page, provider: 'live' | 'fixture' = 'fix
 /** The spawn box is committed (movement unlocks once the player's chunk is). */
 export async function worldReady(page: Page) {
   const world = page.getByTestId('world-renderer');
-  // A new attempt remounts the world, which restores from IndexedDB before streaming again.
+  // A new attempt remounts the world, which streams the server-owned chunks again.
   await expect(world).toHaveAttribute('data-city-status', 'streaming', { timeout: 60000 });
   await expect.poll(async () => Number(await world.getAttribute('data-chunks')), { timeout: 60000 }).toBeGreaterThanOrEqual(9);
   await expect(page.getByTestId('city-loading')).toHaveCount(0, { timeout: 30000 });

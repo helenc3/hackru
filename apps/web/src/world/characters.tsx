@@ -227,7 +227,7 @@ export function Player({ gait }: { gait: RefObject<Gait> }) {
 }
 
 /** NPC rig at local origin. `index` offsets idle phase; turns toward the player (`look`) within ~4.5 units of `offset`. */
-export function Npc({ id, index, look, offset }: { id: 'xiaolin' | 'achen' | 'laozhou' | string; index: number; look: RefObject<{ position: Position }>; offset: Position }) {
+export function Npc({ id, index, look, offset, outfit }: { id: 'xiaolin' | 'achen' | 'laozhou' | string; index: number; look: RefObject<{ position: Position }>; offset: Position; outfit?: string }) {
   const r = useRig();
   const reduced = useReducedMotion();
   const st = useRef({
@@ -283,5 +283,7 @@ export function Npc({ id, index, look, offset }: { id: 'xiaolin' | 'achen' | 'la
     r.head.current?.rotation.set(nod, s.headYaw, tilt);
     groundFeet(r);
   });
-  return <Rig r={r} look={NPC_LOOKS[id] ?? VILLAGER} />;
+  const identity = NPC_LOOKS[id] ?? VILLAGER;
+  const clothing = outfit === 'apron' ? NPC_LOOKS.xiaolin! : outfit === 'smart' ? NPC_LOOKS.achen! : outfit === 'casual' ? VILLAGER : identity;
+  return <Rig r={r} look={{ ...identity, top: clothing.top, arms: clothing.arms, legs: clothing.legs, body: clothing.body, hand: clothing.hand }} />;
 }

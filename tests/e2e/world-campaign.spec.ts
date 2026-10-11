@@ -14,7 +14,7 @@ const target = (state: PublicState, predicate: (entry: PublicState['interactable
 };
 const nextQuest = async (page: Page, missionId: string) => {
   await page.getByTestId('result-panel').getByRole('button', { name: 'Next quest' }).click();
-  await expect(page.getByText(`${missionId} · Tier`)).toBeVisible();
+  await expect(page.getByTestId('quest-panel')).toContainText(missionId === 'Q2' ? 'Ask Xiao Li the way' : 'A photo by the Huangpu');
   await page.waitForTimeout(500); // let the remounted world leave its first frame
   await worldReady(page);
 };
@@ -49,7 +49,7 @@ test('player world: buy a drink, get verified hotel directions, and a river phot
   expect(state).toMatchObject({ status: 'cleared', completedMissionIds: ['Q1'], inventory: { cny: 10, drinks: ['tea'] } });
   expect(state.purchases).toHaveLength(1);
 
-  // Reload mid-journey: same world, spawn restored from IndexedDB without generation, progress intact.
+  // Reload mid-journey: same world and server-owned spawn chunks, progress intact.
   const spawnBefore = hashes(committed.filter((chunk) => Math.abs(chunk.coord.cx) <= 1 && Math.abs(chunk.coord.cz) <= 1));
   expect(Object.keys(spawnBefore)).toHaveLength(9);
   const chunkRequests: (string | null)[] = [];
@@ -59,7 +59,7 @@ test('player world: buy a drink, get verified hotel directions, and a river phot
   await page.getByRole('button', { name: 'Continue Session' }).click();
   await worldReady(page);
   await expect(page.getByTestId('world-renderer')).toHaveAttribute('data-world-id', worldId);
-  expect(chunkRequests.flatMap(spawnCoordsIn)).toEqual([]);
+  expect(chunkRequests.flatMap(spawnCoordsIn)).not.toEqual([]);
   expect(hashes(committed.filter((chunk) => Math.abs(chunk.coord.cx) <= 1 && Math.abs(chunk.coord.cz) <= 1))).toEqual(spawnBefore);
   expect((await playerState(page, request)).completedMissionIds).toEqual(['Q1']);
 
@@ -107,9 +107,11 @@ test('player world: buy a drink, get verified hotel directions, and a river phot
   await page.reload();
   await page.getByRole('button', { name: 'Continue Session' }).click();
   await worldReady(page);
-  await expect.poll(() => committed.filter((chunk) => Math.abs(chunk.coord.cx) <= 1 && Math.abs(chunk.coord.cz) <= 1).length).toBe(9);
-  expect(hashes(committed.filter((chunk) => Math.abs(chunk.coord.cx) <= 1 && Math.abs(chunk.coord.cz) <= 1))).toEqual(spawnBefore);
-  expect(chunkRequests.flatMap(spawnCoordsIn)).toEqual([]);
+  // Layouts are server-owned and stream around the player: from the river only the spawn chunks within the prefetch ring come back.
+  await expect.poll(() => committed.filter((chunk) => Math.abs(chunk.coord.cx) <= 1 && Math.abs(chunk.coord.cz) <= 1).length).toBeGreaterThan(0);
+  const revisited = hashes(committed.filter((chunk) => Math.abs(chunk.coord.cx) <= 1 && Math.abs(chunk.coord.cz) <= 1));
+  for (const [key, hash] of Object.entries(revisited)) expect(hash, `spawn chunk ${key} changed`).toBe(spawnBefore[key]); // identical terrain, never regenerated
+  expect(chunkRequests.flatMap(spawnCoordsIn)).not.toEqual([]);
   expect((await playerState(page, request)).completedMissionIds).toEqual(['Q1', 'Q2', 'Q3']);
 });
 

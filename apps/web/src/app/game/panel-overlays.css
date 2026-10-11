@@ -1,4 +1,4 @@
-.sign-overlay, .recovery-panel, .result-panel, .conversation-card {
+.recovery-panel, .result-panel, .conversation-card {
   position: absolute;
   top: 60px;
   left: 50%;
@@ -8,15 +8,6 @@
   max-height: calc(100% - 180px);
   overflow-y: auto;
   margin: 0;
-}
-
-.sign-overlay {
-  padding: 20px;
-  background: var(--cream);
-  border: var(--outline);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-sticker);
-  animation: vq-pop .28s var(--bounce);
 }
 
 .recovery-panel {

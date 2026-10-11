@@ -14,7 +14,8 @@ async function finishPhoto(page: import('@playwright/test').Page) {
   await page.goto('/');
   await page.getByRole('button', { name: 'Start exploring', exact: true }).click();
   await expect(page.getByTestId('skill-debrief')).toHaveCount(0);
-  await page.getByRole('button', { name: '小美 · Talk', exact: true }).click();
+  await page.getByTestId('world-renderer').focus();
+  await page.keyboard.press('e');
   const panel = page.getByTestId('dialogue-panel');
   await panel.getByRole('button', { name: 'Use typed Mandarin', exact: true }).click();
   await panel.getByRole('textbox').fill('可以帮我在这里拍张照吗？');

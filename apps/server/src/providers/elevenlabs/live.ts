@@ -1,5 +1,5 @@
 import { ElevenLabsClient } from '@elevenlabs/elevenlabs-js';
-import { characterDescriptions, audioVoices, type NpcId, type SpeechProvider } from '@vibequest/shared';
+import { characterDescriptions, audioVoices, npcIdentity, type NpcId, type SpeechProvider } from '@vibequest/shared';
 import { HttpError } from '../../errors.js';
 
 /**
@@ -32,6 +32,11 @@ const speechUnavailable = () => new HttpError(503, 'SPEECH_UNAVAILABLE', 'Mandar
 const transcriptionUnavailable = () => new HttpError(503, 'TRANSCRIPTION_UNAVAILABLE', 'Mandarin transcription is temporarily unavailable.', true);
 
 export function voiceFor(voiceIds: ElevenLabsSpeechOptions['voiceIds'], voiceKey: string): string {
+  if (voiceKey.startsWith('npc:')) {
+    const identity = npcIdentity(voiceKey.slice(4));
+    if (!identity || !APPROVED_VOICE_IDS.has(identity.voiceId)) throw new HttpError(422, 'UNKNOWN_VOICE', 'Unknown NPC voice.');
+    return identity.voiceId;
+  }
   if (!(voiceKey in DEFAULT_VOICE_IDS)) throw new HttpError(422, 'UNKNOWN_VOICE', 'Unknown NPC voice.');
   const voiceId = voiceIds[voiceKey as NpcId] ?? DEFAULT_VOICE_IDS[voiceKey as NpcId];
   if (!APPROVED_VOICE_IDS.has(voiceId)) throw new HttpError(422, 'UNAPPROVED_VOICE', 'Choose a human-approved Mandarin voice.');
@@ -41,6 +46,19 @@ export function voiceFor(voiceIds: ElevenLabsSpeechOptions['voiceIds'], voiceKey
 export function createElevenLabsSpeechProvider(options: ElevenLabsSpeechOptions): SpeechProvider {
   const client = new ElevenLabsClient({ apiKey: options.apiKey });
   return {
+    async synthesizePcm(text, voiceKey) {
+      const line = text.trim();
+      if (!line || line.length > MAX_REPLY_CHARS) throw new HttpError(422, 'INVALID_SPEECH_TEXT', 'NPC speech must be 1-240 characters.');
+      const voiceId = voiceFor(options.voiceIds, voiceKey);
+      try {
+        const stream = await client.textToSpeech.convert(voiceId,
+          { text: line, modelId: options.ttsModel, outputFormat: 'pcm_24000', languageCode: 'zh' },
+          { timeoutInSeconds: options.ttsTimeoutSeconds ?? 5, maxRetries: 0 });
+        const audio = new Uint8Array(await new Response(stream).arrayBuffer());
+        if (!audio.length) throw new Error('empty audio');
+        return audio;
+      } catch { throw speechUnavailable(); }
+    },
     async synthesize(text, voiceKey) {
       const line = text.trim();
       if (!line || line.length > MAX_REPLY_CHARS) throw new HttpError(422, 'INVALID_SPEECH_TEXT', 'NPC speech must be 1-240 characters.');

@@ -60,3 +60,7 @@ voice assignment. Live NPCs use `eleven_v4_turbo`; prerecorded lines use `eleven
 Environment overrides must also select approved IDs. Unapproved overrides are rejected.
 
 Historical IPA samples remain in `audio_test` as evidence of the rejected experiment.
+
+## Streamed city character identities
+
+City NPCs derive gender, visual identity and speech from their reviewed name key. 老王 and 老周 use male appearance and Adam Li; 小李, 阿陈 and 大张 use male appearance and James Gao. 小林 and 小美 use female appearance and Coco Li; 王阿姨 uses female appearance and Anna Su “Trustworthy, Clear and Natural”. Optional NPCs choose a seeded gender first, then a name from its matching profiles. Clothing style varies independently while preserving the character appearance. Named city identities take precedence over legacy role voice overrides. Both recorded replies and live conversations use these approved ElevenLabs voices. Live Gemini audio is suppressed; ElevenLabs synthesizes the committed reply as 24 kHz PCM for the existing relay. This introduces a synthesis delay before speech.

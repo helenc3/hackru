@@ -33,6 +33,12 @@ describe('regional planner', () => {
     }
   });
 
+  it('halves avenues, streets, lanes and promenades from their original widths', () => {
+    const roads = Array.from({ length: 9 }, (_, i) => planChunk(SEEDS[0]!, { cx: i - 4, cz: -1 }).roads).flat();
+    expect(roads.filter((r) => r.kind === 'street').every((r) => r.width === 3.5)).toBe(true);
+    expect(roads.filter((r) => r.kind === 'avenue').every((r) => r.width === 5)).toBe(true);
+  });
+
   it('ends seam-crossing roads exactly on the edge at the connector offset', () => {
     for (const seed of SEEDS) for (let cx = -4; cx <= 6; cx++) for (let cz = -5; cz <= 5; cz++) {
       const plan = planChunk(seed, { cx, cz });
@@ -83,7 +89,7 @@ describe('regional planner', () => {
     const largest = Object.entries(counts).sort((a, b) => b[1] - a[1])[0]![0];
     expect(largest).toBe('shopping');
     expect(counts.shopping! / total).toBeGreaterThan(0.2);
-    expect(Object.keys(counts).length).toBeGreaterThanOrEqual(5);
+    expect(Object.keys(counts).sort()).toEqual(['park', 'shopping', 'waterfront']);
     expect(DISTRICT_TARGETS.shopping).toBeGreaterThan(DISTRICT_TARGETS.historic);
   });
 });

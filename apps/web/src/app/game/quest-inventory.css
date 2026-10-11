@@ -28,45 +28,6 @@
   margin-top: 6px;
 }
 
-.objective-list {
-  list-style: none;
-  display: grid;
-  gap: 17px;
-  padding: 0;
-  font-size: 13px;
-  line-height: 1.6;
-  margin: 23px 0;
-}
-
-.objective-list li {
-  display: flex;
-  gap: 12px;
-}
-
-.objective-list li > span:first-child {
-  flex-shrink: 0;
-  display: grid;
-  place-items: center;
-  width: 22px;
-  height: 22px;
-  border: 2px solid var(--ink);
-  border-radius: 50%;
-  background: #fff;
-  font-size: 12px;
-  font-weight: 800;
-  line-height: 1;
-}
-
-.objective-list li[data-complete=true] {
-  color: var(--text-muted);
-}
-
-.objective-list li[data-complete=true] span:first-child {
-  background: var(--lime);
-  color: var(--ink);
-  animation: vq-check .35s var(--bounce);
-}
-
 .controls-note {
   color: var(--text-muted);
   font-size: 11px;

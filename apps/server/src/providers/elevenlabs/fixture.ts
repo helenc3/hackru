@@ -17,6 +17,7 @@ export function createFixtureSpeechProvider(transcript = '请给我一杯茶。'
   return {
     label: FIXTURE_SPEECH_LABEL,
     synthesize: async () => silentMp3Frame(),
+    synthesizePcm: async () => new Uint8Array(4_800),
     transcribe: async () => transcript,
   };
 }

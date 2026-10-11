@@ -75,7 +75,8 @@ describe('evidence-based adaptation', () => {
     for (const track of ['reading', 'conversation'] as const) state.skills[track] = { mastery: 1, independentCount: 10 };
     expect(updateSkillsAfterAttempt(state)).toBe(state);
     expect(projectPublicState(state, 0, fakeWorld).debrief).toBeUndefined();
-    expect(applyAction(state, { type: 'retryMission' }, 0, fakeWorld).state).toMatchObject({ tier: 2, difficulty: 2 });
+    state.status = 'cleared';
+    expect(applyAction(state, { type: 'startMission', missionId: 'Q2' }, 0, fakeWorld).state).toMatchObject({ tier: 2, difficulty: 2 });
     state.difficulty = 2; expect(selectPracticeTier(state, 'Q1')).toBe(2);
     state.difficulty = 0;
     for (const track of ['reading', 'conversation'] as const) state.skills[track].mastery = 0;

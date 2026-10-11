@@ -43,7 +43,7 @@ test('streams server-owned terrain again after reload without uploading browser 
     await route.fulfill({ json: { chunks, pending: [] } });
   });
   const world = page.getByTestId('world-renderer');
-  await page.goto(fixtureUrl);
+  await page.goto(fixtureUrl, { waitUntil: 'domcontentloaded' });
   await expect.poll(async () => Number(await world.getAttribute('data-chunks'))).toBeGreaterThanOrEqual(9);
   expect(await page.locator('canvas').evaluate((canvas: HTMLCanvasElement) => ({
     pixelRatio: canvas.width / canvas.clientWidth,
@@ -57,7 +57,7 @@ test('streams server-owned terrain again after reload without uploading browser 
   const firstVisitGenerated = generated;
 
   requested.length = 0;
-  await page.reload();
+  await page.reload({ waitUntil: 'domcontentloaded' });
   await expect.poll(async () => Number(await world.getAttribute('data-chunks'))).toBeGreaterThanOrEqual(9);
   expect(restored).toEqual([]);
   expect(requested.flat().some((coord) => chunkKey(coord) === '0,0')).toBe(true);

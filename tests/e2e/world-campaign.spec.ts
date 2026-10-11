@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '../support/browser-test';
 import { chunkOf, GENERATION_RULES, planChunk, seedFromWorldId, type ChunkManifest, type PublicState } from '@vibequest/shared';
-import { harness, hashes, interact, playerState, riversidePlan, say, spawnCoordsIn, startWorld, walkToQuestTarget, worldReady, chat } from './helpers';
+import { harness, HARNESS, hashes, interact, playerState, riversidePlan, say, spawnCoordsIn, startWorld, walkToQuestTarget, worldReady, chat } from './helpers';
 
 /** Planner-reserved guide in chunk (1,0): the Q2 helper on the row-0 avenue's north sidewalk. */
 function guidePlan(worldId: string) {
@@ -19,7 +19,7 @@ const nextQuest = async (page: Page, missionId: string) => {
   await worldReady(page);
 };
 
-test.use({ movementMultiplier: 4 });
+test.use({ movementMultiplier: 8 });
 
 test('player world: buy a drink, get verified hotel directions, and a river photo — the world survives a reload', async ({ page, request }) => {
   test.setTimeout(300_000);
@@ -57,7 +57,7 @@ test('player world: buy a drink, get verified hotel directions, and a river phot
   const chunkRequests: (string | null)[] = [];
   page.on('request', (outgoing) => { if (new URL(outgoing.url()).pathname.endsWith('/chunks')) chunkRequests.push(outgoing.postData()); });
   committed.length = 0;
-  await page.reload();
+  await page.reload({ waitUntil: 'domcontentloaded' });
   await page.getByRole('button', { name: 'Continue Session' }).click();
   await worldReady(page);
   await expect(page.getByTestId('world-renderer')).toHaveAttribute('data-world-id', worldId);
@@ -116,7 +116,7 @@ test('player world: buy a drink, get verified hotel directions, and a river phot
   expect(Object.keys(hashes(beforeReload))).toHaveLength(9);
   const resumedChunks = () => committed.filter((chunk) => Math.abs(chunk.coord.cx - centre.cx) <= 1 && Math.abs(chunk.coord.cz - centre.cz) <= 1);
   chunkRequests.length = 0; committed.length = 0;
-  await page.reload();
+  await page.reload({ waitUntil: 'domcontentloaded' });
   await page.getByRole('button', { name: 'Continue Session' }).click();
   await worldReady(page);
   // Also verify any revisited spawn chunks, while the complete resume box follows the saved player.
@@ -129,7 +129,76 @@ test('player world: buy a drink, get verified hotel directions, and a river phot
   expect((await playerState(page, request)).completedMissionIds).toEqual(['Q1', 'Q2', 'Q3']);
 });
 
-test('developer harness: the same three quests through the validation API, rewards granted once', async ({ request }) => {
+test('real-server validation campaign, reward contracts and production boundaries', async ({ page, request }) => {
+  test.setTimeout(90_000);
+  await test.step("Q1: ambiguous requests clarify and completed quests cannot restart or purchase again", async () => {
+  const h = await harness(request);
+  await h.goto(h.state.position);
+  const vendor = h.anchor((entry) => entry.role === 'vendor' && entry.label === '老王');
+  await h.goto(vendor.position);
+  const unclear = await h.talk(vendor.id, 'vendor', '嗯……那个');
+  expect(unclear.npcReply).toMatch(/[茶水]/); // the clarification names the available drinks
+  await h.act({ type: 'choose', choiceId: 'q1.pay', anchorId: vendor.id }, 422); // no drink ordered yet
+  await h.chat(vendor.id, 'vendor'); // 老王 chats a little before he names a price
+  await h.talk(vendor.id, 'vendor', '我要水。');
+  await h.act({ type: 'choose', choiceId: 'q1.pay', anchorId: vendor.id });
+  expect(h.state).toMatchObject({ status: 'cleared', inventory: { cny: 15, drinks: ['water'] } });
+  const rewarded = { xp: h.state.xp, badges: h.state.badges };
+
+  const rejected = await h.act({ type: 'startMission', missionId: 'Q1' }, 422);
+  expect(rejected.error.code).toBe('ACTION_FORBIDDEN');
+  await h.act({ type: 'choose', choiceId: 'q1.pay', anchorId: vendor.id }, 422);
+  expect(h.state).toMatchObject({ status: 'cleared', inventory: { cny: 15, drinks: ['water'] } });
+  expect(h.state.purchases).toHaveLength(1);
+  expect({ xp: h.state.xp, badges: h.state.badges }).toEqual(rewarded);
+
+  });
+  await test.step("Q3 is locked until Q2, and a capture without an accepted photo request is rejected", async () => {
+  const h = await harness(request);
+  await h.act({ type: 'startMission', missionId: 'Q3' }, 422); // locked until Q2
+  const forged = await h.act({ type: 'photoCapture', photoRequestId: 'forged-1', outcome: 'captured', imageDigest: 'a1b2c3d4e5f60718293a4b5c6d7e8f90' }, 422);
+  expect(forged.error.code).toBe('ACTION_FORBIDDEN');
+  expect(h.state.status).toBe('active');
+
+  });
+  await test.step("replayed action and turn IDs are idempotent, reused IDs conflict, and one reward is granted", async () => {
+  const h = await harness(request);
+  await h.goto(h.state.position);
+  const vendor = h.anchor((entry) => entry.role === 'vendor' && entry.label === '老王');
+  await h.goto(vendor.position); // an anchor stand point is validated as reachable
+
+  // Turn replay: the identical response, no second evaluation.
+  const turn = { turnId: 't-1', npcId: 'vendor', anchorId: vendor.id, input: { text: '我要咖啡。', source: 'typed' } };
+  const first = await h.send('turns', turn);
+  const replay = await h.raw('turns', { ...turn, expectedVersion: 0 });
+  expect(replay.status()).toBe(200);
+  expect(await replay.json()).toEqual(first);
+  const conflict = await h.raw('turns', { ...turn, input: { text: '我要茶。', source: 'typed' }, expectedVersion: h.state.version });
+  expect(conflict.status()).toBe(409);
+  expect((await conflict.json()).error.code).toBe('ID_CONFLICT');
+  expect((await (await request.get(`${HARNESS}/api/sessions/${h.state.sessionId}`)).json()).state.version).toBe(h.state.version);
+
+  await h.chat(vendor.id, 'vendor');
+  await h.talk(vendor.id, 'vendor', '那就茶吧。');
+  const xpBefore = h.state.xp;
+  const pay = { type: 'choose', choiceId: 'q1.pay', anchorId: vendor.id } as const;
+  const clear = await h.act(pay, 200, 'a-clear');
+  expect(h.state).toMatchObject({ status: 'cleared', inventory: { cny: 10 } });
+  expect(h.state.xp).toBeGreaterThan(xpBefore);
+
+  // Replaying the reward-granting payment returns the identical body; money and reward move once.
+  const again = await h.raw('actions', { actionId: 'a-clear', action: pay, expectedVersion: 1 });
+  expect(again.status()).toBe(200);
+  expect(await again.json()).toEqual(clear);
+  const reused = await h.raw('actions', { actionId: 'a-clear', action: { type: 'setInputPreference', preference: 'voice' }, expectedVersion: h.state.version });
+  expect(reused.status()).toBe(409);
+  expect((await reused.json()).error.code).toBe('ID_CONFLICT');
+  const final: PublicState = (await (await request.get(`${HARNESS}/api/sessions/${h.state.sessionId}`)).json()).state;
+  expect(final).toMatchObject({ xp: h.state.xp, badges: h.state.badges, version: h.state.version, inventory: { cny: 10 } });
+  expect(final.purchases).toHaveLength(1);
+
+  });
+  await test.step("developer harness: the same three quests through the validation API, rewards granted once", async () => {
   const h = await harness(request);
   const worldId = h.state.worldId;
   await h.goto(h.state.position);
@@ -177,15 +246,15 @@ test('developer harness: the same three quests through the validation API, rewar
   await h.act({ type: 'photoCapture', photoRequestId: photo.id, outcome: 'captured', imageDigest: 'a1b2c3d4e5f60718293a4b5c6d7e8f90' });
   expect(h.state).toMatchObject({ status: 'cleared', completedMissionIds: ['Q1', 'Q2', 'Q3'], badges: ['shanghai-explorer'] });
   expect(h.state.xp).toBeGreaterThan(q1Xp);
-});
 
-test('production refuses the harness and validation sessions', async ({ page, request }) => {
+  });
+  await test.step("production refuses the harness and validation sessions", async () => {
   expect((await request.post('/api/sessions', { data: { initialTier: 0, providerMode: 'fixture', validationMode: true } })).status()).toBe(422);
-  await page.goto('/__validation');
+  await page.goto('/__validation', { waitUntil: 'domcontentloaded' });
   await expect(page.getByText('The validation harness is unavailable.')).toBeVisible();
-});
 
-test('production serves UI, API and the city routes from one origin', async ({ request }) => {
+  });
+  await test.step("production serves UI, API and the city routes from one origin", async () => {
   const health = await (await request.get('/api/health')).json();
   expect(health).toMatchObject({ status: 'ok', features: { validationHarness: false, fixtures: true, cityProvider: 'fallback' } });
   expect((await request.get('/')).headers()['content-type']).toContain('text/html');
@@ -197,4 +266,6 @@ test('production serves UI, API and the city routes from one origin', async ({ r
   const chunks = await (await request.post(`/api/sessions/${session.sessionId}/chunks`, { data: { coords: [{ cx: 0, cz: 0 }] } })).json();
   expect(chunks.chunks[0]).toMatchObject({ worldId: session.worldId, coord: { cx: 0, cz: 0 } });
   expect(chunks.chunks[0].placements.every((placement: { assetId: string }) => /^(bld|sf|st|ls|wf|an)\./.test(placement.assetId))).toBe(true);
+
+  });
 });

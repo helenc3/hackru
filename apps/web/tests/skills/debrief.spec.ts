@@ -11,7 +11,7 @@ const terminalDebrief = (): NonNullable<PublicState['debrief']> => ({
   evidenceSummary: { spokenTurns: 1, typedTurns: 1, editedTurns: 1, independentListening: 0, assistedListening: 1 },
 });
 async function finishPhoto(page: import('@playwright/test').Page) {
-  await page.goto('/');
+  await page.goto('/', { waitUntil: 'domcontentloaded' });
   await page.getByRole('button', { name: 'Start exploring', exact: true }).click();
   await expect(page.getByTestId('skill-debrief')).toHaveCount(0);
   await page.getByTestId('world-renderer').focus();

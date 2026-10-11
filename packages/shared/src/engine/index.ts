@@ -157,7 +157,7 @@ function pay(state: InternalState, anchor: WorldAnchor, nowMs: number, events: E
   events.push({ id: `${state.attemptId}.purchase-${state.purchases.length}`, kind: 'objective', message: `Paid ¥${price} for ${drink}.` });
 }
 
-export function applyAction(state: InternalState, raw: GameAction, nowMs: number, world: WorldView, movementMultiplier: 1 | 4 = 1): EngineResult {
+export function applyAction(state: InternalState, raw: GameAction, nowMs: number, world: WorldView, movementMultiplier: 1 | 4 | 8 = 1): EngineResult {
   const action = GameActionSchema.parse(raw);
   nowMs = Math.floor(nowMs); // timestamps are integer ms
   const result = synchronizeGame(state, nowMs);

@@ -1,4 +1,4 @@
-import { expect, test } from '../../../../tests/support/browser-test';
+import { test, expect } from 'vitest';
 import { chunkKey, createWorldView, generateFallbackChunk, questTarget, seedFromWorldId, type ChunkManifest, type MissionId, type Position } from '@vibequest/shared';
 import { distance, movePlayer, nextLeg } from '../../src/world/navigation';
 

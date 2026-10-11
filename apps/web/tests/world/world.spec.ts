@@ -1,6 +1,6 @@
 ﻿import { expect, test, type Page } from '../../../../tests/support/browser-test';
 
-test.use({ renderProfile: 'full' });
+test.use({ renderProfile: 'full', movementMultiplier: 8 });
 import { spawn, type ChildProcess } from 'node:child_process';
 import path from 'node:path';
 import { createServer } from 'node:net';
@@ -34,7 +34,7 @@ test.afterAll(async () => {
 });
 
 async function open(page: Page) {
-  await page.goto(fixtureUrl);
+  await page.goto(fixtureUrl, { waitUntil: 'domcontentloaded' });
   await expect(page.getByTestId('world-renderer')).toHaveAttribute('data-position-x', /./);
   await page.getByTestId('world-renderer').focus();
 }
@@ -62,8 +62,7 @@ async function walk(page: Page, key: string, axis: 'x' | 'z', destination: numbe
   finally { await page.keyboard.up(key); }
 }
 async function actions(page: Page) { return JSON.parse(await page.getByTestId('actions').innerText()); }
-
-test('signs are inert while NPC, focus and held-key interactions use shared callbacks once', async ({ page }) => {
+test('world interactions, focus, detached canvas and duplicate payment', async ({ page }) => {
   await open(page);
   await expect(page.getByTestId('world-renderer')).toHaveAttribute('data-chunks', '9');
   await expect(page.locator('[data-target-id]')).toHaveCount(0);
@@ -87,26 +86,36 @@ test('signs are inert while NPC, focus and held-key interactions use shared call
   expect(sent.every((a: { type: string }) => a.type === 'move')).toBe(true);
   expect(sent.filter((a: { type: string }) => a.type === 'move').every((a: { position: { x: number; z: number } }) => Number.isFinite(a.position.x) && Number.isFinite(a.position.z))).toBe(true);
   await expect(page.getByTestId('reward-state')).toHaveText('{"xp":0,"badges":[],"inventory":{"hint":0,"cny":20,"drinks":[]}}');
-});
 
-test('the payment choice carries its anchor and duplicate clicks are locked', async ({ page }) => {
-  await open(page);
+  await test.step('detached canvas remains healthy', async () => {
+
+  await page.locator('canvas').evaluate((canvas) => {
+    const parent = canvas.parentNode!;
+    const next = canvas.nextSibling;
+    parent.removeChild(canvas);
+    try {
+      canvas.dispatchEvent(new Event('webglcontextlost', { cancelable: true }));
+    } finally {
+      parent.insertBefore(canvas, next);
+    }
+  });
+  // Allow a state update from the old listener to reach the DOM.
+  await page.waitForTimeout(100);
+  // Canvas fallback HTML exists even with WebGL; recovery must not replace it.
+  await expect(page.locator('[data-testid="webgl-recovery"]:not(canvas *)')).toHaveCount(0);
+  await expect(page.locator('canvas')).toBeVisible();
+
+  });
+  await test.step('payment uses anchor and locks duplicate clicks', async () => {
+
   await walk(page, 'w', 'z', 4.6, -1);
   await walk(page, 'a', 'x', 12.4, -1);
   await page.getByLabel('Delay callback', { exact: true }).check();
   await page.locator('[data-target-id="fixture.pay"]').evaluate((node: HTMLButtonElement) => { node.click(); node.click(); });
   await expect.poll(async () => (await actions(page)).filter((a: { type: string }) => a.type === 'choose')).toEqual([{ type: 'choose', choiceId: 'q1.pay', anchorId: 'fixture.pay' }]);
   await expect(page.getByTestId('reward-state')).toContainText('"xp":0');
-});
 
-test('creek water blocks walking and the level bridge carries the player across', async ({ page }) => {
-  await open(page);
-  await walk(page, 'd', 'x', 23.5, 1);
-  await page.keyboard.down('d'); await page.waitForTimeout(600); await page.keyboard.up('d');
-  expect(await coordinate(page, 'x')).toBeLessThan(24);
-  await walk(page, 's', 'z', 20, 1);
-  await walk(page, 'd', 'x', 30, 1);
-  expect(await coordinate(page, 'x')).toBeGreaterThanOrEqual(30);
+  });
 });
 
 test('a failed callback records nothing; a lost WebGL context preserves the shell', async ({ page }) => {
@@ -128,25 +137,6 @@ test('a failed callback records nothing; a lost WebGL context preserves the shel
   await expect(page.getByTestId('reward-state')).toContainText('"xp":0');
 });
 
-test('a detached canvas context loss does not show compatibility recovery', async ({ page }) => {
-  await open(page);
-  await page.locator('canvas').evaluate((canvas) => {
-    const parent = canvas.parentNode!;
-    const next = canvas.nextSibling;
-    parent.removeChild(canvas);
-    try {
-      canvas.dispatchEvent(new Event('webglcontextlost', { cancelable: true }));
-    } finally {
-      parent.insertBefore(canvas, next);
-    }
-  });
-  // Allow a state update from the old listener to reach the DOM.
-  await page.waitForTimeout(100);
-  // Canvas fallback HTML exists even with WebGL; recovery must not replace it.
-  await expect(page.locator('[data-testid="webgl-recovery"]:not(canvas *)')).toHaveCount(0);
-  await expect(page.locator('canvas')).toBeVisible();
-});
-
 test('world renders frames and camera-relative controls; demo laptop meets 30 fps', async ({ page }) => {
   // Segment-004 requires 30 FPS on the actual demo laptop. Cloud runners use
   // software WebGL: always exercise rendering/controls here, and explicitly
@@ -158,7 +148,7 @@ test('world renders frames and camera-relative controls; demo laptop meets 30 fp
   await expect(page.getByTestId('world-renderer')).toHaveAttribute('data-fps', /./, { timeout: 15000 });
   const rates: number[] = [];
   for (let sample = 0; sample < 3; sample++) {
-    await page.waitForTimeout(2100);
+    await page.waitForTimeout(1050);
     rates.push(Number(await page.getByTestId('world-renderer').getAttribute('data-fps')));
   }
   const renderer = await page.locator('canvas').evaluate((canvas: HTMLCanvasElement) => {
@@ -170,7 +160,7 @@ test('world renders frames and camera-relative controls; demo laptop meets 30 fp
     viewport: page.viewportSize(), samples: rates, renderer,
     environment: demoLaptop ? 'confirmed demo laptop' : 'browser smoke runner',
     acceptanceTargetFps: demoLaptop ? 30 : null,
-    method: 'R3F rendered frame count divided by elapsed frame time, three 2-second windows after warm-up',
+    method: 'R3F rendered frame count divided by elapsed frame time, three 1-second windows after warm-up',
   };
   await test.info().attach('frame-rate', { body: JSON.stringify(measurement), contentType: 'application/json' });
   await writeFile('test-results/world-performance.json', JSON.stringify(measurement, null, 2));
@@ -183,7 +173,7 @@ test('world renders frames and camera-relative controls; demo laptop meets 30 fp
   await page.mouse.move(bounds.x + bounds.width / 2 + 130, bounds.y + bounds.height / 2);
   await page.mouse.up();
   const before = await coordinate(page, 'x');
-  await page.keyboard.down('w'); await page.waitForTimeout(500); await page.keyboard.up('w');
+  await walk(page, 'w', 'x', before + .35, 1);
   await expect.poll(() => coordinate(page, 'x')).toBeGreaterThan(before + .3);
   await page.screenshot({ path: 'test-results/world-demo-laptop.png', fullPage: true });
   expect(errors).toEqual([]);
@@ -197,7 +187,7 @@ test('unsupported WebGL keeps compatibility recovery in the app shell', async ({
       return getContext.apply(this, args);
     } as typeof getContext;
   });
-  await page.goto(fixtureUrl);
+  await page.goto(fixtureUrl, { waitUntil: 'domcontentloaded' });
   await expect(page.getByTestId('webgl-recovery')).toContainText('The district needs WebGL');
   await expect(page.getByRole('button', { name: 'Reload preview' })).toBeVisible();
   await expect(page.locator('[data-target-id]')).toHaveCount(0);

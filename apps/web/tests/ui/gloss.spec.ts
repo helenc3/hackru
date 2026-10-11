@@ -31,7 +31,7 @@ async function shiftClick(page: Page, point: { x: number; y: number }) {
   await page.keyboard.down('Shift'); await page.mouse.click(point.x, point.y); await page.keyboard.up('Shift');
 }
 async function enter(page: Page) {
-  await page.goto('/');
+  await page.goto('/', { waitUntil: 'domcontentloaded' });
   const resume = page.getByRole('button', { name: 'Continue Session' });
   await (await resume.count() ? resume : page.getByRole('button', { name: 'Start exploring', exact: true })).click();
   await expect(page.getByTestId('game-shell')).toBeVisible();
@@ -77,8 +77,11 @@ test('shift-click glosses an NPC reply, saves a word for review across reloads, 
   await expect(popover.getByTestId('gloss-line-pinyin')).toBeVisible();
   await page.keyboard.press('Escape');
 
-  await page.reload();
-  await enter(page);
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  const resume = page.getByRole('button', { name: 'Continue Session' });
+  await expect(resume).toBeVisible();
+  await resume.click();
+  await expect(page.getByTestId('game-shell')).toBeVisible();
   await page.getByTestId('review-toggle').click();
   const review = page.getByTestId('review-panel');
   await expect(review.getByTestId('review-word')).toHaveCount(1);

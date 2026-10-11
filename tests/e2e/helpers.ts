@@ -17,7 +17,7 @@ async function walkToQuestTargetImpl(page: Page) {
   const compass = page.getByTestId('quest-compass');
   await expect(compass).toBeVisible({ timeout: 15000 });
   await page.getByTestId('walk-there').click();
-  await expect.poll(async () => Number(await compass.getAttribute('data-distance')), { timeout: 150_000, intervals: [500] }).toBeLessThanOrEqual(1);
+  await expect.poll(async () => Number(await compass.getAttribute('data-distance')), { timeout: 150_000, intervals: [100] }).toBeLessThanOrEqual(1);
 }
 
 /** Hold one movement key until the avatar passes `destination` on `axis`; the camera starts at yaw 0 (W = −z, D = +x). */
@@ -133,7 +133,7 @@ export async function chat(page: Page, turns = GOAL_WARMUP_EXCHANGES - 2) {
 export const closeConversation = (page: Page) => page.getByTestId('dialogue-panel').getByRole('button', { name: 'Close conversation' }).click();
 
 export async function startWorld(page: Page, provider: 'live' | 'fixture' = 'fixture', base = '') {
-  await page.goto(`${base}/`);
+  await page.goto(`${base}/`, { waitUntil: 'domcontentloaded' });
   await page.getByLabel('Conversation provider').selectOption(provider);
   await page.getByRole('button', { name: 'Start exploring' }).click();
   await worldReady(page);

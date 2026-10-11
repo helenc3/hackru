@@ -1,4 +1,4 @@
-import { expect, test } from '../../../../tests/support/browser-test';
+import { test, expect } from 'vitest';
 import { WORLD_RULES, createWorldView, type PublicState } from '@vibequest/shared';
 import { collides, distance, movePlayer, nearbyTargets, targetAction, walkingPath, zoneAt } from '../../src/world/navigation';
 import { fixtureCity } from '../../../../fixtures/world/city';
@@ -14,8 +14,9 @@ test('movement keeps the shared speed, camera direction and committed-ground col
   expect(movePlayer(view, spawn, 0, 1, Math.PI / 2, .1).x).toBeCloseTo(19.6);
   expect(movePlayer(view, spawn, 0, 1, 0, 10).z).toBeCloseTo(9.6); // one frame is capped at 0.1 s
   expect(distance(spawn, movePlayer(view, spawn, 0, 1, 0, .1, 4))).toBeCloseTo(1.6);
+  expect(distance(spawn, movePlayer(view, spawn, 0, 1, 0, .1, 8))).toBeCloseTo(3.2);
   let accelerated = spawn;
-  for (let i = 0; i < 20; i++) accelerated = movePlayer(view, accelerated, 1, 0, 0, .1, 4);
+  for (let i = 0; i < 20; i++) accelerated = movePlayer(view, accelerated, 1, 0, 0, .1, 8);
   expect(accelerated.x).toBeLessThan(24 - WORLD_RULES.playerRadius + .01);
   expect(collides(view, accelerated)).toBe(false);
   expect(zoneAt(view, spawn)).toBe('park');

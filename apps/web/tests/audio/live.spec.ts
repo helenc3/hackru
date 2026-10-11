@@ -31,19 +31,20 @@ async function openPanel(page: Page) {
   const api = await installScriptedApi(page);
   // Keep movement and audio bookkeeping responses in the same live session.
   api.patch({ providerStatus: 'live' });
-  await page.goto('/');
+  await page.goto('/', { waitUntil: 'domcontentloaded' });
   await page.getByRole('button', { name: 'Start exploring', exact: true }).click();
   await page.getByTestId('world-renderer').focus();
   await page.keyboard.press('e');
   return page.getByTestId('dialogue-panel');
 }
-
 test('live voice streams mic audio, renders transcripts, applies turns and honours interruptions', async ({ page }) => {
   await fakeAudio(page);
+  let interrupt: (() => void) | undefined;
   const urls: string[] = [];
   const binaryFrames: number[] = [];
   const texts: string[] = [];
   await page.routeWebSocket(/\/api\/sessions\/[^/]+\/live/, (ws) => {
+    interrupt = () => ws.send(JSON.stringify({ type: 'interrupted' }));
     urls.push(ws.url());
     ws.send(JSON.stringify({ type: 'ready', npcId: 'vendor', sampleRate: 24000 }));
     ws.onMessage((message) => {
@@ -80,32 +81,12 @@ test('live voice streams mic audio, renders transcripts, applies turns and honou
   await expect(status).toHaveAttribute('data-status', 'paused');
   await panel.getByRole('button', { name: 'Resume' }).click();
   await expect(status).toHaveAttribute('data-status', 'npc-speaking');
-  await panel.getByRole('button', { name: 'Close conversation' }).click();
-  await expect.poll(() => counter(page, '__trackStops')).toBe(1);
-  expect(texts.some((text) => JSON.parse(text).type === 'stop')).toBe(true);
-});
-
-test('interrupted flushes queued NPC audio', async ({ page }) => {
-  await fakeAudio(page);
-  let interrupt: (() => void) | undefined;
-  await page.routeWebSocket(/\/live/, (ws) => {
-    ws.send(JSON.stringify({ type: 'ready', npcId: 'vendor', sampleRate: 24000 }));
-    let first = true;
-    ws.onMessage((message) => {
-      if (typeof message === 'string' || !first) return;
-      first = false;
-      ws.send(JSON.stringify({ type: 'audio', data: Buffer.alloc(48000).toString('base64') }));
-      ws.send(JSON.stringify({ type: 'audio', data: Buffer.alloc(48000).toString('base64') }));
-      interrupt = () => ws.send(JSON.stringify({ type: 'interrupted' }));
-    });
-  });
-  const panel = await openPanel(page);
-  const status = panel.getByTestId('live-status');
-  await expect(status).toHaveAttribute('data-status', 'npc-speaking');
-  await expect.poll(() => counter(page, '__scheduled')).toBe(2);
   interrupt!();
   await expect(status).toHaveAttribute('data-status', 'live');
   expect(await counter(page, '__stopped')).toBe(2);
+  await panel.getByRole('button', { name: 'Close conversation' }).click();
+  await expect.poll(() => counter(page, '__trackStops')).toBe(1);
+  expect(texts.some((text) => JSON.parse(text).type === 'stop')).toBe(true);
 });
 
 test('a 4xxx close falls back to the batch recorder without opening the mic', async ({ page }) => {

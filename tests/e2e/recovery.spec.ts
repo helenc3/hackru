@@ -2,7 +2,7 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { expect, test, type Page } from '../support/browser-test';
 import type { PublicState } from '@vibequest/shared';
-import { harness, HARNESS, interact, playerState, serverState, sessionId, SMALL_TALK, startWorld, walkToQuestTarget } from './helpers';
+import { interact, playerState, serverState, sessionId, SMALL_TALK, startWorld, walkToQuestTarget } from './helpers';
 
 // Real-server recovery journeys. The configured servers carry no provider keys, so live
 // dialogue calls fail as recoverable 503s. The restart test spawns its own production server it can kill.
@@ -25,7 +25,7 @@ async function reachVendor(page: Page, request: Parameters<typeof playerState>[1
 }
 const progress = (state: PublicState) => ({ missionId: state.missionId, status: state.status, objectives: state.objectives, inventory: state.inventory, xp: state.xp, badges: state.badges, purchases: state.purchases });
 
-test.use({ movementMultiplier: 4 });
+test.use({ movementMultiplier: 8 });
 
 test('live AI outage shows a retryable recovery, keeps the draft, and changes no progress', async ({ page, request }) => {
   await startWorld(page, 'live');
@@ -55,9 +55,37 @@ test('live AI outage shows a retryable recovery, keeps the draft, and changes no
   await expect(recovery).toContainText(`Version ${after.version}`);
 });
 
-test('fixture reply audio failure degrades to the Mandarin subtitle without blocking the purchase', async ({ page, request }) => {
+test('fixture recovery: stale versions resynchronize and failed audio does not block purchase', async ({ page, request }) => {
   await startWorld(page, 'fixture');
   const panel = await reachVendor(page, request);
+  await test.step('stale version resynchronizes the existing world', async () => {
+
+  const id = (await sessionId(page))!;
+  const shown = await serverState(request, id);
+
+  // Another tab advances the session behind this UI's back.
+  const bump = await request.post(`/api/sessions/${id}/actions`, { data: { actionId: `other-tab-${Date.now()}`, expectedVersion: shown.version, action: { type: 'setInputPreference', preference: 'typed-accessibility' } } });
+  expect(bump.status()).toBe(200);
+  const ahead: PublicState = (await bump.json()).state;
+  const stale = await request.post(`/api/sessions/${id}/actions`, { data: { actionId: `late-${Date.now()}`, expectedVersion: shown.version, action: { type: 'setInputPreference', preference: 'voice' } } });
+  expect(stale.status()).toBe(409);
+  const staleBody = await stale.json();
+  expect(staleBody.error).toMatchObject({ code: 'STALE_VERSION', retryable: true });
+  expect(staleBody.state.version).toBe(ahead.version);
+
+  await panel.getByRole('button', { name: 'Use voice', exact: true }).click();
+  const recovery = page.getByTestId('recovery-panel');
+  await expect(recovery).toContainText('Your session needs a refresh.');
+  await expect(recovery).toContainText('STALE_VERSION');
+  await expect(recovery).toContainText(`Version ${ahead.version}`);
+  await recovery.getByRole('button', { name: 'Retry request' }).click();
+  await expect(recovery).toHaveCount(0);
+  await expect.poll(async () => (await serverState(request, id)).version).toBe(ahead.version + 1);
+
+  });
+  const typed = panel.getByRole('button', { name: 'Use typed Mandarin', exact: true });
+  if (await typed.isVisible()) await typed.click();
+  await expect(panel.getByRole('textbox')).toBeEnabled();
   await page.locator('summary[aria-label="Settings"]').click();
   const audio = page.getByTestId('audio-controller');
   // 老王 chats a little (the goal warm-up) before he names a price.
@@ -103,7 +131,7 @@ test('server restart forgets the expired session and a fresh start creates a new
 
     await halt();
     await boot();
-    await page.reload();
+    await page.reload({ waitUntil: 'domcontentloaded' });
     await expect(page.getByRole('button', { name: 'Start exploring' })).toBeEnabled();
     await expect(page.getByRole('button', { name: 'Continue Session' })).toHaveCount(0);
 
@@ -117,67 +145,4 @@ test('server restart forgets the expired session and a fresh start creates a new
     expect(fresh).not.toBe(old);
     expect((await fetch(`${base}/api/sessions/${fresh}`)).status).toBe(200);
   } finally { await halt(); }
-});
-
-test('replayed action and turn IDs are idempotent, reused IDs conflict, and one reward is granted', async ({ request }) => {
-  const h = await harness(request);
-  await h.goto(h.state.position);
-  const vendor = h.anchor((entry) => entry.role === 'vendor' && entry.label === '老王');
-  await h.goto(vendor.position); // an anchor stand point is validated as reachable
-
-  // Turn replay: the identical response, no second evaluation.
-  const turn = { turnId: 't-1', npcId: 'vendor', anchorId: vendor.id, input: { text: '我要咖啡。', source: 'typed' } };
-  const first = await h.send('turns', turn);
-  const replay = await h.raw('turns', { ...turn, expectedVersion: 0 });
-  expect(replay.status()).toBe(200);
-  expect(await replay.json()).toEqual(first);
-  const conflict = await h.raw('turns', { ...turn, input: { text: '我要茶。', source: 'typed' }, expectedVersion: h.state.version });
-  expect(conflict.status()).toBe(409);
-  expect((await conflict.json()).error.code).toBe('ID_CONFLICT');
-  expect((await (await request.get(`${HARNESS}/api/sessions/${h.state.sessionId}`)).json()).state.version).toBe(h.state.version);
-
-  await h.chat(vendor.id, 'vendor');
-  await h.talk(vendor.id, 'vendor', '那就茶吧。');
-  const xpBefore = h.state.xp;
-  const pay = { type: 'choose', choiceId: 'q1.pay', anchorId: vendor.id } as const;
-  const clear = await h.act(pay, 200, 'a-clear');
-  expect(h.state).toMatchObject({ status: 'cleared', inventory: { cny: 10 } });
-  expect(h.state.xp).toBeGreaterThan(xpBefore);
-
-  // Replaying the reward-granting payment returns the identical body; money and reward move once.
-  const again = await h.raw('actions', { actionId: 'a-clear', action: pay, expectedVersion: 1 });
-  expect(again.status()).toBe(200);
-  expect(await again.json()).toEqual(clear);
-  const reused = await h.raw('actions', { actionId: 'a-clear', action: { type: 'setInputPreference', preference: 'voice' }, expectedVersion: h.state.version });
-  expect(reused.status()).toBe(409);
-  expect((await reused.json()).error.code).toBe('ID_CONFLICT');
-  const final: PublicState = (await (await request.get(`${HARNESS}/api/sessions/${h.state.sessionId}`)).json()).state;
-  expect(final).toMatchObject({ xp: h.state.xp, badges: h.state.badges, version: h.state.version, inventory: { cny: 10 } });
-  expect(final.purchases).toHaveLength(1);
-});
-
-test('a stale expectedVersion returns STALE_VERSION and the UI resynchronizes', async ({ page, request }) => {
-  await startWorld(page, 'fixture');
-  const panel = await reachVendor(page, request);
-  const id = (await sessionId(page))!;
-  const shown = await serverState(request, id);
-
-  // Another tab advances the session behind this UI's back.
-  const bump = await request.post(`/api/sessions/${id}/actions`, { data: { actionId: `other-tab-${Date.now()}`, expectedVersion: shown.version, action: { type: 'setInputPreference', preference: 'typed-accessibility' } } });
-  expect(bump.status()).toBe(200);
-  const ahead: PublicState = (await bump.json()).state;
-  const stale = await request.post(`/api/sessions/${id}/actions`, { data: { actionId: `late-${Date.now()}`, expectedVersion: shown.version, action: { type: 'setInputPreference', preference: 'voice' } } });
-  expect(stale.status()).toBe(409);
-  const staleBody = await stale.json();
-  expect(staleBody.error).toMatchObject({ code: 'STALE_VERSION', retryable: true });
-  expect(staleBody.state.version).toBe(ahead.version);
-
-  await panel.getByRole('button', { name: 'Use voice', exact: true }).click();
-  const recovery = page.getByTestId('recovery-panel');
-  await expect(recovery).toContainText('Your session needs a refresh.');
-  await expect(recovery).toContainText('STALE_VERSION');
-  await expect(recovery).toContainText(`Version ${ahead.version}`);
-  await recovery.getByRole('button', { name: 'Retry request' }).click();
-  await expect(recovery).toHaveCount(0);
-  await expect.poll(async () => (await serverState(request, id)).version).toBe(ahead.version + 1);
 });

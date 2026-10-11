@@ -15,13 +15,12 @@ async function setup(page: Page) {
     const entries = q === '水' || q === 'shui' ? [water] : q === 'water' ? [water, boiled] : [];
     return route.fulfill({ json: { query: q, entries } });
   });
-  await page.goto('/');
+  await page.goto('/', { waitUntil: 'domcontentloaded' });
   await page.getByRole('button', { name: 'Start exploring', exact: true }).click();
   await expect(page.getByTestId('game-shell')).toBeVisible();
   return queries;
 }
-
-test('the pocket dictionary finds single words by Hanzi, pinyin or English and rejects phrases', async ({ page }) => {
+test('dictionary search, phrase rejection, review persistence and movement isolation', async ({ page }) => {
   const queries = await setup(page);
   await page.getByTestId('world-renderer').focus();
   await page.keyboard.press('/'); // shortcut opens the panel when not typing
@@ -50,13 +49,11 @@ test('the pocket dictionary finds single words by Hanzi, pinyin or English and r
   // A Hanzi phrase is only detectable by the server's segmentation.
   await search.fill('我要水');
   await expect(panel.getByTestId('lookup-error')).toHaveText('Look up one word at a time: 我要水 is a phrase.');
-});
 
-test('add to review persists, and typing in the dictionary never reaches world movement', async ({ page }) => {
-  await setup(page);
-  await page.getByTestId('lookup-toggle').click();
-  const panel = page.getByTestId('lookup-panel');
-  const search = panel.getByRole('searchbox', { name: 'Look up one word' });
+
+  await search.fill('');
+
+
   await page.evaluate(() => { (window as unknown as { movementKeys: string[] }).movementKeys = []; window.addEventListener('keydown', (event) => { if (['w', 'a', 's', 'd'].includes(event.key)) (window as unknown as { movementKeys: string[] }).movementKeys.push(event.key); }); });
   await search.pressSequentially('water');
   expect(await page.evaluate(() => (window as unknown as { movementKeys: string[] }).movementKeys)).toEqual([]);

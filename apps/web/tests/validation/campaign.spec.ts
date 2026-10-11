@@ -44,7 +44,7 @@ test('one validation session completes all three quests through the shared API, 
     ...hotelSteps(), { action: { type: 'startMission', missionId: 'Q3' }, patch: missionPatch('Q3', 200, { completedMissionIds: ['Q1', 'Q2'], unlockedMissionIds: ['Q1', 'Q2', 'Q3'] }) },
     ...photoSteps(),
   ] });
-  await page.goto(`${devUrl}/__validation`); await page.getByRole('button', { name: 'Start validation session' }).click();
+  await page.goto(`${devUrl}/__validation`, { waitUntil: 'domcontentloaded' }); await page.getByRole('button', { name: 'Start validation session' }).click();
   await drink(page); await page.getByRole('button', { name: 'Next quest' }).click();
   await hotel(page); await page.getByRole('button', { name: 'Next quest' }).click();
   await photograph(page);
@@ -57,17 +57,14 @@ test('one validation session completes all three quests through the shared API, 
   expect(await page.evaluate(() => localStorage.getItem('vibequest.worldId'))).toBeNull();
   await expect(page.getByTestId('inventory-bar')).toContainText('Simulated XP');
 });
-
-test('validation entry needs server permission and cannot resume a player session', async ({ page, devUrl }) => {
+test('validation permission and serial developer relocations', async ({ page, devUrl }) => {
   await installScriptedApi(page, { validation: false });
-  await page.goto(`${devUrl}/__validation`);
+  await page.goto(`${devUrl}/__validation`, { waitUntil: 'domcontentloaded' });
   await expect(page.getByRole('heading', { name: 'Internal validation is unavailable.' })).toBeVisible();
   await expect(page.getByTestId('validation-harness')).toHaveCount(0);
-});
 
-test('rapid developer relocations dispatch serially with fresh versions', async ({ page, devUrl }) => {
   const api = await installScriptedApi(page, { validation: true });
-  await page.goto(`${devUrl}/__validation`); await page.getByRole('button', { name: 'Start validation session' }).click();
+  await page.goto(`${devUrl}/__validation`, { waitUntil: 'domcontentloaded' }); await page.getByRole('button', { name: 'Start validation session' }).click();
   await expect(page.getByTestId('validation-harness')).toBeVisible();
   await page.getByTestId('validation-harness').evaluate((panel) => {
     const button = panel.querySelector<HTMLButtonElement>('button')!;

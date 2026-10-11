@@ -41,6 +41,8 @@ export function Motion({ runtime, root, labels, marks, city, state, tick, sync }
   }, []);
   useFrame(({ camera, size, gl }, delta) => {
     const r = runtime.current;
+    const profile = testProfile();
+    const multiplier = state.providerStatus === 'fixture' ? profile.movementMultiplier : 1;
     city.focus(r.position);
     // Movement waits until the chunk under the player is committed (server validates the same manifests).
     const blocked = !city.ready(r.position) || !r.active || r.busy || state.status !== 'active' || document.activeElement !== root.current || document.hidden;
@@ -59,12 +61,11 @@ export function Motion({ runtime, root, labels, marks, city, state, tick, sync }
     // A far goal re-plans one leg at a time, so it keeps going as chunks ahead stream in.
     if (!blocked && !keyed && !r.path?.length && r.goal) {
       if (distance(r.position, r.goal) < 1) r.goal = undefined;
-      else if (performance.now() >= (r.replanAt ?? 0)) { r.path = r.leg?.(r.position, r.goal) ?? []; r.replanAt = performance.now() + 400; }
+      else if (performance.now() >= (r.replanAt ?? 0)) { r.path = r.leg?.(r.position, r.goal) ?? []; r.replanAt = performance.now() + 400 / multiplier; }
     }
     const waypoint = r.path?.[0];
     const moving = keyed || Boolean(waypoint);
     const previous = r.position;
-    const multiplier = state.providerStatus === 'fixture' ? testProfile().movementMultiplier : 1;
     if (keyed) r.position = movePlayer(city.view, r.position, right, forward, r.yaw, delta, multiplier);
     else if (waypoint) {
       const remaining = distance(r.position, waypoint);
@@ -116,7 +117,7 @@ export function Motion({ runtime, root, labels, marks, city, state, tick, sync }
       tick({ ...r.position });
       root.current?.setAttribute('data-zone', zoneAt(city.view, r.position));
     }
-    if (c.elapsed >= 2) {
+    if (c.elapsed >= profile.fpsSampleSeconds) {
       root.current?.setAttribute('data-fps', (c.frames / c.elapsed).toFixed(1));
       c.elapsed = 0; c.frames = 0;
     }

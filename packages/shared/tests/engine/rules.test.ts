@@ -242,6 +242,9 @@ describe('movement, exploration and bias', () => {
     expect(applyAction(state, action, NOW + 1_000, fakeWorld, 4).state.position).toEqual(action.position);
     expect(() => applyAction(state, { type: 'move', position: { x: 0, z: 30 } }, NOW + 1_000, fakeWorld, 4)).toThrow('speed');
     expect(() => applyAction(state, { type: 'move', position: { x: 600, z: 0 } }, NOW + 1_000_000, fakeWorld, 4)).toThrow('not walkable');
+    expect(applyAction(state, { type: 'move', position: { x: 0, z: 33 } }, NOW + 1_000, fakeWorld, 8).state.position).toEqual({ x: 0, z: 33 });
+    expect(() => applyAction(state, { type: 'move', position: { x: 0, z: 40 } }, NOW + 1_000, fakeWorld, 8)).toThrow('speed');
+    expect(() => applyAction(state, { type: 'move', position: { x: 600, z: 0 } }, NOW + 1_000_000, fakeWorld, 8)).toThrow('not walkable');
   });
 
   it('boosts an unseen quest category modestly after absence, capped and reset by an encounter', () => {

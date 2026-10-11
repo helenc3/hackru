@@ -34,7 +34,7 @@ async function fakeMedia(page: Page, options: { deny?: boolean } = {}) {
 const counter = (page: Page, name: string) => page.evaluate((key) => Number((window as unknown as Record<string, unknown>)[key]), name);
 
 async function openPanel(page: Page) {
-  await page.goto('/');
+  await page.goto('/', { waitUntil: 'domcontentloaded' });
   await page.getByRole('button', { name: 'Start exploring', exact: true }).click();
   await page.getByTestId('world-renderer').focus();
   await page.keyboard.press('e');

@@ -4,5 +4,5 @@ declare global {
 }
 export function testProfile() {
   const profile = typeof window === 'undefined' ? undefined : window.__VIBEQUEST_TEST_PROFILE__;
-  return { lightweight: profile?.lightweight === true, movementMultiplier: profile?.movementMultiplier === 4 ? 4 : 1 };
+  return { lightweight: profile?.lightweight === true, movementMultiplier: profile?.movementMultiplier === 8 ? 8 : profile?.movementMultiplier === 4 ? 4 : 1, fpsSampleSeconds: profile ? 1 : 2 };
 }

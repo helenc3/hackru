@@ -1,4 +1,4 @@
-import { expect, test } from '../../../../tests/support/browser-test';
+import { test, expect } from 'vitest';
 import { DEFAULT_PITCH, PITCH_MAX, PITCH_MIN, dragOrbit, orbitDistance } from '../../src/world/camera';
 
 test('horizontal drag turns, vertical drag tilts, and tilt stays within bounds', () => {

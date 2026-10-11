@@ -1,18 +1,12 @@
-﻿import { Component, memo, useEffect, useRef, useState, type ReactNode } from 'react';
-import { Canvas, useFrame } from '@react-three/fiber';
-import { Group, Vector3 } from 'three';
-import { sceneManifest, type Position, type PublicState, type RendererProps } from '@vibequest/shared';
-import { distance, movePlayer, nearbyTargets, targetAction, zoneAt } from './navigation';
-import { candy, INK, Toon, useReducedMotion } from './toon';
-import { Player, Npc, type Gait } from './characters';
-import { Cafe, Cue, Ground, Kiosk, LanternString, Petals, Platforms, Sign, Sky, Trees, Twinkles } from './decor';
+import { Component, useEffect, useRef, useState, type ReactNode } from 'react';
+import { Canvas } from '@react-three/fiber';
+import { type Position, type RendererProps } from '@vibequest/shared';
+import { distance, nearbyTargets, targetAction, zoneAt } from './navigation';
+import { Cue } from './decor';
+import { District } from './District';
+import { Motion, landmarks } from './Motion';
+import { initialPosition, type Runtime } from './runtime';
 import './world.css';
-
-const landmarks = [
-  { label: '广场', x: 0, z: 11 }, { label: '咖啡店', x: -10, z: 7.8 },
-  { label: '售货亭', x: 8, z: 7 }, { label: '车站', x: 0, z: 1 },
-  ...[-10, 0, 10].map((x, i) => ({ label: ['一号站台', '二号站台', '三号站台'][i], x, z: -13.8 })),
-];
 
 function webGlIsAvailable(): boolean {
   try {
@@ -38,118 +32,6 @@ class CanvasBoundary extends Component<{ children: ReactNode; onFailure: () => v
   static getDerivedStateFromError() { return { failed: true }; }
   componentDidCatch() { this.props.onFailure(); }
   render() { return this.state.failed ? <CompatibilityRecovery /> : this.props.children; }
-}
-
-type Runtime = {
-  position: Position; yaw: number; keys: Set<string>; active: boolean;
-  busy: boolean; syncing: boolean; lastSync: number; lastSent: Position | null;
-  pending: Position | null; generation: number;
-};
-
-function initialPosition(state: PublicState): Position {
-  return { ...(state.zoneId === 'plaza' ? sceneManifest.spawn : sceneManifest.zones.find((zone) => zone.id === state.zoneId)?.center ?? sceneManifest.spawn) };
-}
-
-function Shape({ x, z, width, depth, height, color, outline = true, thickness }: { x: number; z: number; width: number; depth: number; height: number; color: string; outline?: boolean; thickness?: number }) {
-  return <mesh position={[x, height / 2, z]}><boxGeometry args={[width, height, depth]} /><Toon color={color} outline={outline} thickness={thickness} /></mesh>;
-}
-
-const colliderColor = (id: string) => (id.startsWith('cafe') ? candy.coral : id.startsWith('kiosk') ? candy.lemon : candy.teal);
-
-/** Static scene. Memoized: targets and the runtime ref are stable between position ticks. */
-const District = memo(function District({ targets, runtime }: { targets: PublicState['interactables']; runtime: React.RefObject<Runtime> }) {
-  const still = useReducedMotion();
-  return <>
-    <color attach="background" args={[candy.peach]} />
-    <fog attach="fog" args={['#ffd9c2', 38, 80]} />
-    <Sky />
-    {/* Toon rim approximation: warm key, cool lavender fill on shadow sides, soft sky/ground bounce. */}
-    <ambientLight intensity={.3} />
-    <hemisphereLight args={[candy.lavender, candy.peach, .65]} />
-    <directionalLight position={[12, 24, 14]} intensity={2.4} color="#fff1dc" />
-    <directionalLight position={[-14, 10, -10]} intensity={.55} color={candy.lavender} />
-    <Ground />
-    {sceneManifest.colliders.map(({ id, bounds: b }) => <Shape key={id} x={(b.minX + b.maxX) / 2} z={(b.minZ + b.maxZ) / 2} width={b.maxX - b.minX} depth={b.maxZ - b.minZ} height={id.startsWith('platform') ? 1 : 2.4} color={colliderColor(id)} thickness={3} />)}
-    {/* Flat slabs mark walkable areas; only frozen colliders are solid. */}
-    <Shape x={-10} z={5} width={8} depth={6} height={0.045} color={candy.paving} thickness={1.6} />
-    <Shape x={8} z={5} width={6} depth={4} height={0.04} color="#ffe39a" thickness={1.6} />
-    <Shape x={0} z={-2.5} width={30} depth={10} height={0.03} color={candy.mint} thickness={1.6} />
-    {[-10, 0, 10].map((x) => <group key={x}>
-      <Shape x={x} z={-12} width={7} depth={8} height={0.05} color="#a9c9bf" thickness={1.6} />
-      <Shape x={x} z={-17.8} width={7} depth={0.4} height={0.07} color={candy.lemon} outline={false} />
-      <Shape x={x} z={-18.8} width={7} depth={0.1} height={0.07} color={INK} outline={false} />
-    </group>)}
-    <Cafe player={runtime} still={still} />
-    <Kiosk player={runtime} still={still} />
-    <Platforms player={runtime} />
-    <LanternString still={still} />
-    <Trees still={still} />
-    {targets.filter((target) => target.kind === 'npc').map((target, index) => <group key={target.id} position={[target.position.x, 0, target.position.z]}>
-      <Npc id={target.id} index={index} look={runtime} offset={target.position} />
-    </group>)}
-    {targets.filter((target) => target.kind === 'sign' || target.kind === 'pa').map((target, i) => <Sign key={target.id} target={target} phase={i * 1.9} still={still} />)}
-    {!still && <><Petals /><Twinkles /></>}
-  </>;
-});
-
-function Motion({ runtime, root, labels, state, tick, sync }: {
-  runtime: React.RefObject<Runtime>; root: React.RefObject<HTMLElement | null>;
-  labels: React.RefObject<(HTMLSpanElement | null)[]>; state: PublicState;
-  tick: (position: Position) => void; sync: (position: Position) => void;
-}) {
-  const avatar = useRef<Group>(null);
-  const gait = useRef<Gait>({ moving: false, speed: 0 });
-  const clock = useRef({ ui: 0, frames: 0, elapsed: 0, wasMoving: false });
-  const projected = useRef(new Vector3());
-  useFrame(({ camera, size }, delta) => {
-    const r = runtime.current;
-    const k = r.keys;
-    const blocked = !r.active || r.busy || state.status !== 'active' || document.activeElement !== root.current || document.hidden;
-    const right = blocked ? 0 : Number(k.has('KeyD') || k.has('ArrowRight')) - Number(k.has('KeyA') || k.has('ArrowLeft'));
-    const forward = blocked ? 0 : Number(k.has('KeyW') || k.has('ArrowUp')) - Number(k.has('KeyS') || k.has('ArrowDown'));
-    const moving = Boolean(right || forward);
-    const previous = r.position;
-    r.position = movePlayer(r.position, right, forward, r.yaw, delta);
-    if (avatar.current) {
-      avatar.current.position.set(r.position.x, 0, r.position.z);
-      if (distance(previous, r.position) > .0001) avatar.current.rotation.y = Math.atan2(r.position.x - previous.x, r.position.z - previous.z);
-    }
-    gait.current.moving = moving;
-    gait.current.speed = Math.min(distance(previous, r.position) / Math.max(delta, 1e-4), 4.5);
-    // Fixed elevated pitch keeps the capsule visible; yaw is the only orbit axis.
-    camera.position.set(r.position.x + Math.sin(r.yaw) * 9, 8.5, r.position.z + Math.cos(r.yaw) * 9);
-    camera.lookAt(r.position.x, .7, r.position.z);
-    camera.updateMatrixWorld();
-    landmarks.forEach((mark, i) => {
-      const node = labels.current[i];
-      if (!node) return;
-      const p = projected.current.set(mark.x, 1.9, mark.z).project(camera);
-      node.style.display = p.z < 1 && p.z > -1 && Math.abs(p.x) < 1.05 && Math.abs(p.y) < 1.05 ? 'block' : 'none';
-      node.style.transform = `translate(${(p.x + 1) * size.width / 2}px, ${(-p.y + 1) * size.height / 2}px) translate(-50%, -100%)`;
-    });
-    const c = clock.current;
-    c.ui += delta; c.elapsed += delta; c.frames++;
-    root.current?.setAttribute('data-position-x', r.position.x.toFixed(3));
-    root.current?.setAttribute('data-position-z', r.position.z.toFixed(3));
-    if (c.ui >= .1) {
-      c.ui = 0;
-      tick({ ...r.position });
-      root.current?.setAttribute('data-zone', zoneAt(r.position));
-    }
-    if (c.elapsed >= 2) {
-      root.current?.setAttribute('data-fps', (c.frames / c.elapsed).toFixed(1));
-      c.elapsed = 0; c.frames = 0;
-    }
-    const now = performance.now();
-    if ((moving && now - r.lastSync >= 300) || (!moving && c.wasMoving)) {
-      r.lastSync = now;
-      if (distance(r.lastSent ?? initialPosition(state), r.position) > .02) sync({ ...r.position });
-    }
-    c.wasMoving = moving;
-  });
-  return <group ref={avatar} position={[runtime.current.position.x, 0, runtime.current.position.z]}>
-    <Player gait={gait} />
-  </group>;
 }
 
 /** Presentation-only world. Every interaction uses the frozen shared callbacks. */

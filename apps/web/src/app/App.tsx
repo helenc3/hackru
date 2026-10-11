@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
-import { CueIdSchema, NpcIdSchema, sceneManifest, type GameAction } from '@vibequest/shared';
+import { NpcIdSchema, type GameAction } from '@vibequest/shared';
 import { WorldRenderer } from '../world/WorldRenderer';
 import { AudioController } from '../audio/AudioController';
 import { StartPanel } from '../ui/StartPanel';
@@ -10,18 +10,17 @@ import { ResultPanel } from '../ui/ResultPanel';
 import { RecoveryPanel } from '../ui/RecoveryPanel';
 import { CoachPanel } from '../ui/CoachPanel';
 import { BootstrapPreview } from './BootstrapPreview';
+import { WorldInteractions } from '../ui/WorldInteractions';
+import { useApiHealth } from './use-api-health';
 import { useSession } from './use-session';
 import './game.css';
 
 const ValidationHarness = import.meta.env.DEV && import.meta.env.VITE_ENABLE_VALIDATION_HARNESS === 'true'
   ? lazy(() => import('../validation/ValidationHarness').then((module) => ({ default: module.ValidationHarness }))) : null;
 const validationRequested = window.location.pathname === '/__validation';
-type Health = { buildId: string; providers: { geminiConfigured: boolean; elevenlabsConfigured: boolean }; features: { fixtures: boolean; validationHarness: boolean }; segments?: { engine?: string } };
 
 export function App() {
-  const [health, setHealth] = useState<Health | null>(null);
-  const [healthProblem, setHealthProblem] = useState('');
-  const [healthRefresh, setHealthRefresh] = useState(0);
+  const { health, healthProblem, retryHealth } = useApiHealth();
   const validation = Boolean(ValidationHarness && validationRequested && health?.features.validationHarness);
   const session = useSession(validationRequested);
   const [npc, setNpc] = useState<string | null>(null);
@@ -45,18 +44,6 @@ export function App() {
     return () => document.removeEventListener('keydown', close);
   }, [sign, closeSignPanel]);
 
-  useEffect(() => {
-    let disposed = false;
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 8000);
-    void fetch('/api/health', { signal: controller.signal }).then(async (response) => {
-      if (!response.ok) throw new Error('The API is unavailable.');
-      const body = await response.json() as Partial<Health>;
-      if (!body.features || typeof body.features.fixtures !== 'boolean' || typeof body.features.validationHarness !== 'boolean' || !body.providers || typeof body.providers.geminiConfigured !== 'boolean' || typeof body.providers.elevenlabsConfigured !== 'boolean') throw new Error('The API health response is invalid.');
-      setHealth(body as Health); setHealthProblem('');
-    }).catch(() => { if (disposed) return; if (!controller.signal.aborted) setHealthProblem('The API could not be reached.'); else setHealthProblem('The API check timed out.'); }).finally(() => clearTimeout(timeout));
-    return () => { disposed = true; controller.abort(); clearTimeout(timeout); };
-  }, [healthRefresh]);
 
   useEffect(() => { setNpc(null); setSign(null); setPaused(false); setNotice(''); }, [session.state?.sessionId, session.state?.missionId, session.state?.status]);
   const closeConversation = useCallback(() => setNpc(null), []);
@@ -80,7 +67,7 @@ export function App() {
   if (validationRequested && health && !validation) return <main className="validation-denied"><h1>Internal validation is unavailable.</h1><p>This entry requires a development build and server validation configuration.</p><a href="/">Return to the game</a></main>;
   const starter = <><StartPanel validation={validation} fixtures={health?.features.fixtures ?? false} pending={session.pending || !health || validationRequested && !validation} resumeId={session.resumeId} onStart={session.start} onContinue={session.refresh} />
     <RecoveryPanel problem={session.problem} pending={session.pending} onRetry={session.retry} onRefresh={session.refresh} onNew={session.abandon} onDismiss={session.dismiss} />
-    {healthProblem && <aside role="alert" className="recovery-panel">{healthProblem}<button className="button secondary" onClick={() => setHealthRefresh((count) => count + 1)}>Retry API connection</button></aside>}
+    {healthProblem && <aside role="alert" className="recovery-panel">{healthProblem}<button className="button secondary" onClick={retryHealth}>Retry API connection</button></aside>}
   </>;
 
   if (!session.state) {
@@ -90,12 +77,6 @@ export function App() {
 
   const state = session.state;
   const selectedCue = state.visibleCues.find((cue) => cue.id === sign);
-  const available = state.interactables.filter((item) => sceneManifest.interactables.find((target) => target.id === item.id)?.zoneId === state.zoneId);
-  // These affordances reflect server-published interactions. The server owns proximity and guards.
-  const choices = available.filter((item) => item.kind === 'choice');
-  const signs = available.filter((item) => item.kind === 'sign');
-  const broadcasts = available.filter((item) => item.kind === 'pa');
-  const speakers = available.filter((item) => item.kind === 'npc');
 
   return <div className="game-shell" data-testid="game-shell" data-dialogue-open={Boolean(npc)}>
     <header className="game-topbar"><a className="brand" href="#world">VibeQuest<span className="brand-dot">.</span></a><span className="language-chip"><span lang="zh-Hans">中文</span>Mandarin Chinese</span><span>{state.mode === 'boss' ? 'Boss mission' : 'Practice'} · {state.zoneId}</span>{state.status === 'active' && <button className="button secondary" disabled={session.pending && !session.turnPending} onClick={() => void onAction({ type: 'retryMission' }).catch(() => undefined)}>Restart mission</button>}<button className="button secondary" disabled={session.pending} onClick={() => { closeConversation(); session.abandon(); }}>Leave session</button></header>
@@ -104,12 +85,7 @@ export function App() {
       <InventoryBar state={state} pending={session.pending} paused={paused} onAction={onAction} onPause={() => void onAction({ type: paused ? 'resumePractice' : 'pausePractice' }).catch(() => undefined)} />
       {selectedCue?.text && <section className="sign-overlay" role="dialog" aria-label="Inspected sign"><button ref={signClose} className="button secondary" onClick={closeSignPanel} aria-label="Close sign">Close</button><h3 lang="zh-Hans">{selectedCue.label}</h3><p lang="zh-Hans">{selectedCue.text}</p></section>}
       <AudioController state={state} onAction={onAction} speechId={session.turn?.speechId} />
-      <section className="interaction-dock" aria-label="World interactions"><h2>Look, listen, speak, act.</h2><p>Approach an interaction in the world. The server checks your location and mission prerequisites.</p><div>
-        {speakers.map((item) => <button className="button secondary" key={item.id} disabled={session.pending || state.status !== 'active'} onClick={() => onTalk(item.id)}><span lang="zh-Hans">{item.label}</span> · Talk</button>)}
-        {signs.map((item) => <button className="button secondary" key={item.id} disabled={session.pending || state.status !== 'active'} onClick={() => void onAction({ type: 'inspect', targetId: item.id }).catch(() => undefined)}><span lang="zh-Hans">{item.label}</span> · Read sign</button>)}
-        {broadcasts.map((item) => <div className="cue-actions" key={item.id}><span lang="zh-Hans">{item.label}</span><button className="button secondary" disabled={session.pending || state.status !== 'active'} onClick={() => void onAction({ type: 'playCue', cueId: CueIdSchema.parse(item.id), channel: 'audio' }).catch(() => undefined)}>Listen</button><button className="button secondary" disabled={session.pending || state.status !== 'active'} onClick={() => void onAction({ type: 'playCue', cueId: CueIdSchema.parse(item.id), channel: 'subtitles' }).then(() => setSign(item.id)).catch(() => undefined)}>Chinese subtitles</button></div>)}
-      </div></section>
-      {state.status === 'active' && <section className="choice-dock" aria-label="Mission actions">{choices.map((item) => <button className="button secondary" key={item.id} disabled={session.pending} onClick={() => void onAction({ type: 'choose', choiceId: item.id as Extract<GameAction, { type: 'choose' }>['choiceId'] }).catch(() => undefined)} lang="zh-Hans">{item.label}</button>)}</section>}
+      <WorldInteractions state={state} pending={session.pending} onAction={onAction} onTalk={onTalk} onShowSubtitles={setSign} />
     </div><QuestPanel state={state} /></div>
     <RecoveryPanel problem={session.problem} pending={session.pending} onRetry={session.retry} onRefresh={session.refresh} onNew={session.abandon} onDismiss={session.dismiss} />
     {notice && <div className="action-notice" role="status">{notice}</div>}

@@ -23,4 +23,4 @@ This kit specifies automatic merging of an in-scope segment when the repository'
 
 Run `python3 validate_kit.py` to check packet completeness, links, and the dependency graph. This validates the planning kit; the game's checks are implemented in Segment-000 and exercised by subsequent segments.
 
-Version 1.2 supersedes the earlier Spanish/text-edition plan and the older `linguaquest_master_prompt.md` reference. Segment numbers remain stable; 003 owns integrated UI plus internal validation, 005 owns the entire required spoken loop, and 009 is optional pacing polish. Use the current packets and merged completion records rather than cached earlier instructions.
+Version 1.2 supersedes the earlier Spanish/text-edition plan. Segment numbers remain stable; 003 owns integrated UI plus internal validation, 005 owns the entire required spoken loop, and 009 is optional pacing polish. Use the current packets and merged completion records rather than cached earlier instructions.

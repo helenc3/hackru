@@ -6,9 +6,9 @@ import { loadConfig } from '../apps/server/src/config.js';
 import { createElevenLabsSpeechProvider, DEFAULT_VOICE_IDS, voiceFor, mp3DurationMs } from '../apps/server/src/providers/elevenlabs/live.js';
 
 const lines: Record<NpcId, { text: string; terms: string[] }> = {
-  xiaolin: { text: '好的，一杯茶，十元。', terms: ['茶', '十'] },
-  achen: { text: '去江滨的车在三号站台。', terms: ['江滨', '三号'] },
-  laozhou: { text: '一张去海港的票，十五元。', terms: ['海港', '十五'] },
+  xiaolin: { text: '一杯茶十元，两杯咖啡三十元。请确认饮料和价格。', terms: ['茶', '十元|10元', '咖啡', '三十元|30元'] },
+  achen: { text: '请到第二号站台。去江滨的车在三号站台。', terms: ['第二号站台', '江滨', '三号'] },
+  laozhou: { text: '一张去海港的票，十五元。两张三十元。', terms: ['海港', '十五元|15元', '三十元|30元'] },
 };
 
 const config = loadConfig(process.env);
@@ -37,7 +37,8 @@ for (const npc of Object.keys(lines) as NpcId[]) {
   started = Date.now();
   try {
     const heard = await speech.transcribe(audio, 'audio/mpeg');
-    const kept = terms.filter((term) => heard.includes(term));
+    // Scribe may format spoken Chinese numerals as digits; accept equivalent fixture spellings.
+    const kept = terms.filter((term) => term.split('|').some((spelling) => heard.includes(spelling)));
     console.log(`PASS tts ${label}: ${audio.length} bytes ~${mp3DurationMs(audio)}ms audio, ${ttsMs}ms`);
     console.log(`${kept.length === terms.length ? 'PASS' : 'WARN'} stt ${npc}: "${heard}" (sent "${text}") terms ${kept.length}/${terms.length} ${Date.now() - started}ms`);
   } catch (error) {

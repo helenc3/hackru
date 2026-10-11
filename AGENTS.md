@@ -16,6 +16,7 @@ If the segment is complete on remote `main`, verify its completion record and do
 ## Product invariants
 
 - Mandarin Chinese target language, Simplified Chinese world text and standard Mandarin audio; English instructions; single-player desktop browser.
+- Character voice assignments must use only the human-approved ElevenLabs IDs in [docs/MANDARIN_VOICES.md](docs/MANDARIN_VOICES.md). Pass Simplified Chinese Hanzi directly to synthesis; do not convert to pinyin or IPA. Other catalog voices remain untested; Anna Su “Casual, Friendly and Bright” was explicitly rejected.
 - Three authored missions: café practice, platform-change practice, connection boss.
 - One coherent third-person player experience combines reading, spoken directions/conversation, and world actions. The developer text harness validates the same engine but is not a selectable game mode.
 - Microphone capture, Mandarin STT, Gemini NPC response, and Mandarin speech playback are core Segment-005 requirements. Typed/subtitle accessibility stays within the same world.

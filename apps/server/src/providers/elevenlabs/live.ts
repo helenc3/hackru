@@ -3,14 +3,21 @@ import type { NpcId, SpeechProvider } from '@vibequest/shared';
 import { HttpError } from '../../errors.js';
 
 /**
- * Premade multilingual voices used when ELEVENLABS_VOICE_<NPC> is unset. Mandarin comes from the
- * multilingual model, not the voice; override per NPC once the team has reviewed voices.
+ * Human-approved Mandarin assignments; see docs/MANDARIN_VOICES.md.
+ * Send authored Hanzi directly; do not convert dialogue to pinyin or IPA.
  */
+export const APPROVED_VOICE_IDS = new Set([
+  'hZTuv9Zqrq4yHYrEmF1r', 'agczkAUlHLowaNnL72Cc', 'r6qgCCGI7RWKXCagm158',
+  'Ca5bKgudqKJzq8YRFoAz', 'MI36FIkp9wRP7cpWKPTl', 'pU9NaAwkoR3v0Mrg3uKz',
+  '4VZIsMPtgggwNg7OXbPY', 'DowyQ68vDpgFYdWVGjc3', '5mZxJZhSmJTjL7GoYfYI',
+]);
+
 export const DEFAULT_VOICE_IDS: Record<NpcId, string> = {
-  xiaolin: 'EXAVITQu4vr4xnSDxMaL', // Sarah: warm female café owner
-  achen: 'IKne3meq5aSn9XLyUdCD', // Charlie: matter-of-fact station worker
-  laozhou: 'onwK4e9ZLuTAKqWW03F9', // Daniel: formal ticket agent
+  xiaolin: 'Ca5bKgudqKJzq8YRFoAz', // Coco Li: calm, young café owner
+  achen: '4VZIsMPtgggwNg7OXbPY', // James Gao: friendly station worker
+  laozhou: 'hZTuv9Zqrq4yHYrEmF1r', // Adam Li: deep, steady ticket agent
 };
+export const DEFAULT_PA_VOICE_ID = 'agczkAUlHLowaNnL72Cc'; // Adrian: Mandarin narration
 
 export const MAX_CLIP_BYTES = 3 * 1024 * 1024;
 const MAX_REPLY_CHARS = 80;
@@ -29,7 +36,9 @@ const transcriptionUnavailable = () => new HttpError(503, 'TRANSCRIPTION_UNAVAIL
 
 export function voiceFor(voiceIds: ElevenLabsSpeechOptions['voiceIds'], voiceKey: string): string {
   if (!(voiceKey in DEFAULT_VOICE_IDS)) throw new HttpError(422, 'UNKNOWN_VOICE', 'Unknown NPC voice.');
-  return voiceIds[voiceKey as NpcId] ?? DEFAULT_VOICE_IDS[voiceKey as NpcId];
+  const voiceId = voiceIds[voiceKey as NpcId] ?? DEFAULT_VOICE_IDS[voiceKey as NpcId];
+  if (!APPROVED_VOICE_IDS.has(voiceId)) throw new HttpError(422, 'UNAPPROVED_VOICE', 'Choose a human-approved Mandarin voice.');
+  return voiceId;
 }
 
 export function createElevenLabsSpeechProvider(options: ElevenLabsSpeechOptions): SpeechProvider {

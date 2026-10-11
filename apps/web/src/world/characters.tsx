@@ -1,6 +1,6 @@
 import { useRef, type ReactNode, type RefObject } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { MathUtils, type EulerOrder, type Group, type Mesh } from 'three';
+import { MathUtils, Matrix4, type EulerOrder, type Group, type Mesh } from 'three';
 import type { Position } from '@vibequest/shared';
 import { Toon, candy, INK, useReducedMotion } from './toon';
 
@@ -50,6 +50,27 @@ function useRig() {
 }
 type RigRefs = ReturnType<typeof useRig>;
 
+const footTransform = new Matrix4();
+/** Lift the posed rig just enough to keep both capsule soles above the .05-high floors. */
+function groundFeet(r: RigRefs) {
+  const squash = r.squash.current, body = r.body.current;
+  if (!squash || !body) return;
+  squash.position.y = 0;
+  squash.updateMatrix(); body.updateMatrix();
+  let lowest = Infinity;
+  for (const leg of [r.legL.current, r.legR.current]) {
+    if (!leg) continue;
+    leg.updateMatrix();
+    footTransform.copy(squash.matrix).multiply(body.matrix).multiply(leg.matrix);
+    const e = footTransform.elements;
+    // Capsule center is -.2, its straight section is .14, and its radius is .1.
+    // The Y-row norm also accounts for nonuniform squash and body/leg rotations.
+    const radiusY = .1 * Math.hypot(e[1], e[5], e[9]);
+    lowest = Math.min(lowest, e[13] - .2 * e[5] - .07 * Math.abs(e[5]) - radiusY);
+  }
+  if (Number.isFinite(lowest)) squash.position.y = Math.max(0, .065 - lowest);
+}
+
 /** Common per-frame pose: bob, squash about the feet, shadow shrink, blink. */
 function base(r: RigRefs, bob: number, sq: number, blink: number) {
   r.squash.current?.scale.set(1 / Math.sqrt(sq), sq, 1 / Math.sqrt(sq));
@@ -71,6 +92,7 @@ function rest(r: RigRefs) {
   r.legR.current?.rotation.set(0, 0, 0);
   r.armL.current?.rotation.set(0, 0, ARM_Z);
   r.armR.current?.rotation.set(0, 0, -ARM_Z);
+  groundFeet(r);
 }
 
 function Eye({ side, eye }: { side: 1 | -1; eye: RefObject<Group | null> }) {
@@ -198,6 +220,7 @@ export function Player({ gait }: { gait: RefObject<Gait> }) {
     r.head.current?.position.setY(HEAD_Y + (s.head.x - bob) * .8);
     r.head.current?.rotation.set(-.05 * m, 0, -tilt * .6);
     r.hair.current?.rotation.set(-s.hair.x, 0, tilt * .8);
+    groundFeet(r);
   });
   return <Rig r={r} look={PLAYER_LOOK} />;
 }
@@ -257,6 +280,7 @@ export function Npc({ id, index, look, offset }: { id: 'xiaolin' | 'achen' | 'la
     r.armL.current?.rotation.set(0, 0, ARM_Z);
     r.head.current?.position.setY(HEAD_Y);
     r.head.current?.rotation.set(nod, s.headYaw, tilt);
+    groundFeet(r);
   });
   return <Rig r={r} look={NPC_LOOKS[id] ?? VILLAGER} />;
 }

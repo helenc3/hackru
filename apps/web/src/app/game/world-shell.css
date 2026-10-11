@@ -44,12 +44,77 @@
   background: repeating-linear-gradient(135deg, var(--lemon) 0 10px, #ffdb85 10px 20px);
 }
 
-.game-topbar .environment-banner + .button, .game-topbar > .button:first-of-type {
+.topbar-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   margin-left: auto;
 }
 
-.game-topbar .environment-banner ~ .button {
-  margin-left: 0;
+.game-topbar .topbar-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  padding: 6px;
+}
+
+.topbar-icon svg {
+  width: 20px;
+  height: 20px;
+}
+
+.game-settings {
+  position: relative;
+}
+
+.settings-cog {
+  transform-box: fill-box;
+  transform-origin: center;
+  transition: transform .4s cubic-bezier(.22, 1, .36, 1);
+}
+
+.game-settings summary {
+  list-style: none;
+}
+
+.game-settings summary::-webkit-details-marker {
+  display: none;
+}
+
+.game-settings summary:focus-visible {
+  outline: 3px solid var(--plum);
+  outline-offset: 3px;
+}
+
+.settings-popover {
+  position: absolute;
+  top: calc(100% + 12px);
+  right: 0;
+  z-index: 25;
+  width: 300px;
+  max-width: calc(100vw - 40px);
+  padding: 16px;
+  background: var(--cream);
+  border: var(--outline);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sticker);
+}
+
+.settings-popover h2 {
+  margin: 0 0 10px;
+  font-size: 16px;
+}
+
+.settings-popover .audio-status {
+  margin: 0;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.settings-popover .audio-status [role=status] {
+  flex: 1 1 80%;
 }
 
 .game-main {

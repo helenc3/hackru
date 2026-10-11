@@ -24,6 +24,7 @@ export function App() {
   const validation = Boolean(ValidationHarness && validationRequested && health?.features.validationHarness);
   const session = useSession(validationRequested);
   const [npc, setNpc] = useState<string | null>(null);
+  const [settingsRotation, setSettingsRotation] = useState(0);
   const [paused, setPaused] = useState(false);
   const [sign, setSign] = useState<string | null>(null);
   const signClose = useRef<HTMLButtonElement>(null);
@@ -80,7 +81,25 @@ export function App() {
   const npcChoices = here ? state.interactables.filter((item) => item.kind === 'choice' && Math.hypot(item.position.x - here.x, item.position.z - here.z) <= sceneManifest.interactionRadius) : [];
 
   return <div className="game-shell" data-testid="game-shell" data-dialogue-open={Boolean(npc)}>
-    <header className="game-topbar"><a className="brand" href="#world">VibeQuest<span className="brand-dot">.</span></a><span className="language-chip"><span lang="zh-Hans">中文</span>Mandarin Chinese</span><span>{state.mode === 'boss' ? 'Boss mission' : 'Practice'} · {state.zoneId}</span>{state.validationMode ? <span className="environment-banner">Developer validation · all XP, loot and badges are simulated. Progress stays separate from player sessions.</span> : state.providerStatus !== 'live' ? <span className="environment-banner">{state.providerStatus === 'fixture' ? 'Fixture demonstration · scripted responses' : 'Voice or AI service is degraded · retry or use the same-world fallback.'}</span> : null}{state.status === 'active' && <button className="button secondary" disabled={session.pending && !session.turnPending} onClick={() => void onAction({ type: 'retryMission' }).catch(() => undefined)}>Restart mission</button>}<button className="button secondary" disabled={session.pending} onClick={() => { closeConversation(); session.abandon(); }}>Leave session</button></header>
+    <header className="game-topbar"><a className="brand" href="#world">VibeQuest<span className="brand-dot">.</span></a><span>{state.mode === 'boss' ? 'Boss mission' : 'Practice'} · {state.zoneId}</span>{state.validationMode ? <span className="environment-banner">Developer validation · all XP, loot and badges are simulated. Progress stays separate from player sessions.</span> : state.providerStatus !== 'live' ? <span className="environment-banner">{state.providerStatus === 'fixture' ? 'Fixture demonstration · scripted responses' : 'Voice or AI service is degraded · retry or use the same-world fallback.'}</span> : null}<div className="topbar-controls">
+      {!state.validationMode && <BackgroundMusic active={state.status === 'active' && !paused} conversation={Boolean(npc)} />}
+      <details className="game-settings" onKeyDown={(event) => {
+        if (event.key === 'Escape') {
+          event.preventDefault(); event.stopPropagation(); event.currentTarget.open = false;
+          event.currentTarget.querySelector('summary')?.focus();
+        }
+      }}>
+        <summary className="button secondary topbar-icon" aria-label="Settings" title="Settings" onClick={() => setSettingsRotation((rotation) => rotation + 90)}>
+          <svg className="settings-cog" style={{ transform: `rotate(${settingsRotation}deg)` }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <g transform="translate(1.5 .5)">
+              <path d="m9 3-.6 2.4-2 .9L4.2 6 2.7 8.6l1.6 1.8v2.3l-1.6 1.8L4.2 17l2.2-.3 2 .9L9 20h3l.6-2.4 2-.9 2.2.3 1.5-2.5-1.6-1.8v-2.3l1.6-1.8L16.8 6l-2.2.3-2-.9L12 3Z" />
+              <circle cx="10.5" cy="11.5" r="3" />
+            </g>
+          </svg>
+        </summary>
+        <div className="settings-popover"><h2>Audio settings</h2><AudioController state={state} onAction={onAction} speechId={session.turn?.speechId} /></div>
+      </details>
+      {state.status === 'active' && <button className="button secondary" disabled={session.pending && !session.turnPending} onClick={() => void onAction({ type: 'retryMission' }).catch(() => undefined)}>Restart mission</button>}</div></header>
     <main className="game-main">
       <div className="game-world" id="world"><WorldRenderer key={attempt} state={state} onAction={onAction} onTalk={onTalk} /></div>
       <QuestPanel state={state} />
@@ -88,13 +107,8 @@ export function App() {
         <WorldInteractions state={state} pending={session.pending} onAction={onAction} onTalk={onTalk} onShowSubtitles={setSign} />
         <InventoryBar state={state} pending={session.pending} paused={paused} onAction={onAction} onPause={() => void onAction({ type: paused ? 'resumePractice' : 'pausePractice' }).catch(() => undefined)} />
       </div>
-      <div className="hud-bottom-right">
-      {!state.validationMode && <div className="hud-music"><BackgroundMusic active={state.status === 'active' && !paused} conversation={Boolean(npc)} /></div>}
-      <footer className="session-footer">{state.validationMode ? 'Validation session' : 'Player session'} · {state.sessionId} · Version {state.version}<button className="button secondary" disabled={session.pending} onClick={() => void session.refresh().catch(() => undefined)}>Refresh session</button></footer>
-      <AudioController state={state} onAction={onAction} speechId={session.turn?.speechId} />
-      </div>
       {selectedCue?.text && <section className="sign-overlay" role="dialog" aria-label="Inspected sign"><button ref={signClose} className="button secondary" onClick={closeSignPanel} aria-label="Close sign">Close</button><h3 lang="zh-Hans">{selectedCue.label}</h3><p lang="zh-Hans">{selectedCue.text}</p></section>}
-      <RecoveryPanel problem={session.problem} pending={session.pending} onRetry={session.retry} onRefresh={session.refresh} onNew={session.abandon} onDismiss={session.dismiss} />
+      <RecoveryPanel problem={session.problem} pending={session.pending} state={state} onRetry={session.retry} onRefresh={session.refresh} onNew={session.abandon} onDismiss={session.dismiss} />
       {notice && <div className="action-notice" role="status">{notice}</div>}
       {session.events.length > 0 && <section className="event-feed" aria-label="Mission updates" aria-live="polite">{session.events.slice(-3).map((event) => <p key={event.id}>{event.message}</p>)}</section>}
       {paused && !npc && state.status === 'active' && <CoachPanel state={state} turn={session.turn} />}

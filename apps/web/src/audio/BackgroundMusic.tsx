@@ -69,8 +69,12 @@ export function BackgroundMusic({ active, conversation }: { active: boolean; con
     first.current = false;
   }, [ready, active, conversation, activity, muted]);
 
-  return <button type="button" className="button secondary" aria-pressed={muted}
+  const label = failed ? 'Retry music' : !ready ? 'Enable music' : muted ? 'Unmute music' : 'Mute music';
+  return <button type="button" className="button secondary topbar-icon" aria-label={label} title={label} aria-pressed={muted}
     onClick={() => { if (!ready) retry.current?.(); else setMuted((value) => !value); }}>
-    {failed ? 'Retry music' : !ready ? 'Enable music' : muted ? 'Unmute music' : 'Mute music'}
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M9 18V5l11-2v13M9 8l11-2" /><ellipse cx="6" cy="18" rx="3" ry="2" /><ellipse cx="17" cy="16" rx="3" ry="2" />
+      {muted && <path d="m3 3 18 18" />}
+    </svg>
   </button>;
 }

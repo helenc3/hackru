@@ -7,7 +7,6 @@ import { candy, INK, Toon, useReducedMotion } from './toon';
 
 /** Purely decorative, non-colliding scenery. Nothing here touches gameplay state. */
 type Vec3 = [number, number, number];
-type Look = React.RefObject<{ position: Position }>;
 /** [x, y, z, scaleX, scaleY, scaleZ, rotX, rotY, rotZ] — unit geometry, scaled per instance. */
 type Place = readonly number[];
 
@@ -26,9 +25,9 @@ function compose(p: Place, out: Matrix4) {
  * One instanced draw (+ one outline draw) for many same-material pieces. `tints` gives per-instance
  * colors; `sway` ([pivotX, pivotY, pivotZ, phase] per item) gives a slow ±.03 rad canopy rock at 0.35 Hz.
  */
-function Batch({ items, color = '#ffffff', tints, outline = true, thickness, sway, still, children }: {
+function Batch({ items, color = '#ffffff', tints, outline = true, thickness, sway, still, clearView, children }: {
   items: readonly Place[]; color?: string; tints?: readonly string[]; outline?: boolean; thickness?: number;
-  sway?: readonly Place[]; still?: boolean; children: ReactNode;
+  sway?: readonly Place[]; still?: boolean; clearView?: 'fade' | 'solid'; children: ReactNode;
 }) {
   const ref = useRef<InstancedMesh>(null);
   useLayoutEffect(() => {
@@ -53,23 +52,7 @@ function Batch({ items, color = '#ffffff', tints, outline = true, thickness, swa
     });
     m.instanceMatrix.needsUpdate = true;
   });
-  return <instancedMesh ref={ref} args={[undefined, undefined, items.length]}>{children}<Toon color={color} outline={outline} thickness={thickness} /></instancedMesh>;
-}
-
-/** Hides overhead roofs while they sit between the camera and the player, so cover never hides the avatar. */
-function useClearView(group: React.RefObject<Group | null>, player: Look, b: { minX: number; maxX: number; minZ: number; maxZ: number; minY: number; maxY: number }) {
-  useFrame(({ camera }) => {
-    const g = group.current;
-    if (!g) return;
-    const p = player.current.position, c = camera.position, body = 1;
-    const crosses = (y: number) => {
-      const t = (c.y - y) / (c.y - body);
-      if (!(t > 0 && t < 1)) return false;
-      const x = c.x + (p.x - c.x) * t, z = c.z + (p.z - c.z) * t;
-      return x > b.minX && x < b.maxX && z > b.minZ && z < b.maxZ;
-    };
-    g.visible = !(crosses(b.minY) || crosses(b.maxY));
-  });
+  return <instancedMesh ref={ref} userData={{ clearView }} args={[undefined, undefined, items.length]}>{children}<Toon color={color} outline={outline} thickness={thickness} /></instancedMesh>;
 }
 
 const skyStops = [0, .45, .75, 1];
@@ -121,7 +104,9 @@ export function Lantern({ at, drop = .4, phase, still }: { at: Vec3; drop?: numb
     const t = clock.elapsedTime + phase;
     swing.current.rotation.z = .08 * Math.sin(t * 1.6);
     swing.current.rotation.x = .05 * Math.sin(t * 1.1 + 1);
-    halo.current.opacity = .55 + .1 * Math.sin(t * 2.4);
+    const glow = .55 + .1 * Math.sin(t * 2.4);
+    halo.current.userData.clearViewOpacity = glow;
+    halo.current.opacity = glow * (halo.current.userData.clearViewFade ?? 1);
   });
   const rod = drop + .23;
   return <group ref={swing} position={at}>
@@ -148,16 +133,15 @@ const frames: Place[] = [
 const panes: Place[] = faces.flatMap(([, z]) => [[-12.6, 1.25, z, 1.2, .8, .06], [-7.4, 1.25, z, 1.2, .8, .06]]);
 const doors: Place[] = [...faces.map(([, z]) => [-10, .9, z, 1, 1.8, .06]), [-14.41, .9, 4, 1, 1.8, .06, 0, Math.PI / 2]];
 const signRods: Place[] = [[-10.75, 2.32, 8.78, .03, .16, .03], [-9.25, 2.32, 8.78, .03, .16, .03]];
-export function Cafe({ player, still }: { player: Look; still: boolean }) {
+export function Cafe({ still }: { still: boolean }) {
   const roof = useRef<Group>(null);
-  useClearView(roof, player, { minX: -15.6, maxX: -5.4, minZ: 1.2, maxZ: 9, minY: 1.8, maxY: 3.1 });
   return <>
-    <group ref={roof}>
+    <group ref={roof} userData={{ clearView: 'fade' }}>
       <mesh position={[-10.5, 2.575, 5.25]}><boxGeometry args={[9.6, .35, 7.1]} /><Toon color={candy.raspberry} thickness={3} /></mesh>
       <Batch items={eaves} color={candy.plum}><boxGeometry /></Batch>
       <Batch items={finials} color={candy.lemon}><coneGeometry args={[1, 1, 8]} /></Batch>
-      <mesh position={[-10, 2.06, 8.78]}><boxGeometry args={[1.9, .42, .1]} /><Toon color={candy.lemon} /></mesh>
-      <Batch items={signRods} color={INK} outline={false}><boxGeometry /></Batch>
+      <mesh position={[-10, 2.06, 8.78]} userData={{ clearView: 'solid' }}><boxGeometry args={[1.9, .42, .1]} /><Toon color={candy.lemon} /></mesh>
+      <Batch items={signRods} color={INK} outline={false} clearView="solid"><boxGeometry /></Batch>
       <Lantern at={[-15, 2.4, 1.85]} drop={.32} phase={0} still={still} />
       <Lantern at={[-6, 2.4, 1.85]} drop={.32} phase={1.3} still={still} />
     </group>
@@ -172,11 +156,10 @@ const stripeTints = stripes.map((_, i) => (i % 2 ? candy.cream : candy.raspberry
 const kioskPosts: Place[] = [[5.1, 1.15, 6.3, .1, 2.3, .1], [10.9, 1.15, 6.3, .1, 2.3, .1]];
 const goods: Place[] = [[5.9, 2.55, 7.25, .45, .3, .32], [6.9, 2.6, 7.25, .32, .4, .3], [8.1, 2.54, 7.25, .5, .28, .34], [9.2, 2.58, 7.25, .34, .36, .3], [10.2, 2.55, 7.25, .42, .3, .3]];
 const goodsTints = [candy.coral, candy.teal, candy.mint, candy.lime, candy.blossom];
-export function Kiosk({ player, still }: { player: Look; still: boolean }) {
+export function Kiosk({ still }: { still: boolean }) {
   const awning = useRef<Group>(null);
-  useClearView(awning, player, { minX: 4.8, maxX: 11.2, minZ: 5.9, maxZ: 7.1, minY: 1.7, maxY: 2.7 });
   return <>
-    <group ref={awning}>
+    <group ref={awning} userData={{ clearView: 'fade' }}>
       <Batch items={stripes} tints={stripeTints}><boxGeometry /></Batch>
       <Lantern at={[5.4, 2.3, 6.25]} drop={.32} phase={2.1} still={still} />
       <Lantern at={[10.6, 2.3, 6.25]} drop={.32} phase={3.4} still={still} />
@@ -194,14 +177,13 @@ const platformPosts: Place[] = platformXs.flatMap((x) => [
 const pylonBoards: Place[] = platformXs.map((x) => [x, 2.2, -16.5, 1.3, .55, .12]);
 // Wordless platform number: n ink dots on the board (the DOM labels carry the Chinese names).
 const pylonDots: Place[] = platformXs.flatMap((x, n) => Array.from({ length: n + 1 }, (_, i) => [x + (i - n / 2) * .3, 2.2, -16.42, .08, .08, .04]));
-function Canopy({ x, player }: { x: number; player: Look }) {
+function Canopy({ x }: { x: number }) {
   const roof = useRef<Group>(null);
-  useClearView(roof, player, { minX: x - 3.8, maxX: x + 3.8, minZ: -16.3, maxZ: -7.7, minY: 3, maxY: 3.4 });
-  return <group ref={roof}><mesh position={[x, 3.2, -12]}><boxGeometry args={[7.4, .2, 8.4]} /><Toon color={candy.teal} thickness={3} /></mesh></group>;
+  return <group ref={roof} userData={{ clearView: 'fade' }}><mesh position={[x, 3.2, -12]}><boxGeometry args={[7.4, .2, 8.4]} /><Toon color={candy.teal} thickness={3} /></mesh></group>;
 }
-export function Platforms({ player }: { player: Look }) {
+export function Platforms() {
   return <>
-    {platformXs.map((x) => <Canopy key={x} x={x} player={player} />)}
+    {platformXs.map((x) => <Canopy key={x} x={x} />)}
     <Batch items={platformPosts} color={candy.inkSoft}><boxGeometry /></Batch>
     <Batch items={pylonBoards} color={candy.lemon}><boxGeometry /></Batch>
     <Batch items={pylonDots} color={INK} outline={false}><sphereGeometry args={[1, 8, 6]} /></Batch>
@@ -219,33 +201,32 @@ export function LanternString({ still }: { still: boolean }) {
 
 const treeSpots = [[-18.6, 17.5], [18.6, 17.5], [-18.6, 3], [18.6, 3], [-18.6, -5], [18.6, -5]];
 const canopy = [[0, 2.7, 0, 1.15], [.75, 2.3, .35, .85], [-.7, 2.35, -.3, .9], [.1, 3.3, -.1, .8]];
-function treeParts(kind: number, parts: number[][]) {
-  const spots = treeSpots.map((spot, i) => [...spot, i]).filter((_, i) => i % 2 === kind);
-  return {
-    items: spots.flatMap(([x, z]) => parts.map(([dx, y, dz, r]) => [x + dx, y, z + dz, r, r, r])),
-    sway: spots.flatMap(([x, z, i]) => parts.map(() => [x, 1.8, z, i * 1.7])),
-  };
-}
-const blossom = treeParts(0, canopy), osmanthus = treeParts(1, canopy);
-const under = [[0, 1.95, .15, .95]];
-const blossomUnder = treeParts(0, under), osmanthusUnder = treeParts(1, under);
-const trunks: Place[] = treeSpots.map(([x, z]) => [x, 1, z, 1, 2, 1]);
-/** Cherry (pink) and osmanthus (gold) blobs on the outer edges, where nobody walks. */
-export function Trees({ still }: { still: boolean }) {
+/** Separate batches per tree let foreground foliage fade without fading the whole grove. */
+function Tree({ x, z, index, still }: { x: number; z: number; index: number; still: boolean }) {
+  const parts = useMemo(() => {
+    const make = (pieces: number[][]) => ({
+      items: pieces.map(([dx, y, dz, r]) => [x + dx, y, z + dz, r, r, r]),
+      sway: pieces.map(() => [x, 1.8, z, index * 1.7]),
+    });
+    return { canopy: make(canopy), under: make([[0, 1.95, .15, .95]]), trunk: [[x, 1, z, 1, 2, 1]] };
+  }, [x, z, index]);
   return <>
-    <Batch items={trunks} color={candy.bark}><cylinderGeometry args={[.18, .26, 1, 10]} /></Batch>
-    <Batch items={blossom.items} sway={blossom.sway} still={still} color={candy.blossom}><sphereGeometry args={[1, 14, 10]} /></Batch>
-    <Batch items={osmanthus.items} sway={osmanthus.sway} still={still} color={candy.osmanthus}><sphereGeometry args={[1, 14, 10]} /></Batch>
-    <Batch items={blossomUnder.items} sway={blossomUnder.sway} still={still} color="#e98bbd" outline={false}><sphereGeometry args={[1, 12, 8]} /></Batch>
-    <Batch items={osmanthusUnder.items} sway={osmanthusUnder.sway} still={still} color="#e8b64a" outline={false}><sphereGeometry args={[1, 12, 8]} /></Batch>
+    <Batch items={parts.trunk} color={candy.bark} clearView="solid"><cylinderGeometry args={[.18, .26, 1, 10]} /></Batch>
+    <group userData={{ clearView: 'fade' }}>
+      <Batch items={parts.canopy.items} sway={parts.canopy.sway} still={still} color={index % 2 ? candy.osmanthus : candy.blossom}><sphereGeometry args={[1, 14, 10]} /></Batch>
+      <Batch items={parts.under.items} sway={parts.under.sway} still={still} color={index % 2 ? '#e8b64a' : '#e98bbd'} outline={false}><sphereGeometry args={[1, 12, 8]} /></Batch>
+    </group>
   </>;
+}
+export function Trees({ still }: { still: boolean }) {
+  return <>{treeSpots.map(([x, z], index) => <Tree key={index} x={x} z={z} index={index} still={still} />)}</>;
 }
 
 /** Chunky ink post with a lemon board (sign) or a teal horn speaker (PA); same spot as before. */
 export function Sign({ target, phase, still }: { target: PublicState['interactables'][number]; phase: number; still: boolean }) {
   const head = useRef<Group>(null);
   useFrame(({ clock }) => { if (!still && head.current) head.current.rotation.y = .02 * Math.sin(clock.elapsedTime * 1.3 + phase); });
-  return <group position={[target.position.x, 0, target.position.z]}>
+  return <group position={[target.position.x, 0, target.position.z]} userData={{ clearView: 'solid' }}>
     <mesh position={[.6, .7, 0]}><boxGeometry args={[.14, 1.4, .14]} /><Toon color={candy.inkSoft} /></mesh>
     <group ref={head} position={[.6, 1.4, 0]}>
       {target.kind === 'sign'

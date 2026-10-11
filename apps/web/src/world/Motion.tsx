@@ -1,10 +1,11 @@
-import { useRef } from 'react';
+import { useEffect, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { Group, Vector3, Vector2, Raycaster, Plane } from 'three';
 import { sceneManifest, type Position, type PublicState } from '@vibequest/shared';
 import { distance, movePlayer, zoneAt } from './navigation';
 import { Player, type Gait } from './characters';
 import { initialPosition, type Runtime } from './runtime';
+import { useAudioActivity } from '../audio/audio-bus';
 
 export const landmarks = [
   { label: '广场', x: 0, z: 11 }, { label: '咖啡店', x: -10, z: 7.8 },
@@ -23,6 +24,22 @@ export function Motion({ runtime, root, labels, state, tick, sync }: {
   const projected = useRef(new Vector3());
   const ray = useRef(new Raycaster());
   const ground = useRef(new Plane(new Vector3(0, 1, 0), 0));
+  const activity = useAudioActivity();
+  const footsteps = useRef<HTMLAudioElement[]>([]);
+  const stride = useRef({ distance: 0, next: 0 });
+  useEffect(() => {
+    const clips = Array.from({ length: 5 }, (_, i) => {
+      const clip = new Audio(`/assets/audio/kenney/impact-sounds/Audio/footstep_concrete_00${i}.ogg`);
+      clip.preload = 'auto';
+      clip.volume = .25;
+      return clip;
+    });
+    footsteps.current = clips;
+    return () => {
+      footsteps.current = [];
+      for (const clip of clips) { clip.pause(); clip.removeAttribute('src'); clip.load(); }
+    };
+  }, []);
   useFrame(({ camera, size, gl }, delta) => {
     const r = runtime.current;
     const blocked = !r.active || r.busy || state.status !== 'active' || document.activeElement !== root.current || document.hidden;
@@ -49,6 +66,22 @@ export function Motion({ runtime, root, labels, state, tick, sync }: {
     }
     gait.current.moving = moving;
     gait.current.speed = Math.min(distance(previous, r.position) / Math.max(delta, 1e-4), 4.5);
+    const traveled = distance(previous, r.position);
+    if (blocked || traveled < .0001 || activity === 'recording') {
+      stride.current.distance = 0;
+      for (const clip of footsteps.current) if (!clip.paused) clip.pause();
+    } else {
+      stride.current.distance += traveled;
+      // Each half-cycle of the avatar's gait is one footfall.
+      const stepLength = Math.PI / 3.4;
+      if (stride.current.distance >= stepLength && footsteps.current.length) {
+        stride.current.distance %= stepLength;
+        const clip = footsteps.current[stride.current.next];
+        stride.current.next = (stride.current.next + 1) % footsteps.current.length;
+        clip.currentTime = 0;
+        void clip.play().catch(() => undefined);
+      }
+    }
     const pitch = r.pitch ?? Math.atan2(7.8, 9);
     const orbit = Math.hypot(7.8, 9);
     camera.position.set(r.position.x + Math.sin(r.yaw) * orbit * Math.cos(pitch), .7 + orbit * Math.sin(pitch), r.position.z + Math.cos(r.yaw) * orbit * Math.cos(pitch));

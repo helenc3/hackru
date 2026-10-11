@@ -132,6 +132,7 @@ test('reply audio waits for the job, plays once, and replay never renews its lif
   await page.evaluate(() => { (window as unknown as Record<string, boolean>).__holdPlayback = false; });
   await expect(controls).toContainText('Audio ready');
   expect(polls).toBe(2);
+  await page.getByLabel('Settings', { exact: true }).click();
   await controls.getByRole('button', { name: 'Replay' }).click();
   await expect.poll(() => counter(page, '__plays')).toBe(2);
   await expect(controls.getByRole('button', { name: 'Replay' })).toBeEnabled();

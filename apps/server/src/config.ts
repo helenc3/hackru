@@ -7,6 +7,7 @@ const booleanEnvironmentSchema = z
 
 const environmentSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
+  HOST: z.string().trim().min(1).default('127.0.0.1'),
   PORT: z.coerce.number().int().min(1).max(65535).optional(),
   GEMINI_API_KEY: z.string().trim().min(1).optional(),
   GEMINI_MODEL: z.string().trim().min(1).default('gemini-3.8-flash'),
@@ -55,7 +56,7 @@ export function loadConfig(environment: NodeJS.ProcessEnv = process.env): Server
   const env = parsed.data;
   return {
     nodeEnv: env.NODE_ENV,
-    host: '127.0.0.1',
+    host: env.HOST, // Hosted deployments set HOST=0.0.0.0; local default stays loopback.
     port: env.PORT ?? (env.NODE_ENV === 'production' ? 4173 : 3001),
     geminiApiKey: env.GEMINI_API_KEY,
     geminiModel: env.GEMINI_MODEL,

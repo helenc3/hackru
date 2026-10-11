@@ -35,11 +35,11 @@ describe('bootstrap API boundary', () => {
     const response = await request(createApp({ config })).get('/api/health').expect(200);
     expect(response.body).toEqual({
       status: 'ok',
-      buildId: 'segment-001',
+      buildId: 'segment-007',
       specVersion: '1.2',
       providers: { geminiConfigured: true, elevenlabsConfigured: true },
       features: { validationHarness: true, fixtures: true },
-      segments: { engine: 'implemented', dialogue: 'unimplemented', speech: 'unimplemented' },
+      segments: { engine: 'implemented', dialogue: 'live', speech: 'live' },
     });
     expect(response.text).not.toContain('test-gemini-secret');
     expect(response.text).not.toContain('test-elevenlabs-secret');

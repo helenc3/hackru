@@ -70,6 +70,7 @@ export function updateSkillsAfterAttempt(state: InternalState): InternalState {
     tracks: structuredClone(next.skills),
     strengths: tracks.filter((track) => units.some((unit) => unit.track === track && eligible(unit) && unit.score === 1)).map((track) => actions[track]),
     improvement: correction ? `Next time, ${challenges[correction.track]}.` : units.some((unit) => !eligible(unit)) ? 'Try the same decision independently before opening an example or subtitles.' : 'Keep connecting Mandarin cues to a concrete world action.',
+    nextPracticeMissionId: practiceId,
     nextPracticeReason: `${reason}${next.skills.listening.independentCount === 0 ? ' Listening is untested: try audio.' : ''}`,
     evidenceSummary: {
       spokenTurns: units.filter((unit) => unit.track === 'conversation' && unit.conversationSource === 'spoken').length,

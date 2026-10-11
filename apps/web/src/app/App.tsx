@@ -8,6 +8,7 @@ import { QuestPanel } from '../ui/QuestPanel';
 import { InventoryBar } from '../ui/InventoryBar';
 import { ResultPanel } from '../ui/ResultPanel';
 import { RecoveryPanel } from '../ui/RecoveryPanel';
+import { CoachPanel } from '../ui/CoachPanel';
 import { BootstrapPreview } from './BootstrapPreview';
 import { useSession } from './use-session';
 import './game.css';
@@ -28,6 +29,8 @@ export function App() {
   const [sign, setSign] = useState<string | null>(null);
   const signClose = useRef<HTMLButtonElement>(null);
   const [notice, setNotice] = useState('');
+  // The server resets position on a new attempt; remounting the world resets the client avatar to match.
+  const [attempt, setAttempt] = useState(0);
   const closeSignPanel = useCallback(() => {
     setSign(null);
     requestAnimationFrame(() => document.querySelector<HTMLElement>('[data-testid="world-renderer"]')?.focus());
@@ -61,7 +64,7 @@ export function App() {
   const onAction = useCallback(async (action: GameAction) => {
     try {
       await session.onAction(action);
-      if (action.type === 'retryMission' || action.type === 'startMission') { setNpc(null); setSign(null); }
+      if (action.type === 'retryMission' || action.type === 'startMission') { setNpc(null); setSign(null); setAttempt((count) => count + 1); }
       if (action.type === 'inspect') setSign(action.targetId);
       if (action.type === 'pausePractice') setPaused(true);
       if (action.type === 'resumePractice' || action.type === 'retryMission' || action.type === 'startMission') setPaused(false);
@@ -97,7 +100,7 @@ export function App() {
   return <div className="game-shell" data-testid="game-shell" data-dialogue-open={Boolean(npc)}>
     <header className="game-topbar"><a className="brand" href="#world">VibeQuest<span className="brand-dot">.</span></a><span className="language-chip"><span lang="zh-Hans">中文</span>Mandarin Chinese</span><span>{state.mode === 'boss' ? 'Boss mission' : 'Practice'} · {state.zoneId}</span>{state.status === 'active' && <button className="button secondary" disabled={session.pending && !session.turnPending} onClick={() => void onAction({ type: 'retryMission' }).catch(() => undefined)}>Restart mission</button>}<button className="button secondary" disabled={session.pending} onClick={() => { closeConversation(); session.abandon(); }}>Leave session</button></header>
     {state.validationMode ? <div className="environment-banner">Developer validation · all XP, loot and badges are simulated. Progress stays separate from player sessions.</div> : state.providerStatus !== 'live' ? <div className="environment-banner">{state.providerStatus === 'fixture' ? 'Fixture demonstration · scripted responses' : 'Voice or AI service is degraded · retry or use the same-world fallback.'}</div> : null}
-    <main className="game-main"><div className="game-layout"><div className="game-world" id="world"><WorldRenderer state={state} onAction={onAction} onTalk={onTalk} />
+    <main className="game-main"><div className="game-layout"><div className="game-world" id="world"><WorldRenderer key={attempt} state={state} onAction={onAction} onTalk={onTalk} />
       <InventoryBar state={state} pending={session.pending} paused={paused} onAction={onAction} onPause={() => void onAction({ type: paused ? 'resumePractice' : 'pausePractice' }).catch(() => undefined)} />
       {selectedCue?.text && <section className="sign-overlay" role="dialog" aria-label="Inspected sign"><button ref={signClose} className="button secondary" onClick={closeSignPanel} aria-label="Close sign">Close</button><h3 lang="zh-Hans">{selectedCue.label}</h3><p lang="zh-Hans">{selectedCue.text}</p></section>}
       <AudioController state={state} onAction={onAction} speechId={session.turn?.speechId} />
@@ -111,6 +114,7 @@ export function App() {
     <RecoveryPanel problem={session.problem} pending={session.pending} onRetry={session.retry} onRefresh={session.refresh} onNew={session.abandon} onDismiss={session.dismiss} />
     {notice && <div className="action-notice" role="status">{notice}</div>}
     {session.events.length > 0 && <section className="event-feed" aria-label="Mission updates" aria-live="polite">{session.events.slice(-3).map((event) => <p key={event.id}>{event.message}</p>)}</section>}
+    {paused && !npc && state.status === 'active' && <CoachPanel state={state} turn={session.turn} />}
     {npc && state.status === 'active' && <DialoguePanel key={`${state.sessionId}:${state.missionId}:${npc}`} state={state} npcId={npc} pending={session.pending} turn={session.turnNpc === npc ? session.turn : null} onAction={onAction} onSubmit={session.submit} onClose={closeConversation} />}
     <ResultPanel state={state} pending={session.pending} onAction={onAction} onExit={session.abandon} />
     {validation && state.validationMode && ValidationHarness && <Suspense fallback={<p>Loading internal validator…</p>}><ValidationHarness state={state} onAction={onAction} onTalk={onTalk} /></Suspense>}

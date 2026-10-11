@@ -13,7 +13,7 @@ export function ResultPanel({ state, pending, onAction, onExit }: { state: Publi
     <div className="result-actions">
       {state.status === 'cleared' && next && <button className="button primary" disabled={pending} onClick={() => void onAction({ type: 'startMission', missionId: next }).catch(() => undefined)}>{next === 'B1' ? 'Enter boss mission' : 'Next practice mission'}</button>}
       {state.status === 'failed' && <button className="button primary" disabled={pending} onClick={() => void onAction({ type: 'retryMission' }).catch(() => undefined)}>Retry mission</button>}
-      {state.status === 'failed' && state.mode === 'boss' && <button className="button secondary" disabled={pending} onClick={() => void onAction({ type: 'startMission', missionId: 'P2' }).catch(() => undefined)}>Return to practice</button>}
+      {state.status === 'failed' && state.mode === 'boss' && <button className="button secondary" disabled={pending} onClick={() => void onAction({ type: 'startMission', missionId: state.debrief?.nextPracticeMissionId ?? 'P2' }).catch(() => undefined)}>Return to practice</button>}
       <button className="button secondary" disabled={pending} onClick={onExit}>Return to start</button>
     </div>
   </section>;

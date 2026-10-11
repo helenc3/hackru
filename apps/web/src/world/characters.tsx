@@ -209,7 +209,8 @@ export function Player({ gait }: { gait: RefObject<Gait> }) {
     s.prevBob = bob;
     spring(s.sq, 1 + MathUtils.clamp(vy * .12, -.08, .08), dt, 220, 14);
     spring(s.head, bob, dt, 90, 12);
-    spring(s.hair, m * .45 + (bob - s.head.x) * 6, dt, 60, 7);
+    // Hair trails the head gently: small lean while walking, light bounce, well damped so it never flaps.
+    spring(s.hair, m * .18 + (bob - s.head.x) * 2.5, dt, 60, 11);
     base(r, bob, s.sq.x, stepBlink(s.blink, s.rng, dt));
     const tilt = Math.sin(s.phase) * .04 * m + Math.sin(s.t * 1.1) * .015 * (1 - m);
     r.body.current?.rotation.set(.12 * m, 0, tilt);
@@ -219,7 +220,7 @@ export function Player({ gait }: { gait: RefObject<Gait> }) {
     r.armR.current?.rotation.set(sw * .45, 0, -ARM_Z);
     r.head.current?.position.setY(HEAD_Y + (s.head.x - bob) * .8);
     r.head.current?.rotation.set(-.05 * m, 0, -tilt * .6);
-    r.hair.current?.rotation.set(-s.hair.x, 0, tilt * .8);
+    r.hair.current?.rotation.set(-s.hair.x, 0, tilt * .35);
     groundFeet(r);
   });
   return <Rig r={r} look={PLAYER_LOOK} />;

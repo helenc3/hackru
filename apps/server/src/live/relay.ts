@@ -37,9 +37,10 @@ export function createLiveBridge(options: {
   let inputText = '';
   let outputText = '';
   let lastOutput = '';
+  let outputs = 0;
   let closed = false;
   let waiters: ((text: string) => void)[] = [];
-  const completeOutput = (text: string) => { lastOutput = text; outputText = ''; for (const waiter of waiters) waiter(text); waiters = []; };
+  const completeOutput = (text: string) => { lastOutput = text; outputText = ''; outputs++; for (const waiter of waiters) waiter(text); waiters = []; };
   const nextOutput = () => new Promise<string | undefined>((resolve) => {
     const timer = setTimeout(() => resolve(undefined), REPLY_WAIT_MS);
     waiters.push((text) => { clearTimeout(timer); resolve(text); });
@@ -49,13 +50,15 @@ export function createLiveBridge(options: {
     // ponytail: the input buffer resets here; a transcription fragment arriving after the turn starts becomes its own utterance.
     const text = inputText.trim().slice(0, 500); inputText = '';
     if (!text) return;
+    const outputsBefore = outputs;
     options.send({ type: 'playerTranscript', text, final: true });
     const spokenReply = afterModelTurn ? () => Promise.resolve(lastOutput) : nextOutput;
     options.turn(text, spokenReply).then((turn) => {
       if (closed) return;
       options.send({ type: 'turn', turn });
       if (turn.conversationEnded) {
-        // Let the spoken goodbye finish (next completed model turn), else cap. ponytail: a goodbye already completed before the engine answered waits out the cap.
+        // The spoken goodbye already completed while the engine evaluated: close now. Otherwise let it finish (next completed model turn), else cap.
+        if (afterModelTurn || outputs > outputsBefore) { close('farewell'); return; }
         const timer = setTimeout(() => close('farewell'), FAREWELL_WAIT_MS);
         waiters.push(() => { clearTimeout(timer); close('farewell'); });
         return;

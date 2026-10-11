@@ -98,6 +98,6 @@ test('rapid developer location actions dispatch serially with fresh versions', a
     buttons.find((button) => button.textContent === 'concourse')!.click();
   });
   await expect.poll(() => api.requests.filter((request) => request.path.endsWith('/actions')).length).toBe(2);
-  await expect(page.locator('.session-footer')).toContainText('Version 2');
+  expect(api.state().version).toBe(2); // the topbar no longer shows the version; the scripted server tracks it
   expect(api.failures).toEqual([]);
 });

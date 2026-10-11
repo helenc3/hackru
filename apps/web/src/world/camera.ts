@@ -1,11 +1,15 @@
-/** Pointer angle around the canvas center; the center itself has no angle. */
-export function pointerAngle(x: number, y: number, bounds: { left: number; top: number; width: number; height: number }): number | null {
-  const dx = x - (bounds.left + bounds.width / 2);
-  const dy = y - (bounds.top + bounds.height / 2);
-  return Math.hypot(dx, dy) < 8 ? null : Math.atan2(dy, dx);
+export const PITCH_MIN = .25;
+export const PITCH_MAX = 1.35;
+/** Default tilt matches the original fixed camera (7.8 up, 9 back). */
+export const DEFAULT_PITCH = Math.atan2(7.8, 9);
+const DRAG_RADIANS_PER_PIXEL = .006;
+
+/** Standard orbit drag: horizontal motion turns around the player, vertical motion tilts. Dragging down lifts the camera. */
+export function dragOrbit(yaw: number, pitch: number, dx: number, dy: number): { yaw: number; pitch: number } {
+  return { yaw: yaw - dx * DRAG_RADIANS_PER_PIXEL, pitch: Math.max(PITCH_MIN, Math.min(PITCH_MAX, pitch + dy * DRAG_RADIANS_PER_PIXEL)) };
 }
 
-/** Shortest signed turn, including when crossing the atan2 ±π boundary. */
-export function angularDisplacement(previous: number, next: number): number {
-  return Math.atan2(Math.sin(next - previous), Math.cos(next - previous));
+/** The camera closes in as it drops toward the ground: 6 units at the lowest tilt, 15 at the highest. */
+export function orbitDistance(pitch: number): number {
+  return 6 + 9 * (pitch - PITCH_MIN) / (PITCH_MAX - PITCH_MIN);
 }

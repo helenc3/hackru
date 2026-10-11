@@ -1,0 +1,53 @@
+/* Welcome screen over a blurred, non-interactive world preview; mission results review, conversation card, intro controls. */
+.welcome-shell { position: relative; background: var(--sky, #dff1ff); }
+.world-preview { z-index: 0; pointer-events: none; filter: blur(5px) saturate(1.15); transform: scale(1.03); }
+.world-preview .district-nearby, .world-preview .world-note, .world-preview .world-caption, .world-preview .district-error, .world-preview .compatibility-screen { display: none; }
+.welcome-shell::after { content: ''; position: absolute; inset: 0; z-index: 0; pointer-events: none; background: linear-gradient(180deg, #fffdf5bb 0%, #fffdf588 50%, #fffdf533 100%); }
+.welcome-shell .welcome-screen { position: relative; z-index: 1; flex: 1; min-height: 0; overflow-y: auto; }
+
+.result-close { position: absolute; top: 12px; right: 12px; padding: 6px 10px; font-size: 12px; line-height: 1; }
+.result-objectives, .mission-progress { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 8px; font-size: 13px; }
+.result-objectives li, .mission-progress li { display: flex; align-items: center; gap: 8px; }
+.result-objectives input, .mission-progress input { pointer-events: none; width: 16px; height: 16px; accent-color: var(--mint); margin: 0; }
+.mission-progress { margin: 12px 0 10px; font-size: 12px; }
+.mission-progress li span { flex: 1; }
+.vocab-review { margin-top: 18px; padding: 14px 16px; background: var(--cream); border: var(--outline); border-radius: var(--radius-md); font-size: 13px; }
+.vocab-review h3 { margin: 0 0 6px; }
+.vocab-review p { margin: 0 0 8px; color: var(--text-muted); font-size: 12px; text-transform: capitalize; }
+.vocab-review dl { margin: 0; display: grid; gap: 6px; }
+.vocab-review dl > div { display: grid; grid-template-columns: minmax(90px, auto) 1fr; gap: 10px; padding: 4px 8px; border-radius: 8px; }
+.vocab-review dl > div[data-focus=true] { background: var(--lemon); font-weight: 700; }
+.vocab-review dt { font-size: 15px; white-space: pre-line; }
+.vocab-review dd { margin: 0; color: var(--text-muted); }
+.conversation-card { background: linear-gradient(180deg, #fff3fa 0%, #f4eeff 100%); border: var(--outline); border-radius: var(--radius-lg); box-shadow: var(--shadow-sticker); padding: 25px; animation: vq-pop .28s var(--bounce); }
+.conversation-card > .eyebrow { display: inline-block; color: var(--ink); background: var(--blossom); border: 2px solid var(--ink); border-radius: var(--radius-pill); padding: 3px 10px; }
+.conversation-card h2 { font-size: 26px; margin: 12px 0 4px; }
+.conversation-card > p { font-size: 13px; color: var(--text-muted); margin: 0; }
+.conversation-card .bubble { font-size: 16px; padding: 8px 12px; }
+.conversation-card h3 { font-size: 15px; margin: 18px 0 6px; }
+.conversation-card .coach-panel { margin-top: 14px; padding-top: 12px; }
+
+.intro-columns { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 28px; margin-top: 24px; }
+.intro-setup { min-width: 0; }
+.intro-setup fieldset { margin-top: 0; }
+.intro-setup .setup-row { align-items: flex-start; flex-direction: column; gap: 8px; }
+.intro-setup .setup-row p { margin: 0; }
+.intro-setup audio { max-width: 100%; margin-top: 12px; }
+.intro-controls { border-left: 2px solid var(--ink); padding-left: 28px; }
+.intro-controls h3 { margin: 0 0 6px; font-size: 20px; }
+.controls-list { display: grid; grid-template-columns: auto 1fr; gap: 8px 14px; margin: 14px 0 0; font-size: 13px; align-items: center; }
+.controls-list dt { justify-self: start; padding: 4px 10px; border: 2px solid var(--ink); border-radius: 8px; background: var(--lemon); font-weight: 800; font-size: 12px; box-shadow: 2px 2px 0 var(--ink); }
+.controls-list dd { margin: 0; color: var(--text-muted); font-weight: 600; }
+@media (max-width: 640px) {
+  .intro-columns { grid-template-columns: 1fr; }
+  .intro-controls { border-left: 0; border-top: 2px solid var(--ink); padding: 24px 0 0; }
+}
+
+/* Quest panel meta row lost its layout in the CSS refactor: tier and status must not run together. */
+.mission-meta { display: flex; justify-content: space-between; gap: 10px; font-size: 12px; color: var(--text-muted); }
+/* The server debrief sits below the actions as supporting detail; compact its inline sizing so the card leads with the summary. */
+.result-panel .skill-debrief { padding: 12px 16px !important; font-size: 13px !important; margin-top: 18px; border-top: 3px dashed var(--lavender); }
+.result-panel .skill-debrief h2 { font-size: 18px; margin: 4px 0 8px; }
+.result-panel .skill-debrief h3 { font-size: 14px; margin: 12px 0 6px; }
+/* Nearby prompts share the right column with the dialogue panel; the conversation owns that space while open. */
+.game-shell[data-dialogue-open="true"] .district-nearby { display: none; }

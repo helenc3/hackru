@@ -249,3 +249,64 @@ test('a goodbye turn closes the conversation by itself', async ({ page }) => {
   await expect(page.getByTestId('dialogue-panel')).toHaveCount(0);
   await expect(page.getByRole('button', { name: '小林 · Talk', exact: true })).toBeEnabled();
 });
+
+test('mission results card closes, reopens from the progress list, and offers Play again', async ({ page }) => {
+  const objectives = (complete: boolean) => [
+    { id: 'p1.communication', label: 'Read the sign and communicate in Mandarin.', complete },
+    { id: 'p1.arrival', label: 'Act on the directions to reach your destination.', complete },
+  ];
+  const skill = { mastery: 0.5, independentCount: 1 };
+  const debrief = {
+    tracks: { reading: skill, listening: { mastery: 0.4, independentCount: 0 }, conversation: skill, repair: skill },
+    strengths: ['Read a sign and acted on it.'], improvement: 'Next time, act on the announcement.', nextPracticeReason: 'Listening is untested: try audio.', nextPracticeMissionId: 'P2' as const,
+    evidenceSummary: { spokenTurns: 0, typedTurns: 1, editedTurns: 0, independentListening: 0, assistedListening: 0 },
+  };
+  // P1 has no timer, so the client does not poll: the scripted server clears the mission on the sign inspection.
+  const api = await installScriptedApi(page, { steps: [
+    { action: { type: 'inspect', targetId: 'p1.entrance-sign' }, patch: { status: 'cleared', objectives: objectives(true), debrief } },
+    { action: { type: 'startMission', missionId: 'P1' }, patch: { status: 'active', objectives: objectives(false), debrief: undefined } },
+  ] });
+  await start(page);
+  await page.getByRole('button', { name: '入口告示 · Read sign' }).click();
+  const result = page.getByTestId('result-panel');
+  await expect(result).toContainText('You found your way.');
+  await expect(result.getByRole('list', { name: 'Quest summary' }).getByRole('checkbox', { checked: true })).toHaveCount(2);
+  await expect(page.getByTestId('vocab-review')).toContainText('Vocab to study');
+  await expect(page.getByTestId('vocab-review')).toContainText('请从广场进入');
+  await result.getByRole('button', { name: 'Close results' }).click();
+  await expect(result).toHaveCount(0);
+  const progress = page.getByTestId('mission-progress');
+  await expect(progress.getByRole('checkbox', { name: 'Café detour cleared' })).toBeChecked();
+  await progress.getByRole('button', { name: 'Review Café detour' }).click();
+  await expect(result).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(result).toHaveCount(0);
+  await progress.getByRole('button', { name: 'Review Café detour' }).click();
+  await result.getByRole('button', { name: 'Play again' }).click();
+  await expect(result).toHaveCount(0);
+  const replay = api.requests.find((request) => request.path.endsWith('/actions') && (request.body as { action: { type: string } }).action.type === 'startMission');
+  expect(replay).toBeTruthy();
+  expect(api.failures).toEqual([]);
+});
+
+test('a goodbye ends the conversation and shows the summary card with the exchange', async ({ page }) => {
+  const api = await installScriptedApi(page, { steps: [{ text: '我要水。', reply: '好的。', feedback: true }, { text: '再见。', reply: '好的，再见！', end: true }] });
+  await start(page); const panel = await typedPanel(page);
+  await panel.getByRole('textbox').fill('我要水。'); await panel.getByRole('button', { name: 'Send Mandarin' }).click();
+  await expect(panel.getByTestId('npc-reply')).toContainText('好的。');
+  await panel.getByRole('textbox').fill('再见。'); await panel.getByRole('button', { name: 'Send Mandarin' }).click();
+  const card = page.getByTestId('conversation-card');
+  await expect(card).toContainText('CONVERSATION COMPLETE');
+  await expect(page.getByTestId('dialogue-panel')).toHaveCount(0);
+  await expect(card.locator('.chat-thread')).toContainText('好的，再见！');
+  await expect(card.getByRole('list', { name: 'Quest summary' }).getByRole('checkbox')).toHaveCount(2);
+  // A goodbye is final: the card offers no way back into the conversation.
+  await expect(card.getByRole('button', { name: 'Talk again' })).toHaveCount(0);
+  await card.getByRole('button', { name: 'Back to the world' }).click();
+  await expect(card).toHaveCount(0);
+  // Closing by hand is not a goodbye: no card.
+  await (await typedPanel(page)).getByRole('button', { name: 'Close conversation' }).click();
+  await expect(page.getByTestId('dialogue-panel')).toHaveCount(0);
+  await expect(card).toHaveCount(0);
+  expect(api.failures).toEqual([]);
+});

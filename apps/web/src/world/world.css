@@ -62,18 +62,18 @@
   pointer-events: none;
 }
 
-/* Above the HUD bars (z 6) and clear of them: a long audio status must never cover a target. */
+/* Right edge, vertically centered: the bottom band belongs to the docks and the centre column to sign/result overlays, all of which must stay clickable. */
 
 .district-nearby {
   position: absolute;
-  left: 50%;
-  bottom: 96px;
-  transform: translateX(-50%);
+  right: 20px;
+  top: 50%;
+  transform: translateY(-50%);
   display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
+  flex-direction: column;
+  align-items: flex-end;
   gap: 8px;
-  max-width: 44%;
+  max-width: 26%;
   z-index: 7;
 }
 

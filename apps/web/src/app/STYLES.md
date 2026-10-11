@@ -24,3 +24,5 @@ override files, duplicate conversation blocks, or intro breakpoints to migrate
 from the older refactor proposal. This refactor preserves existing selectors,
 values, animations, breakpoint membership, and import sites without adding a
 CSS framework or changing component classes.
+
+`game/mission-results.css` (welcome preview overlay, intro columns, mission results review, conversation card) is imported last in `game.css` on purpose: it overrides `panel-overlays.css` and `forms-start.css` and must stay at the end of the manifest.

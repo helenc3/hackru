@@ -88,13 +88,15 @@ test('live AI outage shows a retryable recovery, keeps the draft, and changes no
   expect(after.status).toBe('active');
   expect(progress(after)).toEqual(progress(before)); // P1 is untimed: timer stays null; no objective/xp change.
   expect(after.version).toBeGreaterThan(before.version); // Only the provider bookkeeping advanced.
-  await expect(page.locator('.session-footer')).toContainText(`Version ${after.version}`);
+  await expect(recovery).toContainText(`Version ${after.version}`); // the recovery panel's troubleshooting details show the UI's adopted version
 });
 
 test('fixture reply audio failure degrades to the Mandarin subtitle without blocking progress', async ({ page, request }) => {
   await start(page, 'fixture');
   const panel = await reachXiaolin(page);
   const id = (await sessionId(page))!;
+  // Audio controls live in the topbar settings popover.
+  await page.locator('summary[aria-label="Settings"]').click();
   const audio = page.getByTestId('audio-controller');
   for (const [index, line] of ['我要咖啡。', '那就茶吧。', '茶十元。'].entries()) {
     await panel.getByRole('textbox').fill(line);
@@ -106,6 +108,7 @@ test('fixture reply audio failure degrades to the Mandarin subtitle without bloc
       await expect(audio.getByRole('status')).toHaveText('Reply audio is unavailable. Retry or read the reply.', { timeout: 15000 });
       await expect(audio.getByRole('button', { name: 'Retry audio' })).toBeVisible();
       await expect(page.getByTestId('recovery-panel')).toHaveCount(0);
+      await page.locator('summary[aria-label="Settings"]').click(); // close the popover so it never covers world targets
     }
   }
   await panel.getByRole('button', { name: 'Close conversation' }).click();
@@ -205,9 +208,8 @@ test('replayed action and turn IDs are idempotent, reused IDs conflict, and one 
 test('a stale expectedVersion returns STALE_VERSION and the UI resynchronizes', async ({ page, request }) => {
   await start(page, 'fixture');
   const id = (await sessionId(page))!;
-  const footer = page.locator('.session-footer');
   const shown = await serverState(request, id);
-  await expect(footer).toContainText(`Version ${shown.version}`);
+  // The UI no longer renders its version outside the recovery panel; adoption is proven by the retry below succeeding.
 
   // Another tab advances the session behind this UI's back.
   const bump = await request.post(`/api/sessions/${id}/actions`, { data: { actionId: `other-tab-${Date.now()}`, expectedVersion: shown.version, action: { type: 'setInputPreference', preference: 'typed-accessibility' } } });
@@ -218,16 +220,14 @@ test('a stale expectedVersion returns STALE_VERSION and the UI resynchronizes', 
   const staleBody = await stale.json();
   expect(staleBody.error).toMatchObject({ code: 'STALE_VERSION', retryable: true });
   expect(staleBody.state.version).toBe(ahead.version);
-  await expect(footer).toContainText(`Version ${shown.version}`);
 
   // The UI's next action is stale; the error carries state and the UI adopts it.
   await page.getByRole('button', { name: /^Pause/ }).click();
   const recovery = page.getByTestId('recovery-panel');
   await expect(recovery).toContainText('Your session needs a refresh.');
   await expect(recovery).toContainText('STALE_VERSION');
-  await expect(footer).toContainText(`Version ${ahead.version}`);
+  await expect(recovery).toContainText(`Version ${ahead.version}`); // troubleshooting details show the adopted state
   await recovery.getByRole('button', { name: 'Retry request' }).click();
   await expect(recovery).toHaveCount(0);
   await expect.poll(async () => (await serverState(request, id)).version).toBe(ahead.version + 1);
-  await expect(footer).toContainText(`Version ${ahead.version + 1}`);
 });

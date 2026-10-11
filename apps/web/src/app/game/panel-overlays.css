@@ -1,4 +1,4 @@
-.sign-overlay, .recovery-panel, .result-panel {
+.sign-overlay, .recovery-panel, .result-panel, .conversation-card {
   position: absolute;
   top: 60px;
   left: 50%;

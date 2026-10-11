@@ -26,6 +26,10 @@ If the segment is complete on remote `main`, verify its completion record and do
 - No API secrets in the browser or commits. Tests default to fixture providers.
 - No extra language, multiplayer, authentication, procedural city, continuous voice, or pronunciation grader.
 
+## Testing policy
+
+Do not run the full test suite on ordinary edits. While iterating, run only the checks in the blast radius of the change: the unit or UI spec files that cover the edited modules, the typecheck, and lint. Use `vitest run <files>` and `playwright test <files>` with explicit paths; prefer `--workers=1` for world and end-to-end journeys, which are flaky under parallel software rendering. Run the complete suite (`npm test`, `npx playwright test`, and the end-to-end config) only immediately before an actual commit, and report its full result in the commit summary.
+
 ## Coordination rules
 
 The protocol and frozen contracts take precedence over incidental examples in the product spec for ownership and invocation. The product spec defines behavior. Ask only about an actual incompatible requirement or missing authorization; routine choices are made within the specification. Record a needed interface change in a proposal rather than changing another owner's API silently.

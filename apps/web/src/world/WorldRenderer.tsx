@@ -2,7 +2,7 @@ import { Component, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Canvas, useThree } from '@react-three/fiber';
 import { type Position, type RendererProps } from '@vibequest/shared';
 import { distance, nearbyTargets, targetAction, zoneAt, walkingPath } from './navigation';
-import { pointerAngle, angularDisplacement } from './camera';
+import { DEFAULT_PITCH, dragOrbit } from './camera';
 import { Cue } from './decor';
 import { District } from './District';
 import { DestinationMarker } from './DestinationMarker';
@@ -54,7 +54,8 @@ function ContextLossHandler({ onFailure }: { onFailure: () => void }) {
 }
 
 /** Presentation-only world. Every interaction uses the frozen shared callbacks. */
-export function WorldRenderer({ state, onAction, onTalk }: RendererProps) {
+/** `preview` renders the same district behind the welcome screen; it is inert and must not look like the live world to tests or assistive tech. */
+export function WorldRenderer({ state, onAction, onTalk, preview = false }: RendererProps & { preview?: boolean }) {
   const [hasWebGl, setHasWebGl] = useState(webGlIsAvailable);
   const [position, setPosition] = useState(() => initialPosition(state));
   const [busy, setBusy] = useState(false);
@@ -64,7 +65,7 @@ export function WorldRenderer({ state, onAction, onTalk }: RendererProps) {
   current.current = { state, onAction, onTalk };
   const runtime = useRef<Runtime>({ position: initialPosition(state), yaw: 0, keys: new Set(), active: false, busy: false, syncing: false, lastSync: 0, lastSent: null, pending: null, generation: 0 });
   const syncPromise = useRef<Promise<void>>(Promise.resolve());
-  const drag = useRef<{ x: number; y: number; startX: number; startY: number; angle: number | null; moved: boolean; alt: boolean; pointerId: number } | null>(null);
+  const drag = useRef<{ x: number; y: number; startX: number; startY: number; moved: boolean; pointerId: number } | null>(null);
   const sessionKey = `${state.sessionId}:${state.missionId}`;
   useEffect(() => {
     const r = runtime.current;
@@ -132,17 +133,20 @@ export function WorldRenderer({ state, onAction, onTalk }: RendererProps) {
   }
 
   const nearby = nearbyTargets(state, position);
-  return <section ref={root} tabIndex={0} className="world-renderer district-world" aria-label="Mandarin district — click to move" data-testid="world-renderer"
+  const movementKeys = ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
+  return <section ref={root} tabIndex={0} className="world-renderer district-world" aria-label="Mandarin district — keyboard or click to move" data-testid={preview ? 'world-preview' : 'world-renderer'}
     onFocus={(event) => { runtime.current.active = event.target === root.current; }}
     onBlur={() => { runtime.current.keys.clear(); runtime.current.path = []; runtime.current.active = false; }}
     onKeyDown={(event) => {
       if (event.target !== root.current || event.nativeEvent.isComposing) return;
+      if (movementKeys.includes(event.code)) { event.preventDefault(); runtime.current.keys.add(event.code); runtime.current.path = []; }
       if (event.code === 'KeyE' && !event.repeat) { event.preventDefault(); const target = nearbyTargets(current.current.state, runtime.current.position)[0]; if (target) void interact(target.id); }
     }}
+    onKeyUp={(event) => { runtime.current.keys.delete(event.code); }}
     onPointerDown={(event) => {
       if (event.target instanceof HTMLCanvasElement && (event.button === 0 || event.button === 2)) {
         root.current?.focus();
-        drag.current = { x: event.clientX, y: event.clientY, startX: event.clientX, startY: event.clientY, angle: pointerAngle(event.clientX, event.clientY, event.target.getBoundingClientRect()), moved: false, alt: event.altKey, pointerId: event.pointerId };
+        drag.current = { x: event.clientX, y: event.clientY, startX: event.clientX, startY: event.clientY, moved: false, pointerId: event.pointerId };
         event.currentTarget.setPointerCapture(event.pointerId);
       }
     }}
@@ -152,29 +156,17 @@ export function WorldRenderer({ state, onAction, onTalk }: RendererProps) {
       if (!gesture || gesture.pointerId !== event.pointerId) return;
       if (!gesture.moved && Math.hypot(event.clientX - gesture.startX, event.clientY - gesture.startY) < 5) return;
       gesture.moved = true;
-      const canvas = root.current?.querySelector('canvas');
-      if (!canvas) return;
-      const angle = pointerAngle(event.clientX, event.clientY, canvas.getBoundingClientRect());
-      if (angle !== null && gesture.angle !== null) runtime.current.yaw += angularDisplacement(gesture.angle, angle);
-      if (gesture.alt || event.altKey) runtime.current.pitch = Math.max(.25, Math.min(1.35, (runtime.current.pitch ?? Math.atan2(7.8, 9)) + (event.clientY - gesture.y) * .006));
-      gesture.x = event.clientX; gesture.y = event.clientY; gesture.angle = angle;
+      const r = runtime.current;
+      const next = dragOrbit(r.yaw, r.pitch ?? DEFAULT_PITCH, event.clientX - gesture.x, event.clientY - gesture.y);
+      r.yaw = next.yaw; r.pitch = next.pitch;
+      gesture.x = event.clientX; gesture.y = event.clientY;
     }}
     onPointerUp={(event) => {
       const gesture = drag.current;
       if (!gesture || gesture.pointerId !== event.pointerId) return;
-      if (!gesture.moved) {
-        if (gesture.alt || event.altKey) {
-          const canvas = root.current?.querySelector('canvas');
-          if (canvas) {
-            const bounds = canvas.getBoundingClientRect();
-            const angle = pointerAngle(event.clientX, event.clientY, bounds);
-            if (angle !== null) runtime.current.yaw = -angle - Math.PI / 2;
-            runtime.current.pitch = .25 + Math.max(0, Math.min(1, (event.clientY - bounds.top) / bounds.height)) * 1.1;
-          }
-        } else if (!runtime.current.busy && current.current.state.status === 'active') {
-          const point = runtime.current.groundPoint?.(event.clientX, event.clientY);
-          if (point) { runtime.current.keys.clear(); runtime.current.path = walkingPath(runtime.current.position, point); }
-        }
+      if (!gesture.moved && !runtime.current.busy && current.current.state.status === 'active') {
+        const point = runtime.current.groundPoint?.(event.clientX, event.clientY);
+        if (point) { runtime.current.keys.clear(); runtime.current.path = walkingPath(runtime.current.position, point); }
       }
       drag.current = null;
       if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
@@ -189,7 +181,7 @@ export function WorldRenderer({ state, onAction, onTalk }: RendererProps) {
       <div className="district-labels" aria-hidden="true">{landmarks.map((mark, i) => <span key={mark.label} ref={(node) => { labels.current[i] = node; }} className="district-landmark" lang="zh-Hans">{mark.label}</span>)}</div>
       <div className="world-caption"><span className="live-dot" />The district<span>Third-person navigation</span></div>
       <div className="district-nearby" aria-label="Nearby interactions">{nearby.map((target, i) => <button key={target.id} disabled={busy || state.status !== 'active'} onClick={() => void interact(target.id)} data-target-id={target.id}><span lang="zh-Hans">{target.label}</span>{i === 0 ? ' · E' : ''}</button>)}</div>
-      <div className="world-note">Click to walk · Drag clockwise / counterclockwise to orbit · Alt/Option + click or drag to angle camera · E to interact</div>
+      <div className="world-note">WASD / arrows or click to walk · Drag sideways to orbit, up / down to tilt · E to interact</div>
     </>}
   </section>;
 }

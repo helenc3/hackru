@@ -1,5 +1,5 @@
 import {
-  ActionRequestSchema, CreateSessionRequestSchema, TurnRequestSchema, TurnResponseSchema, createGame, applyAction, applyEvaluation, projectPublicState,
+  ActionRequestSchema, CreateSessionRequestSchema, TurnRequestSchema, TurnResponseSchema, createGame, applyAction, applyEvaluation, isClosingLine, projectPublicState,
   synchronizeGame, dialogueContext, groundedReply, createFixtureDialogueProvider, EngineRuleError, validateEvaluationForContext,
   type PublicState, type TurnRequest, type TurnContext, type TurnResponse, type ActionResponse,
 } from '@vibequest/shared';
@@ -181,7 +181,7 @@ async function evaluate(services: ServerServices, body: TurnRequest, pending: Pe
         registerSpeechJob(session, { id: speechId, sessionId: session.id, attemptId: pending.attemptId, turnId: body.turnId, replyZh, voiceKey: body.npcId, operationId: speechId, status: 'pending' });
         speech = { npcReply: replyZh, speechId };
       }
-      const outcome: TurnResponse = TurnResponseSchema.parse({ turnId: body.turnId, state: projectPublicState(session.state, nowMs), events: engine.events, ...speech, ...(engine.conversationEnded ? { conversationEnded: true } : {}), ...(session.state.mode === 'practice' ? { ...(evaluation.coach ? { feedback: evaluation.coach } : {}), vibe: { intent: evaluation.intentGrade.score, clarity: evaluation.clarity, courtesy: evaluation.courtesy } } : {}) });
+      const outcome: TurnResponse = TurnResponseSchema.parse({ turnId: body.turnId, state: projectPublicState(session.state, nowMs), events: engine.events, ...speech, ...(engine.conversationEnded || (evaluation.intent !== 'request_repeat' && isClosingLine(spoken)) ? { conversationEnded: true } : {}), ...(session.state.mode === 'practice' ? { ...(evaluation.coach ? { feedback: evaluation.coach } : {}), vibe: { intent: evaluation.intentGrade.score, clarity: evaluation.clarity, courtesy: evaluation.courtesy } } : {}) });
       session.pendingRequests.delete(body.turnId);
       session.completedRequests.set(body.turnId, { payload: pending.payload, response: outcome });
       pending.resolve(outcome);

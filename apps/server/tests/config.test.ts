@@ -6,8 +6,8 @@ describe('server-only configuration', () => {
     expect(loadConfig({})).toMatchObject({
       nodeEnv: 'development', host: '127.0.0.1', port: 3001,
       enableDemoFixtures: false, enableValidationHarness: false,
-      geminiModel: 'gemini-3.8-flash', elevenlabsTtsModel: 'eleven_flash_v2_5',
-      elevenlabsPaModel: 'eleven_multilingual_v2', elevenlabsSttModel: 'scribe_v2',
+      geminiModel: 'gemini-3.8-flash', elevenlabsTtsModel: 'eleven_v4_turbo',
+      elevenlabsPaModel: 'eleven_v4', elevenlabsSttModel: 'scribe_v2',
     });
     expect(loadConfig({ NODE_ENV: 'production' }).port).toBe(4173);
     expect(loadConfig({ PORT: '5050' }).port).toBe(5050);

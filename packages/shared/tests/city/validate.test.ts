@@ -48,6 +48,14 @@ describe('validateManifest', () => {
     expect(e).toMatch(/anchor x1: bld.test.box does not grant/); expect(e).toMatch(/anchor x2: .*role vendor/); expect(e).not.toContain('anchor x3');
     expect(e).toMatch(/placement h: the hotel exists only/);
   });
+  it('rejects NPC anchors with nobody standing there or the wrong required name', () => {
+    const named = plan({ requiredAnchors: [{ capability: 'drink-vendor', anchorId: 'v', nameKey: 'laowang' }] });
+    const board = sealManifest(manifest(named, {
+      placements: [{ ...shop('a', 10, 10), assetId: 'bld.test.box' }, { ...shop('stall', 30, 10), assetId: 'an.test.stall', params: {} }],
+      anchors: [{ id: 'v', placementId: 'stall', capability: 'drink-vendor', kind: 'npc', role: 'vendor', nameKey: 'xiaolin', x: 30, z: 12 }],
+    }));
+    expect(errors(validateManifest(board, named))).toMatch(/must be named laowang/);
+  });
   it('detects blocked connectors and unreachable anchors', () => {
     // A viewpoint stand point in the middle of a creek with no deck is unreachable.
     const wet = plan({ water: [{ id: 'w', kind: 'creek', rect: { minX: 0, maxX: 40, minZ: 28, maxZ: 40 } }] });

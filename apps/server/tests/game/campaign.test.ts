@@ -13,12 +13,13 @@ describe('Shanghai exploration campaign through the fixture API', () => {
   });
 
   it('Q1: unavailable coffee, ambiguous requests and repeat purchases never re-grant the reward', async () => {
-    const game = await campaign();
+    const game = await campaign(); await game.warm();
     const vague = await game.talk('我想去月球。');
     expect(vague.body.state.status).toBe('active');
     await game.pay(ANCHORS.vendor.id, 422); // nothing confirmed yet
     await game.talk('我要咖啡。'); await game.pay(ANCHORS.vendor.id, 422);
-    await game.talk('我要水。'); await game.talk('水五元。');
+    await game.talk('我要水。');
+    expect((await game.talk('水五元。', 'vendor', undefined, 422)).body.error.code).toBe('GOAL_ACTION_PENDING'); // Pay is up: only the button now
     await game.pay(ANCHORS.farVendor.id, 422); // payment happens at the vendor you are standing at
     await game.pay();
     const xp = game.state.xp;
@@ -33,7 +34,7 @@ describe('Shanghai exploration campaign through the fixture API', () => {
   it('Q1: insufficient funds rejects payment without changing money or inventory', async () => {
     const game = await campaign();
     await game.services.sessionStore.withSession(game.state.sessionId, async (session) => { session.state.inventory.cny = 0; });
-    await game.talk('我要水。'); await game.talk('水五元。');
+    await game.warm(); await game.talk('我要水。'); await game.talk('水五元。');
     const rejected = await game.pay(ANCHORS.vendor.id, 422);
     expect(rejected.body.error.code).toBe('ACTION_FORBIDDEN');
     expect(game.state.inventory).toMatchObject({ cny: 0, drinks: [] });
@@ -41,7 +42,7 @@ describe('Shanghai exploration campaign through the fixture API', () => {
 
   it('Q2: only a guide in reach gives a route, and other destinations are not invented', async () => {
     const game = await campaign(); await q1(game);
-    await game.act({ type: 'startMission', missionId: 'Q2' });
+    await game.act({ type: 'startMission', missionId: 'Q2' }); await game.warm();
     await game.talk('请问，去上海大酒店怎么走？', 'guide', ANCHORS.guide.id, 422); // too far away
     await game.walkTo(ANCHORS.guide.position);
     await game.talk('请问，去上海大酒店怎么走？', 'vendor', ANCHORS.guide.id, 422); // role must match the anchor
@@ -58,7 +59,7 @@ describe('Shanghai exploration campaign through the fixture API', () => {
 
   it('Q3: missing viewpoint, wrong spot, early or failed capture never complete; completed quests cannot restart', async () => {
     const game = await campaign(); await q1(game); await q2(game);
-    await game.act({ type: 'startMission', missionId: 'Q3' });
+    await game.act({ type: 'startMission', missionId: 'Q3' }); await game.warm();
     await game.walkTo(ANCHORS.lonely.position);
     await game.talk('可以帮我在这里拍张照吗？', 'passerby', ANCHORS.lonely.id);
     expect(game.state.photo).toBeNull(); // no river viewpoint near this passer-by

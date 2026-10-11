@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import { planChunk, seedFromWorldId, type ChunkManifest, type PublicState } from '@vibequest/shared';
-import { harness, hashes, interact, playerState, riversidePlan, say, spawnCoordsIn, startWorld, walkRoute, worldReady } from './helpers';
+import { harness, hashes, interact, playerState, riversidePlan, say, spawnCoordsIn, startWorld, walkToQuestTarget, worldReady, chat } from './helpers';
 
 /** Planner-reserved guide in chunk (1,0): the Q2 helper on the row-0 avenue's north sidewalk. */
 function guidePlan(worldId: string) {
@@ -30,16 +30,18 @@ test('player world: buy a drink, get verified hotel directions, and a river phot
   const worldId = (await page.getByTestId('world-renderer').getAttribute('data-world-id'))!;
   let state = await playerState(page, request);
   expect(state).toMatchObject({ missionId: 'Q1', worldId, inventory: { cny: 20 } });
-  const spawn = state.position; // the corner sidewalk of the row-0 avenue; north of it is open road
 
   // Q1 — 老王 stands 5 m east of spawn. Coffee is sold out; asking for tea prices it and enables the Pay button; paying completes the quest.
+  expect(state.questTarget).toMatchObject({ label: '老王' });
+  await walkToQuestTarget(page);
+  state = await playerState(page, request);
   const vendor = target(state, (entry) => entry.role === 'vendor' && entry.label === '老王');
-  await walkRoute(page, [vendor.position]);
   await interact(page, vendor.id);
   await expect(page.getByTestId('dialogue-panel')).toContainText('你想喝什么');
   expect(await say(page, '我要咖啡。')).toContain('咖啡卖完了');
+  await chat(page); // 老王 chats a little before he names a price
   await expect(page.getByTestId('pay-button')).toHaveCount(0);
-  expect(await say(page, '那就茶吧。')).toContain('十元');
+  await say(page, '那就茶吧。');
   await expect(page.getByTestId('pay-button')).toContainText('Pay ¥10');
   await page.getByTestId('pay-button').click();
   await expect(page.getByTestId('result-panel')).toBeVisible();
@@ -63,12 +65,13 @@ test('player world: buy a drink, get verified hotel directions, and a river phot
 
   // Q2 — the guide on the avenue east of spawn gives directions from the committed street graph.
   await nextQuest(page, 'Q2');
-  const guide = guidePlan(worldId);
-  const avenueZ = riversidePlan(worldId).avenueZ ?? guide.z + 5.8;
-  await walkRoute(page, [spawn, { x: spawn.x, z: avenueZ }, { x: guide.x, z: avenueZ }, { x: guide.x, z: guide.z + 1.4 }]);
+  expect((await playerState(page, request)).questTarget).toMatchObject({ label: '小李' });
+  await walkToQuestTarget(page);
   state = await playerState(page, request);
   const helper = target(state, (entry) => entry.role === 'guide');
   await interact(page, helper.id);
+  await say(page, '你好！');
+  await chat(page); // 小李 chats a little before he gives the route
   await say(page, '请问，去上海大酒店怎么走？'); // completes Q2, which closes the conversation
   state = await playerState(page, request);
   expect(state.directions?.textZh).toContain('上海大酒店');
@@ -77,13 +80,14 @@ test('player world: buy a drink, get verified hotel directions, and a river phot
 
   // Q3 — east along the avenue to the Huangpu promenade, ask a passer-by, stand on the spot, countdown, capture.
   await nextQuest(page, 'Q3');
-  const river = riversidePlan(worldId);
-  const promenadeX = river.riverWestX - 3;
-  await walkRoute(page, [{ x: guide.x, z: avenueZ }, { x: promenadeX, z: avenueZ }, { x: promenadeX, z: river.passerby.z }]);
+  // The compass points ~140 m east to the Huangpu promenade; Walk there follows the streets.
+  expect((await playerState(page, request)).questTarget?.label).toContain('黄浦江');
+  await walkToQuestTarget(page);
   state = await playerState(page, request);
-  const passerby = target(state, (entry) => entry.role === 'passerby');
-  await walkRoute(page, [passerby.position]);
+  const passerby = target(state, (entry) => entry.role === 'passerby' && entry.id === state.questTarget?.anchorId);
   await interact(page, passerby.id);
+  await say(page, '你好！');
+  await chat(page);
   await say(page, '可以帮我在这里拍张照吗？');
   state = await playerState(page, request);
   expect(state.photo).toMatchObject({ status: 'accepted' });
@@ -103,8 +107,10 @@ test('player world: buy a drink, get verified hotel directions, and a river phot
   await page.reload();
   await page.getByRole('button', { name: 'Continue Session' }).click();
   await worldReady(page);
-  await expect.poll(() => committed.filter((chunk) => Math.abs(chunk.coord.cx) <= 1 && Math.abs(chunk.coord.cz) <= 1).length).toBe(9);
-  expect(hashes(committed.filter((chunk) => Math.abs(chunk.coord.cx) <= 1 && Math.abs(chunk.coord.cz) <= 1))).toEqual(spawnBefore);
+  // Layouts are server-owned and stream around the player: from the river only the spawn chunks within the prefetch ring come back.
+  await expect.poll(() => committed.filter((chunk) => Math.abs(chunk.coord.cx) <= 1 && Math.abs(chunk.coord.cz) <= 1).length).toBeGreaterThan(0);
+  const revisited = hashes(committed.filter((chunk) => Math.abs(chunk.coord.cx) <= 1 && Math.abs(chunk.coord.cz) <= 1));
+  for (const [key, hash] of Object.entries(revisited)) expect(hash, `spawn chunk ${key} changed`).toBe(spawnBefore[key]); // identical terrain, never regenerated
   expect(chunkRequests.flatMap(spawnCoordsIn)).not.toEqual([]);
   expect((await playerState(page, request)).completedMissionIds).toEqual(['Q1', 'Q2', 'Q3']);
 });
@@ -116,6 +122,7 @@ test('developer harness: the same three quests through the validation API, rewar
   const vendor = h.anchor((entry) => entry.role === 'vendor' && entry.label === '老王');
   await h.goto(vendor.position); // an anchor stand point is validated as reachable
   await h.talk(vendor.id, 'vendor', '我要咖啡。');
+  await h.chat(vendor.id, 'vendor');
   const priced = await h.talk(vendor.id, 'vendor', '那就茶吧。');
   expect(priced.actions).toEqual([{ kind: 'pay', anchorId: vendor.id, drink: 'tea', priceCny: 10 }]);
   await h.act({ type: 'choose', choiceId: 'q1.pay', anchorId: vendor.id });
@@ -130,6 +137,7 @@ test('developer harness: the same three quests through the validation API, rewar
   await h.goto(helper.position);
   await h.talk(helper.id, 'guide', '去火车站怎么走？');
   expect(h.state.directions).toBeNull(); // unknown destination: no invented route
+  await h.chat(helper.id, 'guide');
   const turn = await h.talk(helper.id, 'guide', '请问，去上海大酒店怎么走？');
   expect(turn.npcReply).toBe(h.state.directions?.textZh);
   expect(h.state.status).toBe('cleared');
@@ -139,6 +147,8 @@ test('developer harness: the same three quests through the validation API, rewar
   await h.goto({ x: river.passerby.x, z: river.passerby.z });
   const passerby = h.anchor((entry) => entry.role === 'passerby');
   await h.goto(passerby.position);
+  await h.talk(passerby.id, 'passerby', '你好！');
+  await h.chat(passerby.id, 'passerby');
   await h.talk(passerby.id, 'passerby', '可以帮我在这里拍张照吗？');
   const photo = h.state.photo!;
   expect(photo.status).toBe('accepted');

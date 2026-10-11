@@ -11,6 +11,7 @@ test('Q1: ambiguous requests clarify and completed quests cannot restart or purc
   const unclear = await h.talk(vendor.id, 'vendor', '嗯……那个');
   expect(unclear.npcReply).toMatch(/[茶水]/); // the clarification names the available drinks
   await h.act({ type: 'choose', choiceId: 'q1.pay', anchorId: vendor.id }, 422); // no drink ordered yet
+  await h.chat(vendor.id, 'vendor'); // 老王 chats a little before he names a price
   await h.talk(vendor.id, 'vendor', '我要水。');
   await h.act({ type: 'choose', choiceId: 'q1.pay', anchorId: vendor.id });
   expect(h.state).toMatchObject({ status: 'cleared', inventory: { cny: 15, drinks: ['water'] } });

@@ -14,7 +14,8 @@ const base = process.argv[2] ?? 'http://127.0.0.1:3001';
 const key = process.env.ELEVENLABS_API_KEY;
 if (!key) throw new Error('ELEVENLABS_API_KEY is required to synthesize player clips.');
 const eleven = new ElevenLabsClient({ apiKey: key });
-const lines = ['你好！', '我要咖啡。', '那就茶吧。', '茶多少钱？', '茶十元，对吗？', '请再说一遍。', '谢谢。', '好的，再见。'];
+// Ordering prices the drink and puts up the Pay button, which ends the talking — so it comes last.
+const lines = ['你好！', '我要咖啡。', '请再说一遍。', '那就茶吧。'];
 
 let state!: PublicState;
 let n = 0;

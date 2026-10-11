@@ -39,3 +39,12 @@ original license and credit text.
 Descriptions are inferred from filenames and pack context; listening review
 is pending. Pack preview montages have been removed; the catalog contains
 744 individual clips.
+
+## CC-CEDICT dictionary
+
+Word lookup and shift-click glosses use CC-CEDICT (https://www.mdbg.net/chinese/dictionary?page=cc-cedict),
+installed through the data-only npm package `cedict-json` (1.3.20251213, CEDICT release of 2025-12-13).
+Copyright © MDBG and the CC-CEDICT contributors. License: Creative Commons Attribution-ShareAlike 4.0
+International (CC BY-SA 4.0, https://creativecommons.org/licenses/by-sa/4.0/). The server converts the
+numbered pinyin to tone marks at load time; the entries are otherwise unmodified. Any redistribution of the
+dictionary data itself must keep this attribution and the same license.

@@ -2,10 +2,11 @@ import {
   AUDIO_PHASE_MAX_MS, CreateGameOptionsSchema, GameActionSchema, InternalStateSchema, PHOTO_RULES, PublicStateSchema, QuestCategorySchema, TurnEvaluationSchema, WORLD_RULES,
   type CreateGameOptions, type EngineResult, type EvidenceRecord, type ExplorationState, type GameAction, type InternalState, type NpcAction, type NpcId, type Position, type PublicInteractable, type PublicState, type QuestCategory, type TurnContext, type TurnEvaluation,
 } from '../contracts.js';
-import { authoredFacts, clarifyReplies, DRINK_PRICES, groundedReplies, npcOpeners, npcs, speakMandarinReplies, STARTING_CNY } from '../content/index.js';
+import { authoredFacts, clarifyReplies, DRINK_PRICES, groundedReplies, impatienceReplies, npcOpeners, npcs, pacingReplies, speakMandarinReplies, STARTING_CNY } from '../content/index.js';
 import { missionFor, missionSnapshot, NEXT_MISSION } from '../content/missions.js';
 import { BIAS_RULES, chunkKey, chunkOf, type Anchor, type Capability, type WorldView } from '../city/contracts.js';
 import { recordEncounters } from '../city/bias.js';
+import { questTarget } from '../city/quest-target.js';
 import { text } from '../city/text-catalog.js';
 import { npcIdentity } from '../city/npc-identity.js';
 import { advanceClock } from './clock.js';
@@ -19,12 +20,17 @@ export class SegmentNotImplementedError extends Error {
 }
 export class EngineRuleError extends Error {
   readonly status = 422;
-  readonly code = 'ACTION_FORBIDDEN';
+  constructor(message: string, readonly code: string = 'ACTION_FORBIDDEN') { super(message); }
 }
 type WorldAnchor = Anchor & { position: Position; chunk: string };
 const requireRule = (condition: unknown, message: string): void => { if (!condition) throw new EngineRuleError(message); };
 const prefix = (state: InternalState) => state.missionId.toLowerCase();
 const currentNode = (state: InternalState) => missionFor(state.missionId).nodes.find((node) => node.id === state.nodeId)!;
+/** Exchanges a quest NPC tolerates before losing patience; reaching it fails the attempt. */
+export const NPC_PATIENCE_LIMIT = 12;
+/** The NPC only delivers the goal (price, route, photo) from this exchange on; earlier goal requests are deferred in character. */
+export const GOAL_WARMUP_EXCHANGES = 5;
+const MOOD_RANK = { disengaged: 0, terse: 1, neutral: 2, warm: 3 } as const;
 const mood = (patience: number): InternalState['npcState'][NpcId]['mood'] => patience >= 4 ? 'warm' : patience >= 2 ? 'neutral' : patience === 1 ? 'terse' : 'disengaged';
 const distance = (a: Position, b: Position) => Math.hypot(a.x - b.x, a.z - b.z);
 const QUEST_CAPABILITIES: Partial<Record<Capability, QuestCategory>> = { 'drink-vendor': 'drink-vendor', 'direction-helper': 'direction-helper', 'hotel-landmark': 'hotel-landmark', 'river-viewpoint': 'river-viewpoint', 'photo-passerby': 'photo-passerby' };
@@ -71,7 +77,7 @@ function evidence(state: InternalState, track: EvidenceRecord['track'], score: E
     ...(track === 'conversation' ? { turnId: state.pendingTurn?.turnId, conversationSource: source === 'stt' ? 'spoken' : source === 'stt-edited' ? 'edited' : 'typed' } : {}),
     independent: !assisted && !state.validationMode, firstAttempt, validationMode: state.validationMode, listeningAssisted: assisted, providerFailure: false });
 }
-function terminal(state: InternalState, result: 'clear' | 'fail', events: EngineResult['events']): void {
+function terminal(state: InternalState, result: 'clear' | 'fail', events: EngineResult['events'], failMessage = 'Attempt ended. Retry for a fresh attempt.'): void {
   if (state.status !== 'active') return;
   state.status = result === 'clear' ? 'cleared' : 'failed';
   const mission = missionFor(state.missionId);
@@ -93,7 +99,7 @@ function terminal(state: InternalState, result: 'clear' | 'fail', events: Engine
   state.skills = updated.skills; state.skillUpdatedAttemptIds = updated.skillUpdatedAttemptIds;
   if (updated.debrief) state.debrief = updated.debrief;
   state.pauseReasons = [];
-  events.push({ id: `${state.attemptId}.result`, kind: 'result', message: result === 'clear' ? 'Quest complete.' : 'Attempt ended.' });
+  events.push({ id: `${state.attemptId}.result`, kind: 'result', message: result === 'clear' ? 'Quest complete.' : failMessage });
 }
 export function synchronizeGame(state: InternalState, nowMs: number): EngineResult {
   return { state: advanceClock(state, nowMs), events: [] };
@@ -159,7 +165,9 @@ export function applyAction(state: InternalState, raw: GameAction, nowMs: number
   const events = result.events;
   if (action.type === 'startMission') {
     const missionId = action.missionId;
-    requireRule(next.status === 'cleared' && NEXT_MISSION[next.missionId] === missionId, 'Only the next quest can be started after completing the current quest.');
+    // No restarting active or completed quests; a failed attempt (the NPC lost patience) may start again.
+    const retryAfterFailure = next.status === 'failed' && next.missionId === missionId;
+    requireRule(retryAfterFailure || (next.status === 'cleared' && NEXT_MISSION[next.missionId] === missionId), 'Only the next quest, or a failed quest, can be started.');
     requireRule(next.unlockedMissionIds.includes(missionId), 'Complete the prerequisite quest first.');
     const fresh = createGame({ sessionId: next.sessionId, worldId: next.worldId, attemptId: `${missionId.toLowerCase()}.${nowMs}.${next.version + 1}`, missionId, initialTier: next.difficulty === 0 ? 0 : 1, validationMode: next.validationMode, inputPreference: next.inputPreference, providerStatus: next.providerStatus, spawn: next.position }, nowMs);
     for (const key of ['version', 'zoneId', 'lastMovementAtMs', 'inventory', 'purchases', 'xp', 'badges', 'awardedRewardIds', 'unlockedMissionIds', 'completedMissionIds', 'directions', 'exploration', 'skills', 'evidence', 'difficulty', 'skillUpdatedAttemptIds'] as const) Object.assign(fresh, { [key]: structuredClone(next[key]) });
@@ -259,6 +267,7 @@ export function applyAction(state: InternalState, raw: GameAction, nowMs: number
 export function dialogueContext(state: InternalState, npcId: NpcId, anchorId: string, world: WorldView): TurnContext {
   requireRule(state.status === 'active', 'This attempt has ended.');
   requireRule(missionFor(state.missionId).npcRoles.includes(npcId), 'This NPC is not part of the current quest.');
+  if (pendingGoalAction(npcActions(state), state.inventory.cny, npcId)) throw new EngineRuleError('The conversation is over: use the button to finish.', 'GOAL_ACTION_PENDING');
   const anchor = requireAnchor(state, world, anchorId);
   requireRule(anchor.kind === 'npc' && anchor.role === npcId, 'That anchor is not this NPC.');
   const npc = npcs.find((entry) => entry.id === npcId)!;
@@ -286,7 +295,7 @@ function completeDrinkConfirmation(state: InternalState, evaluation: TurnEvaluat
 /** An NPC line that closes the exchange ("thanks, come again", "bye"): the conversation ends after it, whoever said goodbye first. */
 const CLOSING_LINE = /再见|拜拜|慢走|欢迎(?:您)?(?:再来|下次|常来)|下次(?:再来|见)|回头见|一路(?:顺风|平安)|路上小心/;
 export function isClosingLine(text: string | undefined): boolean { return Boolean(text && CLOSING_LINE.test(text)); }
-/** Authored Mandarin for every fact-bearing reply. The model's replyZh is used only for small talk. */
+/** Authored Mandarin for every fact-bearing reply. The model's replyZh is used only for small talk (bounded by the smallTalk/otherWares facts). */
 export function groundedReply(state: InternalState, npcId: NpcId, evaluation: TurnEvaluation, _world?: WorldView): string {
   const slot = (key: string) => evaluation.slots.find((entry) => entry.key === key)?.value;
   const anchorId = state.npcState[npcId].anchorId;
@@ -334,20 +343,59 @@ function applyWorldFacts(state: InternalState, npcId: NpcId, anchor: WorldAnchor
     events.push({ id: `${state.attemptId}.photo-accepted`, kind: 'photo', message: 'They agreed! Stand at the photo spot with the river behind you.' });
   }
 }
+/** The goal a request asks this NPC for, as a canonical evaluation (so a remembered request can be delivered later). */
+function goalOf(npcId: NpcId, evaluation: TurnEvaluation): TurnEvaluation | null {
+  const slot = (key: string) => evaluation.slots.find((entry) => entry.key === key)?.value;
+  if (npcId === 'vendor' && ['order_drink', 'accept_substitute', 'confirm_drink_price'].includes(evaluation.intent) && (slot('drink') === 'tea' || slot('drink') === 'water')) return evaluation;
+  if (npcId === 'guide' && evaluation.intent === 'ask_directions' && slot('destination') === 'grand-hotel') return evaluation;
+  if (npcId === 'passerby' && evaluation.intent === 'request_photo') return evaluation;
+  return null;
+}
+function rememberedGoal(npcId: NpcId, value: string, like: TurnEvaluation): TurnEvaluation {
+  const base = { ...like, interaction: 'relevant' as const, targetLanguageUse: 'yes' as const };
+  if (npcId === 'vendor') return { ...base, intent: 'order_drink', slots: [{ key: 'drink', value: value as 'tea' | 'water' }] };
+  if (npcId === 'guide') return { ...base, intent: 'ask_directions', slots: [{ key: 'destination', value: 'grand-hotel' }] };
+  return { ...base, intent: 'request_photo', slots: [] };
+}
+/**
+ * Warm-up pacing (deterministic): the NPC delivers the goal only from exchange GOAL_WARMUP_EXCHANGES on.
+ * An earlier goal request is remembered and deferred with an in-character line; once warmed up, the
+ * remembered request is delivered on the player's next ordinary turn, so a focused player always gets it
+ * well before the patience limit. `session.warmed-<role>` skips the warm-up (test seam for goal mechanics).
+ */
+function paceGoal(state: InternalState, npcId: NpcId, evaluation: TurnEvaluation, successful: boolean): { deferred: boolean; evaluation: TurnEvaluation } {
+  const key = `${prefix(state)}.goal-asked`;
+  if (evaluation.intent === 'cancel_order') delete state.flags[key];
+  const asked = successful ? goalOf(npcId, evaluation) : null;
+  if (asked) state.flags[key] = npcId === 'vendor' ? String(asked.slots.find((entry) => entry.key === 'drink')!.value) : npcId;
+  const exchange = Number(state.flags[`${prefix(state)}.exchanges`] ?? 0) + 1;
+  const warmed = exchange >= GOAL_WARMUP_EXCHANGES || Boolean(state.flags[`session.warmed-${npcId}`]);
+  const remembered = state.flags[key];
+  if (asked) return { deferred: !warmed, evaluation };
+  // Warmed up with an earlier request pending: the NPC comes back to it ("你要的水，五块。") on any ordinary turn.
+  if (warmed && typeof remembered === 'string' && !offTarget(evaluation) && !['farewell', 'cancel_order', 'request_repeat'].includes(evaluation.intent)) return { deferred: false, evaluation: rememberedGoal(npcId, remembered, evaluation) };
+  return { deferred: false, evaluation };
+}
 export function applyEvaluation(state: InternalState, npcId: NpcId, anchorId: string, raw: TurnEvaluation, nowMs: number, world: WorldView): EngineResult {
   nowMs = Math.floor(nowMs); // timestamps are integer ms
   const result = synchronizeGame(state, nowMs);
   const next = result.state;
-  const evaluation = completeDrinkConfirmation(next, TurnEvaluationSchema.parse(raw));
+  let evaluation = completeDrinkConfirmation(next, TurnEvaluationSchema.parse(raw));
   dialogueContext(next, npcId, anchorId, world);
   const anchor = world.anchor(anchorId)!;
   requireRule(next.pendingTurn?.npcId === npcId && next.pendingTurn.anchorId === anchorId && next.pendingTurn.attemptId === next.attemptId, 'Evaluation requires a current server-reserved turn.');
   const npc = next.npcState[npcId];
   npc.anchorId = anchorId;
   if (npc.patience === 0) npc.patience = 1;
+  const raw0 = evaluation;
   const successful = evaluation.interaction === 'relevant' && evaluation.targetLanguageUse === 'yes' && evaluation.intentGrade.score >= 0.7 && evaluation.intentGrade.confidence >= 0.75;
+  const pacing = next.status === 'active' ? paceGoal(next, npcId, raw0, successful) : { deferred: false, evaluation: raw0 };
+  const paced = pacing.deferred;
+  if (pacing.evaluation !== raw0) evaluation = pacing.evaluation; // delivering a remembered request
+  // An understood request is conversation evidence even when the NPC answers with a question first.
+  if (paced) evidence(next, 'conversation', 1, undefined, next.pendingTurn!.assisted, next.nodeId);
   let transitioned = false;
-  if (successful) {
+  if ((successful || pacing.evaluation !== raw0) && !paced) {
     const before = next.nodeId;
     applyWorldFacts(next, npcId, anchor, evaluation, world, result.events);
     const options = currentNode(next).intentTransitions.filter((entry) => entry.trigger.intent === evaluation.intent);
@@ -367,7 +415,7 @@ export function applyEvaluation(state: InternalState, npcId: NpcId, anchorId: st
   }
   const conversationEnded = evaluation.intent === 'farewell' && successful;
   // A miss surfaces the node's vocabulary once, recorded like a used hint (assisted) without spending one.
-  if (!transitioned && next.status === 'active' && !['greeting', 'request_repeat', 'farewell'].includes(evaluation.intent) && Number(next.flags[`${next.nodeId}-hint-level`] ?? 0) < 2) {
+  if (!transitioned && !paced && next.status === 'active' && !['greeting', 'small_talk', 'request_repeat', 'farewell'].includes(evaluation.intent) && Number(next.flags[`${next.nodeId}-hint-level`] ?? 0) < 2) {
     const hint = missionFor(next.missionId).hints.find((entry) => entry.nodeId === next.nodeId && entry.level === 2);
     if (hint) {
       next.flags[`${next.nodeId}-hint-level`] = 2; next.flags['session.assisted'] = true;
@@ -384,9 +432,27 @@ export function applyEvaluation(state: InternalState, npcId: NpcId, anchorId: st
     result.events.push({ id: `${next.attemptId}.language-${next.pendingTurn!.turnId}`, kind: 'objective', message: evaluation.interaction === 'insult' ? `${name} is upset: -5 XP. Stay polite.` : evaluation.targetLanguageUse === 'no' ? `${name} didn't understand English: -5 XP. Try it in Mandarin.` : `${name} didn't follow that: -5 XP. Try a short Mandarin sentence.` });
   }
   npc.mood = mood(npc.patience);
-  const reply = groundedReply(next, npcId, evaluation, world);
-  // The NPC closing the exchange ("谢谢，慢走！") ends it too; a requested repeat of an earlier goodbye does not.
-  const npcClosed = evaluation.intent !== 'request_repeat' && isClosingLine(reply);
+  const deferrals = `${prefix(next)}.deferrals`;
+  let reply = groundedReply(next, npcId, evaluation, world);
+  if (paced) { const n = Number(next.flags[deferrals] ?? 0); reply = pacingReplies[npcId][n % pacingReplies[npcId].length]!; next.flags[deferrals] = n + 1; }
+  // Patience: every exchange with this quest's NPC counts until the goal is reached. Impatience shows
+  // in character near the limit; at the limit the NPC leaves and the attempt fails. Deterministic: the model never decides it.
+  let gaveUp = false;
+  if (next.status === 'active') {
+    const key = `${prefix(next)}.exchanges`;
+    const exchanges = Number(next.flags[key] ?? 0) + 1;
+    next.flags[key] = exchanges;
+    if (exchanges >= NPC_PATIENCE_LIMIT) {
+      reply = impatienceReplies[npcId].leave; gaveUp = true; npc.mood = 'disengaged';
+      terminal(next, 'fail', result.events, `${label(anchor)} got tired of chatting — try again and get to the point sooner.`);
+    } else if (exchanges >= NPC_PATIENCE_LIMIT - 3) {
+      if (exchanges === NPC_PATIENCE_LIMIT - 3 || exchanges === NPC_PATIENCE_LIMIT - 1) reply = `${reply}${impatienceReplies[npcId][exchanges === NPC_PATIENCE_LIMIT - 1 ? 'last' : 'first']}`;
+      const cap = exchanges >= NPC_PATIENCE_LIMIT - 1 ? 'terse' : 'neutral';
+      if (MOOD_RANK[npc.mood] > MOOD_RANK[cap]) npc.mood = cap;
+    }
+  }
+  // The NPC closing the exchange ("慢走啊！") ends it too; a requested repeat of an earlier goodbye does not.
+  const npcClosed = gaveUp || (evaluation.intent !== 'request_repeat' && isClosingLine(reply));
   npc.history.push({ role: 'player', text: next.pendingTurn!.text }, { role: 'npc', text: reply });
   npc.history = npc.history.slice(-12);
   return { state: InternalStateSchema.parse(next), events: result.events, ...(conversationEnded || npcClosed ? { conversationEnded: true as const } : {}) };
@@ -417,6 +483,14 @@ export function npcActions(state: InternalState): PublicState['npcActions'] {
   if (state.status === 'cleared') for (const role of missionFor(state.missionId).npcRoles) { const anchorId = state.npcState[role].anchorId; if (anchorId) out.push({ anchorId, action: { kind: 'end-conversation' } }); }
   return out.slice(0, 8);
 }
+/**
+ * The quest-finishing button now waiting on this NPC role. While it waits the conversation is over:
+ * turns are rejected and only the button finishes the task. An unaffordable Pay doesn't count, so talking
+ * stays possible; a failed photo capture keeps go-to-photo-spot, so the retry needs no talking.
+ */
+export function pendingGoalAction(actions: PublicState['npcActions'], cny: number, role: NpcId): PublicState['npcActions'][number] | undefined {
+  return actions.find(({ action }) => (role === 'vendor' && action.kind === 'pay' && action.priceCny <= cny) || (role === 'passerby' && action.kind === 'go-to-photo-spot'));
+}
 /** The actions for one conversation after a turn; a goodbye always offers to end it. */
 export function turnActions(state: InternalState, anchorId: string, conversationEnded: boolean): NpcAction[] {
   const actions = npcActions(state).filter((entry) => entry.anchorId === anchorId).map((entry) => entry.action);
@@ -440,7 +514,7 @@ export function projectPublicState(state: InternalState, nowMs: number, world: W
     interactables,
     npcMood: Object.fromEntries(npcs.map((npc) => [npc.id, next.npcState[npc.id].mood])), inventory: next.inventory, purchases: next.purchases,
     xp: next.xp, badges: next.badges, unlockedMissionIds: next.unlockedMissionIds, completedMissionIds: next.completedMissionIds,
-    directions: next.directions, photo: next.photo, npcActions: npcActions(next), timer: null,
+    directions: next.directions, photo: next.photo, npcActions: npcActions(next), questTarget: questTarget(next, world), timer: null,
     capabilities: { coach: true, hints: true, freeze: false }, validationMode: next.validationMode, inputPreference: next.inputPreference, providerStatus: next.providerStatus,
     ...(next.debrief ? { debrief: next.debrief } : {}),
   });

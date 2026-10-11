@@ -51,6 +51,11 @@ describe('live Claude dialogue provider', () => {
     expect(schema.required).toEqual(expect.arrayContaining(['intent', 'replyZh', 'coach']));
   });
 
+  it('never sends an empty enum, even for a role with no slot keys', () => {
+    const passerby = { ...baselineTurnContext, npcId: 'passerby' as const, allowedIntents: ['request_photo', 'greeting', 'farewell', 'unknown'] as TurnContext['allowedIntents'] };
+    expect(JSON.stringify(strictSchema(responseSchemaFor(passerby)))).not.toContain('"enum":[]');
+  });
+
   it('accepts a directions evaluation and rejects an invented destination', async () => {
     await expect(providerReturning(guideEvaluation).provider.evaluate(guideContext, '请问，去上海大酒店怎么走？')).resolves.toMatchObject({ slots: [{ key: 'destination', value: 'grand-hotel' }] });
     const invented = providerReturning({ ...guideEvaluation, slots: [{ key: 'destination', value: 'jiangbin' }] });

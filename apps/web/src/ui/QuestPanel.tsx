@@ -4,9 +4,9 @@ import { missionTitles } from './ResultPanel';
 
 /** English instructions per quest (NEW_QUESTS.md); world text stays Simplified Chinese. */
 export const missionInstructions: Record<MissionId, string> = {
-  Q1: 'Find 老王 (Lao Wang) at his drink stand near where you start. Ask for a drink in Mandarin, then press Pay.',
-  Q2: 'Find 小李 (Xiao Li) on the avenue and ask in Mandarin how to get to 上海大酒店 (Shanghai Grand Hotel).',
-  Q3: 'Walk east to the 黄浦江 (Huangpu River) and ask a passer-by to take your photo. They will show you where to stand.',
+  Q1: 'Find 老王 (Lao Wang) at his drink stand a few steps from where you start (follow the arrow at the top). Ask for a drink in Mandarin, then press Pay.',
+  Q2: 'Find 小李 (Xiao Li) on the avenue just east of the start (follow the arrow at the top) and ask in Mandarin how to get to 上海大酒店 (Shanghai Grand Hotel).',
+  Q3: 'Head east to the 黄浦江 (Huangpu River) promenade — follow the arrow at the top of the screen or press Walk there. A passer-by waits at the viewing deck; ask them to take your photo and they will show you where to stand.',
 };
 
 export function QuestPanel({ state, results, onReview }: { state: PublicState; results: Partial<Record<MissionId, PublicState>>; onReview: (missionId: MissionId) => void }) {

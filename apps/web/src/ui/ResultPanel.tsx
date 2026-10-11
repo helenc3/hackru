@@ -2,6 +2,8 @@ import { useEffect, useRef } from 'react';
 import { cues, missions, type MissionId, type PublicState, type RendererProps } from '@vibequest/shared';
 import { SkillDebrief } from './SkillDebrief';
 
+/** The quest NPC's name when they walked off (the only way an attempt fails). */
+const questNpcNames: Record<MissionId, string> = { Q1: '老王', Q2: '小李', Q3: 'The passer-by' };
 export const missionTitles: Record<MissionId, string> = { Q1: 'Buy a drink from Lao Wang', Q2: 'Ask Xiao Li the way', Q3: 'A photo by the Huangpu' };
 
 /** Study list from authored content only: cue text plus the "X means Y" glosses inside the mission hints. */
@@ -29,13 +31,14 @@ export function ResultPanel({ state, live, pending, onAction, onExit, onClose }:
   const start = (missionId: MissionId) => void onAction({ type: 'startMission', missionId }).catch(() => undefined);
   return <section className="result-panel" role="dialog" aria-labelledby="result-title" data-testid="result-panel" data-review={review}>
     <button ref={close} type="button" className="button secondary result-close" onClick={onClose} aria-label="Close results">✕</button>
-    <span className="eyebrow">{state.validationMode ? 'SIMULATED RESULT · NO PLAYER ACHIEVEMENT' : review ? 'QUEST REVIEW' : 'QUEST COMPLETE'}</span>
-    <h2 id="result-title">{state.status === 'cleared' ? 'Nicely done.' : 'Attempt ended.'}</h2>
-    <p>{missionTitles[state.missionId]} · {state.status === 'cleared' ? 'The server confirmed the required objectives.' : 'This attempt ended. You can start a new session from the welcome screen.'}</p>
+    <span className="eyebrow">{state.validationMode ? 'SIMULATED RESULT · NO PLAYER ACHIEVEMENT' : review ? 'QUEST REVIEW' : state.status === 'failed' ? 'QUEST FAILED' : 'QUEST COMPLETE'}</span>
+    <h2 id="result-title">{state.status === 'cleared' ? 'Nicely done.' : `${questNpcNames[state.missionId]} got tired of chatting.`}</h2>
+    <p>{missionTitles[state.missionId]} · {state.status === 'cleared' ? 'The server confirmed the required objectives.' : 'Try again and get to the point sooner. Your next attempt starts a fresh conversation; earlier rewards and money are kept.'}</p>
     <ul className="result-objectives" aria-label="Quest summary">{state.objectives.map((objective) => <li key={objective.id}><input type="checkbox" checked={objective.complete} readOnly tabIndex={-1} aria-label={objective.label} /><span>{objective.label}</span></li>)}</ul>
     {state.badges.map((badge) => <span className="earned-badge" key={badge}>{state.validationMode ? 'Simulated badge: ' : 'Badge: '}{badge === 'shanghai-explorer' ? 'Shanghai Explorer' : badge}</span>)}
     <div className="result-actions">
       {canAct && !review && state.status === 'cleared' && next && <button className="button primary" disabled={pending} onClick={() => start(next)}>Next quest</button>}
+      {canAct && state.status === 'failed' && <button className="button primary" disabled={pending} onClick={() => start(state.missionId)}>Try again</button>}
       {canAct && <button className="button secondary" disabled={pending} onClick={onExit}>Return to start</button>}
       <button className="button secondary" disabled={pending} onClick={onClose}>{canAct ? 'Close' : 'Back to quest'}</button>
     </div>

@@ -247,6 +247,7 @@ function inspect(manifest: ChunkManifest, plan: ChunkPlan, options: Options): Is
   for (const required of plan.requiredAnchors) {
     const anchor = manifest.anchors.find((a) => a.id === required.anchorId && a.capability === required.capability);
     if (!anchor) structural(`required ${required.capability} anchor ${required.anchorId} missing`);
+    else if (required.nameKey && anchor.nameKey !== required.nameKey) structural(`required anchor ${required.anchorId} must be named ${required.nameKey}`);
     else if (required.near && Math.hypot(anchor.x - required.near.x, anchor.z - required.near.z) > 10) structural(`required anchor ${required.anchorId} is too far from its planned spot`);
   }
   if (!issues.some((i) => i.structural)) {

@@ -4,6 +4,7 @@ import { loadConfig, validationHarnessEnabled, type ServerConfig } from './confi
 import { HttpError } from './errors.js';
 import { createAudioRouter } from './routes/audio.js';
 import { createCityRouter } from './routes/city.js';
+import { createDictionaryRouter } from './dictionary/router.js';
 import { createGameRouter } from './routes/game.js';
 import { createServices, type ServerServices } from './services.js';
 
@@ -47,6 +48,7 @@ export function createApp(options: AppOptions = {}): Express {
   app.use('/api', createGameRouter(services));
   app.use('/api', createAudioRouter(services));
   app.use('/api', createCityRouter(services));
+  app.use('/api', createDictionaryRouter(config));
   app.use('/api', (_request, _response, next) => {
     next(new HttpError(404, 'NOT_FOUND', 'Unknown API route.'));
   });

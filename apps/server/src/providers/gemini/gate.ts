@@ -13,13 +13,13 @@ export function meetsProgressionGate(e: TurnEvaluation): boolean {
 }
 
 const CLARIFY: Record<NpcId, string> = {
-  vendor: '不好意思，我没听懂。您想喝点什么？',
-  guide: '不好意思，请再说一遍？您要去哪儿？',
-  passerby: '不好意思，我没听懂。您需要帮忙吗？',
+  vendor: '啊？你要喝点什么？',
+  guide: '啊？你要去哪儿？',
+  passerby: '嗯？什么事？',
 };
 const EXAMPLE: Record<NpcId, string> = { vendor: '请给我一杯茶。', guide: '请问，去上海大酒店怎么走？', passerby: '可以帮我在这里拍张照吗？' };
 
-/** Safe no-transition evaluation: asks for clarification and grants nothing. */
+/** Safe no-transition evaluation: an in-character clarification (coaching stays in `coach`) that grants nothing. */
 export function clarificationEvaluation(context: TurnContext, _playerText?: string): TurnEvaluation {
   return {
     intent: 'unknown', slots: [], evidenceQuote: '',

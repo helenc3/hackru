@@ -1,4 +1,5 @@
 import { expect, vi } from 'vitest';
+import { GOAL_WARMUP_EXCHANGES, pacingReplies } from '@vibequest/shared';
 import request from 'supertest';
 import type { Anchor, Directions, GameAction, NpcId, Position, PublicState, WorldInfo, WorldView } from '@vibequest/shared';
 import { createApp } from '../../src/app.js';
@@ -89,8 +90,12 @@ export async function campaign(providerMode: 'fixture' | 'live' = 'fixture', val
     return response;
   };
   const session = async () => (await services.sessionStore.get(state.sessionId))!;
+  /** Skip the goal warm-up for the current attempt (mechanics tests; the q1/q2/q3 journeys do the real warm-up). */
+  const warm = () => services.sessionStore.withSession(state.sessionId, async (record) => {
+    for (const role of ['vendor', 'guide', 'passerby']) record.state.flags[`session.warmed-${role}`] = true;
+  });
   return {
-    app, services, act, talk, walkTo, session, get state() { return state; }, get position() { return position; },
+    app, services, act, talk, walkTo, session, warm, get state() { return state; }, get position() { return position; },
     pay: (anchorId: string = ANCHORS.vendor.id, status = 200) => act({ type: 'choose', choiceId: 'q1.pay', anchorId }, status),
     startPhoto: (status = 200) => act({ type: 'choose', choiceId: 'q3.start-photo', anchorId: ANCHORS.viewpoint.id }, status),
     capture: (outcome: 'captured' | 'failed', status = 200, imageDigest: string | undefined = 'a1b2c3d4e5f60718293a4b5c6d7e8f90') =>
@@ -99,11 +104,16 @@ export async function campaign(providerMode: 'fixture' | 'live' = 'fixture', val
 }
 export type Campaign = Awaited<ReturnType<typeof campaign>>;
 
-/** Q1 at 老王: coffee is sold out (dialogue only); naming tea enables the Pay action, and paying completes the quest. */
+/** Small talk with an NPC (counts toward the goal warm-up and the patience limit). */
+export async function chat(game: Campaign, npcId: NpcId, turns: number) {
+  for (let i = 0; i < turns; i++) await game.talk('今天天气很好。', npcId);
+}
+/** Q1 at 老王: coffee is sold out (dialogue only); after the warm-up, naming tea enables the Pay action, and paying completes the quest. */
 export async function q1(game: Campaign) {
   const coffee = await game.talk('我要咖啡。');
   expect(coffee.body.npcReply).toBe('咖啡卖完了。我们有茶和水。');
   expect(coffee.body.actions).toEqual([]);
+  await chat(game, 'vendor', GOAL_WARMUP_EXCHANGES - 2);
   const tea = await game.talk('那就茶吧。');
   expect(tea.body.actions).toEqual([{ kind: 'pay', anchorId: ANCHORS.vendor.id, drink: 'tea', priceCny: 10 }]);
   expect(game.state.npcActions).toEqual([{ anchorId: ANCHORS.vendor.id, action: tea.body.actions[0] }]);
@@ -115,6 +125,11 @@ export async function q1(game: Campaign) {
 export async function q2(game: Campaign) {
   await game.act({ type: 'startMission', missionId: 'Q2' });
   await game.walkTo(ANCHORS.guide.position);
+  // A request during the warm-up gets an in-character deferral; asking again once warmed up gets the route.
+  const opening = await game.talk('请问，去上海大酒店怎么走？', 'guide');
+  expect(opening.body.npcReply).toBe(pacingReplies.guide[0]);
+  expect(game.state.directions).toBeNull();
+  await chat(game, 'guide', GOAL_WARMUP_EXCHANGES - 2);
   const turn = await game.talk('请问，去上海大酒店怎么走？', 'guide');
   expect(turn.body.npcReply).toBe(ROUTE.textZh);
   expect(turn.body.actions).toEqual([{ kind: 'show-directions' }, { kind: 'end-conversation' }]);
@@ -125,6 +140,8 @@ export async function q2(game: Campaign) {
 export async function q3(game: Campaign) {
   await game.act({ type: 'startMission', missionId: 'Q3' });
   await game.walkTo(ANCHORS.passerby.position);
+  await game.talk('你好！', 'passerby');
+  await chat(game, 'passerby', GOAL_WARMUP_EXCHANGES - 2);
   const ask = await game.talk('可以帮我在这里拍张照吗？', 'passerby');
   expect(game.state.photo).toMatchObject({ status: 'accepted', passerbyAnchorId: ANCHORS.passerby.id, viewpointAnchorId: ANCHORS.viewpoint.id });
   expect(ask.body.actions).toEqual([{ kind: 'go-to-photo-spot', spot: game.state.photo!.spot }]);

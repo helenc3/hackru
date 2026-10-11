@@ -10,3 +10,4 @@ export * from './validate.js';
 export * from './world-view.js';
 export * from './directions.js';
 export * from './bias.js';
+export * from './quest-target.js';

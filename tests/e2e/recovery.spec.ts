@@ -2,22 +2,24 @@ import { spawn, type ChildProcess } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { expect, test, type Page } from '@playwright/test';
 import type { PublicState } from '@vibequest/shared';
-import { harness, HARNESS, interact, playerState, serverState, sessionId, startWorld, walkRoute } from './helpers';
+import { harness, HARNESS, interact, playerState, serverState, sessionId, SMALL_TALK, startWorld, walkToQuestTarget } from './helpers';
 
 // Real-server recovery journeys. The configured servers carry no provider keys, so live
 // dialogue calls fail as recoverable 503s. The restart test spawns its own production server it can kill.
 const ROOT = fileURLToPath(new URL('../..', import.meta.url));
 const RESTART_PORT = Number(process.env.E2E_RESTART_PORT ?? 4480);
 
-/** 老王 stands 5 m east of spawn. */
+/** 老王 is Q1's quest target, a few metres from spawn. */
 async function reachVendor(page: Page, request: Parameters<typeof playerState>[1]) {
+  await walkToQuestTarget(page);
   const state = await playerState(page, request);
   const vendor = state.interactables.find((entry) => entry.role === 'vendor' && entry.label === '老王')!;
-  await walkRoute(page, [vendor.position]);
   await interact(page, vendor.id);
   const panel = page.getByTestId('dialogue-panel');
   const typed = panel.getByRole('button', { name: 'Use typed Mandarin', exact: true });
-  if (await typed.count()) await typed.click();
+  // Wait for the panel to settle on voice or typed input before choosing, or the toggle can be missed.
+  await expect(panel.getByRole('textbox').or(typed)).toBeVisible();
+  if (await typed.isVisible()) await typed.click();
   await expect(panel.getByRole('textbox')).toBeEnabled();
   return panel;
 }
@@ -56,12 +58,13 @@ test('fixture reply audio failure degrades to the Mandarin subtitle without bloc
   const panel = await reachVendor(page, request);
   await page.locator('summary[aria-label="Settings"]').click();
   const audio = page.getByTestId('audio-controller');
-  for (const [index, line] of ['我要咖啡。', '那就茶吧。'].entries()) {
-    const before = await panel.getByTestId('npc-reply').innerText();
+  // 老王 chats a little (the goal warm-up) before he names a price.
+  for (const [index, line] of ['我要咖啡。', ...SMALL_TALK, '那就茶吧。'].entries()) {
+    const replies = panel.locator('.bubble.npc:not(.partial)');
+    const before = await replies.count();
     await panel.getByRole('textbox').fill(line);
     await panel.getByRole('button', { name: 'Send Mandarin' }).click();
-    await expect(panel.getByRole('textbox')).toHaveValue('');
-    await expect(panel.getByTestId('npc-reply')).not.toHaveText(before);
+    await expect.poll(() => replies.count()).toBeGreaterThan(before);
     if (index === 0) {
       // No ElevenLabs key: the speech job fails and the subtitle stays the channel.
       await expect(audio.getByRole('status')).toHaveText('Reply audio is unavailable. Retry or read the reply.', { timeout: 15000 });
@@ -131,6 +134,7 @@ test('replayed action and turn IDs are idempotent, reused IDs conflict, and one 
   expect((await conflict.json()).error.code).toBe('ID_CONFLICT');
   expect((await (await request.get(`${HARNESS}/api/sessions/${h.state.sessionId}`)).json()).state.version).toBe(h.state.version);
 
+  await h.chat(vendor.id, 'vendor');
   await h.talk(vendor.id, 'vendor', '那就茶吧。');
   const xpBefore = h.state.xp;
   const pay = { type: 'choose', choiceId: 'q1.pay', anchorId: vendor.id } as const;

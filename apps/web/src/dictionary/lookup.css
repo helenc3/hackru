@@ -1,0 +1,48 @@
+.lookup-panel {
+  position: fixed;
+  top: 72px;
+  right: 16px;
+  z-index: 40;
+  width: min(380px, calc(100vw - 32px));
+  max-height: min(70vh, 560px);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px 16px;
+  background: var(--cream);
+  border: var(--outline);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sticker);
+}
+.lookup-panel header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.lookup-panel h2 { margin: 0; font-size: 1.1rem; }
+.lookup-panel input {
+  width: 100%;
+  padding: 10px 12px;
+  font: inherit;
+  font-size: 1.05rem;
+  color: var(--text);
+  background: #fff;
+  border: var(--outline);
+  border-radius: var(--radius-md);
+}
+.lookup-panel input:focus-visible, .lookup-panel button:focus-visible { outline: var(--focus); box-shadow: var(--focus-ring); }
+.lookup-status p { margin: 0; color: var(--text-muted); font-size: .92rem; }
+.lookup-status [role="alert"] { color: var(--plum); }
+.lookup-results { margin: 0; padding: 0; list-style: none; overflow-y: auto; display: grid; gap: 8px; }
+.lookup-results li {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-areas: "hanzi action" "pinyin action" "english english";
+  gap: 2px 10px;
+  padding: 10px 12px;
+  background: #fff;
+  border: 2px solid var(--ink);
+  border-radius: var(--radius-md);
+}
+.lookup-hanzi { grid-area: hanzi; font-size: 1.4rem; font-weight: 700; }
+.lookup-hanzi small { font-size: .9rem; font-weight: 400; color: var(--text-muted); }
+.lookup-pinyin { grid-area: pinyin; color: var(--ink-soft); }
+.lookup-english { grid-area: english; font-size: .92rem; overflow-wrap: anywhere; }
+.lookup-results button { grid-area: action; align-self: start; white-space: nowrap; }
+.lookup-results button[aria-pressed="true"] { background: var(--mint); }

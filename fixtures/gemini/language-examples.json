@@ -382,7 +382,7 @@
       "courtesy": 0.8,
       "targetLanguageUse": "no",
       "interaction": "relevant",
-      "replyZh": "请说中文。",
+      "replyZh": "啊？听不懂……要喝点什么？",
       "coach": {
         "understood": "You asked for tea in English.",
         "explanation": "Say it in Mandarin.",
@@ -433,7 +433,7 @@
       "courtesy": 0.8,
       "targetLanguageUse": "yes",
       "interaction": "irrelevant",
-      "replyZh": "我没听懂。您要茶还是水？",
+      "replyZh": "啊？你要茶还是水？",
       "coach": {
         "understood": "You asked clearly.",
         "explanation": "Natural, polite Mandarin.",
@@ -632,7 +632,7 @@
       "courtesy": 0.8,
       "targetLanguageUse": "no",
       "interaction": "irrelevant",
-      "replyZh": "请说中文。",
+      "replyZh": "啊？听不懂……要喝点什么？",
       "coach": {
         "understood": "You asked clearly.",
         "explanation": "Natural, polite Mandarin.",

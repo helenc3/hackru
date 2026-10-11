@@ -8,6 +8,8 @@ export type Runtime = {
   pitch?: number; path?: Position[]; groundPoint?: (x: number, y: number) => Position | null;
   /** Collision over committed manifests; movement waits until the player's chunk is committed. */
   view?: Walkable; ready?: (position: Position) => boolean;
+  /** A far walk target (Walk there / Go to photo spot), followed one re-planned leg at a time. */
+  goal?: Position; replanAt?: number; leg?: (from: Position, goal: Position) => Position[];
 };
 
 export function initialPosition(state: Pick<PublicState, 'position'>): Position {

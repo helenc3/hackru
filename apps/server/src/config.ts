@@ -25,6 +25,8 @@ const environmentSchema = z.object({
   ENABLE_CLAUDE_CITY: booleanEnvironmentSchema,
   /** Measured: claude-sonnet-5-5 composes a valid chunk in ~10.5 s; opus-5-5 exceeded 20 s at full density and haiku-5-5 returned invalid JSON. */
   CITY_MODEL: z.string().trim().min(1).default('claude-sonnet-5-5'),
+  /** Whole-line English for shift-click glosses when no authored translation exists. */
+  DICTIONARY_MODEL: z.string().trim().min(1).default('claude-sonnet-5-5'),
 });
 
 /** Server-only configuration. Never serialize this object to a client. */
@@ -44,6 +46,7 @@ export interface ServerConfig {
   voiceIds: Record<NpcId, string>;
   enableClaudeCity: boolean;
   cityModel: string;
+  dictionaryModel: string;
   enableDemoFixtures: boolean;
   enableValidationHarness: boolean;
 }
@@ -76,6 +79,7 @@ export function loadConfig(environment: NodeJS.ProcessEnv = process.env): Server
     voiceIds: Object.fromEntries(characterDescriptions.map((npc) => [npc.id, npc.voice.id])) as Record<NpcId, string>,
     enableClaudeCity: env.ENABLE_CLAUDE_CITY,
     cityModel: env.CITY_MODEL,
+    dictionaryModel: env.DICTIONARY_MODEL,
     enableDemoFixtures: env.ENABLE_DEMO_FIXTURES,
     enableValidationHarness: env.ENABLE_VALIDATION_HARNESS,
   };

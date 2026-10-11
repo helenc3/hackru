@@ -1,7 +1,7 @@
 import type { LiveServerMessage } from '@google/genai';
 import type { TurnResponse } from '@vibequest/shared';
 import { describe, expect, it } from 'vitest';
-import { alignmentNote, createLiveBridge, targetPhrase, type ServerEvent } from '../src/live/relay.js';
+import { alignmentNote, createLiveBridge, type ServerEvent } from '../src/live/relay.js';
 
 const message = (value: Record<string, unknown>) => value as unknown as LiveServerMessage;
 const turnResponse = (events: { message: string }[]) => ({ turnId: 't', events, npcReply: 'x', state: { objectives: [{ id: 'a', label: 'Confirm the price.', complete: false }] } }) as unknown as TurnResponse;
@@ -85,18 +85,27 @@ describe('live bridge', () => {
     expect(events.at(-1)).toEqual({ type: 'closed', reason: 'farewell' });
     expect(events.filter((event) => event.type === 'turn')).toHaveLength(1);
   });
+  it('ends the session (reason goal) when a turn leaves only a finishing button', async () => {
+    const events: ServerEvent[] = [];
+    const live = { closed: false, sendAudio: () => undefined, sendNote: () => undefined, close: () => { live.closed = true; } };
+    const bridge = createLiveBridge({ send: (event) => events.push(event), live, turn: async () => turnResponse([]), note: () => undefined, ends: () => true });
+    bridge.onLiveMessage(message({ serverContent: { inputTranscription: { text: '我要水' } } }));
+    bridge.onLiveMessage(message({ data: 'QUJD', serverContent: { outputTranscription: { text: '好嘞，水五块。' } } }));
+    bridge.onLiveMessage(message({ serverContent: { turnComplete: true } }));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(live.closed).toBe(true);
+    expect(events.at(-1)).toEqual({ type: 'closed', reason: 'goal' });
+  });
 });
 
 describe('live alignment notes', () => {
-  const turn = (events: { kind: string; message: string }[], directions: { textZh: string } | null) =>
-    ({ events, state: { objectives: [{ id: 'q2.ask', label: 'Ask the way to the hotel.', complete: false }], directions } }) as unknown as TurnResponse;
+  const turn = (events: { kind: string; message: string }[], directions: { textZh: string } | null, photo: { status: string } | null = null) =>
+    ({ events, state: { objectives: [{ id: 'q2.ask', label: 'Ask the way to the hotel.', complete: false }], directions, photo } }) as unknown as TurnResponse;
   it('makes the NPC speak a verified route word for word', () => {
-    const note = alignmentNote(turn([{ kind: 'directions', message: 'Route verified.' }], { textZh: '沿着南京路往东走。' }), 'guide', 'q2.ask', undefined);
-    expect(note).toBe('[game] Say this verified route to the learner word for word, adding nothing: 沿着南京路往东走。');
+    expect(alignmentNote(turn([{ kind: 'directions', message: 'Route verified.' }], { textZh: '沿着南京路往东走。' }))).toBe('[context] Tell them this route word for word, adding nothing: 沿着南京路往东走。');
   });
-  it('otherwise models the role phrase and the next step', () => {
-    expect(alignmentNote(turn([], null), 'passerby', 'q3.ask', undefined)).toContain('可以帮我在这里拍张照吗？');
-    expect(targetPhrase('vendor', 'q1.receipt', 'water')).toBe('水五元');
-    expect(targetPhrase('vendor', 'q1.order')).toBe('我要一杯茶');
+  it('gives in-world context only, never a phrase for the player to say', () => {
+    expect(alignmentNote(turn([], null, { status: 'accepted' }))).toContain('photo');
+    expect(alignmentNote(turn([], null))).toBeUndefined();
   });
 });

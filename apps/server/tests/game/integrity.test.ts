@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import request from 'supertest';
-import { createFixtureDialogueProvider, type TurnEvaluation } from '@vibequest/shared';
+import { createFixtureDialogueProvider, pacingReplies, type TurnEvaluation } from '@vibequest/shared';
 import { ANCHORS, advance, campaign } from './helpers.js';
 import { registerTranscription, updateSpeechJob } from '../../src/session-store.js';
 
@@ -85,7 +85,7 @@ describe('reservation, idempotency and audio integrity', () => {
     expect(session.state.evidence.find((entry) => entry.turnId === 'stt-turn')?.conversationSource).toBe('spoken');
     const speechId = turn.body.speechId;
     const job = session.speechJobs.get(speechId)!;
-    expect(job).toMatchObject({ sessionId: session.id, attemptId: session.state.attemptId, turnId: 'stt-turn', replyZh: '好的，一杯茶，十元。', status: 'pending' });
+    expect(job).toMatchObject({ sessionId: session.id, attemptId: session.state.attemptId, turnId: 'stt-turn', replyZh: pacingReplies.vendor[0], status: 'pending' });
     await game.act({ type: 'audioPhase', operationId: 'unknown-playback', phase: 'playing' }, 409); // stale helper version
     const action = async (actionId: string, value: unknown, status = 200) => request(game.app).post(`${path}/actions`).send({ actionId, expectedVersion: session.state.version, action: value }).expect(status);
     await action('not-ready', { type: 'audioPhase', operationId: job.operationId, phase: 'playing' }, 422);
@@ -97,6 +97,7 @@ describe('reservation, idempotency and audio integrity', () => {
     await action('overlap', { type: 'audioPhase', operationId: 'new-recording', phase: 'recording' }, 422);
     await action('idle', { type: 'audioPhase', operationId: job.operationId, phase: 'idle' });
     await action('replay-ended', { type: 'audioPhase', operationId: job.operationId, phase: 'playing' }, 422);
+    await game.warm(); // the edited order is delivered without the goal warm-up
     const edited = await request(game.app).post(`${path}/turns`).send({ turnId: 'edited-turn', expectedVersion: session.state.version, npcId: 'vendor', anchorId: ANCHORS.vendor.id, input: { text: '我要水。', source: 'stt', transcriptionId: 'transcription-1' } }).expect(200);
     expect(edited.body.state.status).toBe('active');
     expect(session.state.evidence.find((entry) => entry.turnId === 'edited-turn')?.conversationSource).toBe('edited');

@@ -1,9 +1,20 @@
 import { expect, type APIRequestContext, type Page } from '@playwright/test';
 import { walkingPath } from '../../apps/web/src/world/navigation';
-import { GENERATION_RULES, chunkOf, chunkKey, createWorldView, planChunk, seedFromWorldId, type ChunkManifest, type GameAction, type Position, type PublicState } from '@vibequest/shared';
+import { GENERATION_RULES, GOAL_WARMUP_EXCHANGES, chunkOf, chunkKey, createWorldView, planChunk, seedFromWorldId, type ChunkManifest, type GameAction, type Position, type PublicState } from '@vibequest/shared';
 
 export const HARNESS = process.env.E2E_HARNESS_URL ?? 'http://127.0.0.1:4175';
 export const SESSION_KEY = 'vibequest.player-session.v1';
+
+/**
+ * Walk to the active quest's target the way a player would: the compass's "Walk there" follows the
+ * street network one obstacle-aware leg at a time, so routes do not depend on the world's seed.
+ */
+export async function walkToQuestTarget(page: Page) {
+  const compass = page.getByTestId('quest-compass');
+  await expect(compass).toBeVisible({ timeout: 15000 });
+  await page.getByTestId('walk-there').click();
+  await expect.poll(async () => Number(await compass.getAttribute('data-distance')), { timeout: 150_000, intervals: [500] }).toBeLessThanOrEqual(1);
+}
 
 /** Hold one movement key until the avatar passes `destination` on `axis`; the camera starts at yaw 0 (W = −z, D = +x). */
 async function walkAxis(page: Page, axis: 'x' | 'z', destination: number) {
@@ -92,14 +103,24 @@ export async function say(page: Page, text: string) {
   const panel = page.getByTestId('dialogue-panel');
   const typed = panel.getByRole('button', { name: 'Use typed Mandarin', exact: true });
   if (await typed.count()) await typed.click();
-  const before = await panel.getByTestId('npc-reply').count() ? await panel.getByTestId('npc-reply').innerText() : '';
+  // Count replies, not text: an NPC may legitimately say the same line twice.
+  const replies = panel.locator('.bubble.npc:not(.partial)');
+  const before = await replies.count();
   await panel.getByRole('textbox').fill(text);
   await panel.getByRole('button', { name: 'Send Mandarin' }).click();
   // A quest-completing turn ends the attempt, which closes the conversation; the caller reads the result.
-  await expect.poll(async () => !await panel.count() || await panel.getByRole('textbox').inputValue() === '').toBe(true);
+  // Once a goal button is up the text box is gone (only the button finishes the task).
+  const box = panel.getByRole('textbox');
+  await expect.poll(async () => !await panel.count() || !await box.count() || await box.inputValue() === '').toBe(true);
   if (!await panel.count()) return null;
-  await expect.poll(async () => await panel.getByTestId('npc-reply').count() ? panel.getByTestId('npc-reply').innerText() : '').not.toBe(before);
+  await expect.poll(() => replies.count()).toBeGreaterThan(before);
   return panel.getByTestId('npc-reply').innerText();
+}
+
+/** Small-talk turns through the NPC's warm-up: `turns` defaults to filling the exchanges before the goal request. */
+export const SMALL_TALK = ['今天天气很好。', '我是美国人。', '我第一次来上海。'];
+export async function chat(page: Page, turns = GOAL_WARMUP_EXCHANGES - 2) {
+  for (let i = 0; i < turns; i++) await say(page, SMALL_TALK[i % SMALL_TALK.length]!);
 }
 
 export const closeConversation = (page: Page) => page.getByTestId('dialogue-panel').getByRole('button', { name: 'Close conversation' }).click();
@@ -155,6 +176,10 @@ export async function harness(request: APIRequestContext) {
   };
   const act = (action: GameAction, status = 200, actionId = `h-${++n}`) => send('actions', { actionId, action }, status);
   const talk = (anchorId: string, npcId: 'vendor' | 'guide' | 'passerby', text: string, turnId = `t-${++n}`) => send('turns', { turnId, npcId, anchorId, input: { text, source: 'typed' } });
+  /** Small talk through the NPC's goal warm-up (defaults to the exchanges before a goal request on exchange GOAL_WARMUP_EXCHANGES). */
+  const chat = async (anchorId: string, npcId: 'vendor' | 'guide' | 'passerby', turns = GOAL_WARMUP_EXCHANGES - 2) => {
+    for (let i = 0; i < turns; i++) await talk(anchorId, npcId, SMALL_TALK[i % SMALL_TALK.length]!);
+  };
   /** Commit the chunks around a position, then step there (validation mode: no speed rule). */
   const goto = async (position: Position) => {
     const { cx, cz } = chunkOf(position);
@@ -176,5 +201,5 @@ export async function harness(request: APIRequestContext) {
     if (!found) throw new Error(`No matching interactable among ${state.interactables.map((target) => target.id).join(', ')}`);
     return found;
   };
-  return { get state() { return state; }, raw, send, act, talk, goto, anchor };
+  return { get state() { return state; }, raw, send, act, talk, chat, goto, anchor };
 }

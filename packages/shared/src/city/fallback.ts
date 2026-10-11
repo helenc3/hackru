@@ -63,7 +63,8 @@ export function generateFallbackChunk(worldId: string, seed: string, coord: Chun
   const approved = (entry: CatalogEntry | undefined): entry is CatalogEntry => Boolean(entry && entry.review === 'approved');
   const entries = (filter: (entry: CatalogEntry) => boolean) => CATALOG.filter((entry) => approved(entry) && filter(entry));
   /** Names other than the quest givers, so 老王 and 小李 stay unique. */
-  const extraNames = () => Object.keys(TEXT_CATALOG['npc-name']).filter((k) => !QUEST_GIVERS.includes(k));
+  // 小林 was the old spawn vendor; random NPCs don't reuse it.
+  const extraNames = () => Object.keys(TEXT_CATALOG['npc-name']).filter((k) => !QUEST_GIVERS.includes(k) && k !== 'xiaolin');
   const randomName = () => {
     const gender = rng() < 0.5 ? 'male' : 'female';
     return pick(extraNames().filter((name) => npcIdentity(name)?.gender === gender))!;

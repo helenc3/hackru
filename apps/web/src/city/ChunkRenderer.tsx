@@ -166,20 +166,27 @@ function TreeProxies({ items, origin }: { items: Resolved[]; origin: Position })
   useLayoutEffect(() => {
     if (!canopy.current || !trunk.current) return;
     items.forEach((item, i) => {
-      const { w, d, h } = item.size;
+      const { w, d } = item.size;
+      const h = item.size.h * .85;
       const trunkHeight = h * .6;
       dummy.position.set(origin.x + item.placement.x, trunkHeight / 2, origin.z + item.placement.z);
       dummy.rotation.set(0, item.placement.rotation * DEG, 0);
       dummy.scale.set(w * .055, trunkHeight, d * .055);
       dummy.updateMatrix();
       trunk.current!.setMatrixAt(i, dummy.matrix);
-      dummy.position.y = h * .7;
-      dummy.scale.set(w / 2, h * .3, d / 2);
-      dummy.updateMatrix();
-      canopy.current!.setMatrixAt(i, dummy.matrix);
       const colour = item.entry?.id === 'ls.tree.osmanthus' && item.params.bloom === true ? candy.osmanthus
         : item.params.season === 'autumn' ? '#f0b64a' : item.params.season === 'spring' ? '#b6e88a' : candy.grassDeep;
-      canopy.current!.setColorAt(i, tint.set(colour));
+      for (let lobe = 0; lobe < 3; lobe++) {
+        const side = lobe === 0 ? 0 : lobe === 1 ? 1 : -1;
+        const offset = side * w * .22;
+        const angle = item.placement.rotation * DEG;
+        dummy.position.set(origin.x + item.placement.x + offset * Math.cos(angle), h * (side === 0 ? .72 : .62), origin.z + item.placement.z - offset * Math.sin(angle));
+        const radius = Math.min(w, d) * (side === 0 ? .33 : .28);
+        dummy.scale.setScalar(radius);
+        dummy.updateMatrix();
+        canopy.current!.setMatrixAt(i * 3 + lobe, dummy.matrix);
+        canopy.current!.setColorAt(i * 3 + lobe, tint.set(colour));
+      }
     });
     for (const mesh of [canopy.current, trunk.current]) {
       mesh.instanceMatrix.needsUpdate = true;
@@ -190,7 +197,7 @@ function TreeProxies({ items, origin }: { items: Resolved[]; origin: Position })
   if (!items.length) return null;
   return <>
     <instancedMesh ref={trunk} args={[undefined, undefined, items.length]}><cylinderGeometry args={[.7, 1, 1, 6]} /><Toon color={candy.bark} outline={false} /></instancedMesh>
-    <instancedMesh ref={canopy} args={[undefined, undefined, items.length]}><sphereGeometry args={[1, 8, 6]} /><Toon color="#ffffff" outline={false} /></instancedMesh>
+    <instancedMesh ref={canopy} args={[undefined, undefined, items.length * 3]}><sphereGeometry args={[1, 8, 6]} /><Toon color="#ffffff" outline={false} /></instancedMesh>
   </>;
 }
 

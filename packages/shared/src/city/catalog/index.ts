@@ -5,6 +5,7 @@ import { buildingsCommercialEntries } from './buildings-commercial.js';
 import { storefrontEntries } from './storefront.js';
 import { streetEntries } from './street.js';
 import { landscapeEntries } from './landscape.js';
+export { treeHeightScale } from './landscape.js';
 import { waterfrontEntries } from './waterfront.js';
 import { anchorsEntries } from './anchors.js';
 

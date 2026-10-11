@@ -1,6 +1,7 @@
 import { useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import type { Group } from 'three';
+import { treeHeightScale } from '@vibequest/shared';
 import { candy, INK, Toon } from '../../world/toon';
 import type { AssetComponent, AssetProps } from './types';
 
@@ -25,45 +26,46 @@ function Trunk({ height, radius, color = candy.bark }: { height: number; radius:
 
 const PlaneTree: AssetComponent = (props) => {
   const s = n(props, 'scale'), [main, deep] = foliage[props.params.season as Season], tall = props.params.variant === 'tall';
-  const lobes: [number, number, number, number][] = tall
-    ? [[0, 5.6, 0, 1.4], [.6, 4.6, .3, 1.3], [-.6, 4.8, -.3, 1.3], [0, 6.4, 0, 1]]
-    : [[0, 5.2, 0, 1.6], [1.2, 4.7, .4, 1.2], [-1.1, 4.8, -.4, 1.25], [.2, 5.9, -.3, 1.1], [-.3, 4.4, 1, 1]];
-  return <group scale={s}>
+  return <group scale={[s, treeHeightScale(s) * .85, s]}>
     <Trunk height={4.4} radius={.28} color="#d9cbb0" />
-    <Sway still={props.still || props.lod > 0} phase={props.seed}>{(props.lod === 0 ? lobes : lobes.slice(0, 2)).map(([x, y, z, r], i) => <Blob key={i} at={[x, y, z]} r={r} color={i % 2 ? deep : main} outline={props.lod === 0 || i === 0} />)}</Sway>
+    <Sway still={props.still || props.lod > 0} phase={props.seed}>
+      <Blob at={[0, tall ? 5.6 : 5.2, 0]} r={1.6} color={main} />
+      <Blob at={[1.1, 4.7, .35]} r={1.3} color={deep} />
+      <Blob at={[-1.1, 4.8, -.35]} r={1.3} color={main} />
+    </Sway>
   </group>;
 };
 const CamphorTree: AssetComponent = (props) => {
-  const s = n(props, 'scale'), [main] = foliage[props.params.season as Season];
-  return <group scale={s}>
+  const s = n(props, 'scale'), [main, deep] = foliage[props.params.season as Season];
+  return <group scale={[s, treeHeightScale(s) * .85, s]}>
     <Trunk height={2.4} radius={.3} />
     <Sway still={props.still || props.lod > 0} phase={props.seed}>
-      <Blob at={[0, 3.6, 0]} r={2.2} color={props.params.season === 'summer' ? '#3f8f3a' : main} />
-      {props.lod === 0 && <Blob at={[.9, 3, .6]} r={1.3} color="#4fa046" outline={false} />}
+      <Blob at={[0, 3.6, 0]} r={1.7} color={props.params.season === 'summer' ? '#3f8f3a' : main} />
+      <Blob at={[1.05, 3, .35]} r={1.25} color={deep} />
+      <Blob at={[-1.05, 3.1, -.35]} r={1.25} color={main} />
     </Sway>
   </group>;
 };
 const WillowTree: AssetComponent = (props) => {
   const s = n(props, 'scale'), [main, deep] = foliage[props.params.season as Season];
-  return <group scale={s}>
+  return <group scale={[s, treeHeightScale(s) * .85, s]}>
     <Trunk height={3.2} radius={.22} />
     <Sway still={props.still || props.lod > 0} phase={props.seed}>
-      <Blob at={[0, 4, 0]} r={1.4} color={main} />
-      {Array.from({ length: props.lod === 0 ? 8 : 4 }, (_, i) => {
-        const a = i / (props.lod === 0 ? 8 : 4) * Math.PI * 2;
-        return <mesh key={i} position={[Math.cos(a) * 1.4, 2.7, Math.sin(a) * 1.4]}><cylinderGeometry args={[.35, .15, 2.4, 6]} /><Toon color={i % 2 ? deep : main} outline={false} /></mesh>;
-      })}
+      <Blob at={[0, 3.8, 0]} r={1.35} color={main} />
+      <Blob at={[.85, 3.2, .3]} r={1.05} color={deep} />
+      <Blob at={[-.85, 3.3, -.3]} r={1.05} color={main} />
     </Sway>
   </group>;
 };
 const OsmanthusTree: AssetComponent = (props) => {
   const s = n(props, 'scale'), bloom = props.params.bloom === true;
-  const canopy: [number, number, number, number][] = [[0, 2.7, 0, 1.15], [.75, 2.3, .35, .85], [-.7, 2.35, -.3, .9], [.1, 3.3, -.1, .8]];
-  return <group scale={s}>
+  const main = bloom ? candy.osmanthus : foliage[props.params.season as Season][0];
+  return <group scale={[s, treeHeightScale(s) * .85, s]}>
     <Trunk height={2} radius={.2} />
     <Sway still={props.still || props.lod > 0} phase={props.seed}>
-      {(props.lod === 0 ? canopy : canopy.slice(0, 2)).map(([x, y, z, r], i) => <Blob key={i} at={[x, y, z]} r={r} color={bloom ? candy.osmanthus : foliage[props.params.season as Season][0]} />)}
-      {props.lod === 0 && <Blob at={[0, 1.95, .15]} r={.95} color={bloom ? '#e8b64a' : '#5fb043'} outline={false} />}
+      <Blob at={[0, 2.7, 0]} r={1.15} color={main} />
+      <Blob at={[.65, 2.3, .3]} r={.85} color={main} />
+      <Blob at={[-.65, 2.35, -.3]} r={.85} color={main} />
     </Sway>
   </group>;
 };

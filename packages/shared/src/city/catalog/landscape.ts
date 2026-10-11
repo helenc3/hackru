@@ -9,12 +9,17 @@ const all: readonly DistrictKind[] = ['shopping', 'historic', 'residential', 'of
 const scale = (min: number, max: number): ParamSpec => ({ type: 'number', min, max, default: 1, step: 0.05, description: 'Uniform size multiplier.' });
 const season: ParamSpec = { type: 'enum', values: ['summer', 'autumn', 'spring'], default: 'summer', description: 'Foliage tint.' };
 
+/** Keep the smallest trees unchanged while making the largest 50% taller. */
+export function treeHeightScale(size: number): number {
+  return size * (1 + .5 * (size - .7) / .7);
+}
+
 /** Trees block only at the trunk; canopies are walk-under and fade in ClearView. */
 function tree(id: string, description: string, districts: readonly DistrictKind[], canopy: number, height: number, trunk: number, extra: Record<string, ParamSpec> = {}): CatalogEntry {
   return {
     id, version: 1, component: 'LandscapeTree', category: 'landscape', description, districts,
     params: { scale: scale(0.7, 1.4), season, ...extra }, placement: 'sidewalk',
-    footprint: (p) => ({ w: canopy * num(p, 'scale'), d: canopy * num(p, 'scale'), h: height * num(p, 'scale') }),
+    footprint: (p) => ({ w: canopy * num(p, 'scale'), d: canopy * num(p, 'scale'), h: height * treeHeightScale(num(p, 'scale')) }),
     collision: (p) => ({ solids: [centered(trunk * 2 * num(p, 'scale'), trunk * 2 * num(p, 'scale'))], walkable: [] }),
     sockets: () => [], clearance: { front: 0.6, side: 0.6 }, capabilities: [],
     lod: { levels: 2, cullDistance: 90 }, cost: { triangles: 900, drawCalls: 2, instanced: true }, review: 'approved',

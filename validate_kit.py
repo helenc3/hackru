@@ -7,8 +7,8 @@ root = Path(__file__).resolve().parent
 registry = json.loads((root / "segment-registry.json").read_text())
 segments = registry["segments"]
 ids = {segment["id"] for segment in segments}
-assert len(ids) == len(segments) == 10, "Expected ten unique segments"
-assert registry["specVersion"] == "1.2"
+assert len(ids) == len(segments) == 11, "Expected eleven unique segments"
+assert registry["specVersion"] == "2.0"
 by_id = {segment["id"]: segment for segment in segments}
 visited = set()
 active = set()
@@ -37,7 +37,7 @@ for segment in segments:
         assert f"## {section}" in text, f"Missing {section} in {packet.name}"
     assert f"Build {segment['id']}" in text
     assert f"# {segment['id']}: {segment['title']}" in text
-    assert "Spec version 1.2" in text
+    assert "Spec version 1.2" in text or "Spec version 2.0" in text
     assert "Mandarin Chinese" in text
     assert "required core functionality" in text
     assert segment["status"] == "planned", "Kit must not claim implementation"
@@ -47,7 +47,7 @@ for segment in segments:
 for document in root.rglob("*.md"):
     # Dependencies and generated test/build outputs are not part of this kit.
     if any(part in {"node_modules", ".git", "dist", "build", "test-results", "playwright-report"}
-           for part in document.relative_to(root).parts):
+           for part in document.relative_to(root).parts) or document.relative_to(root).parts[0] == ".claude":
         continue
     text = document.read_text()
     assert "CODEX_TASKS.md" not in text, f"Stale reference in {document}"
@@ -75,4 +75,4 @@ assert "not first deliver voice input" in polish_packet
 assert "replyEs" not in spec
 assert "replyZh" in spec
 assert "'audio' | 'text'" not in spec
-print("PASS: 10 v1.2 Mandarin packets, valid dependencies, required core voice, optional polish isolation, and Markdown links.")
+print("PASS: 11 Mandarin packets (v1.2 history + v2.0 Segment-010), valid dependencies, required core voice, optional polish isolation, and Markdown links.")

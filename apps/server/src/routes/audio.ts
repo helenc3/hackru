@@ -1,7 +1,7 @@
 import express, { Router } from 'express';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
-import { TranscriptionResponseSchema, cues } from '@vibequest/shared';
+import { TranscriptionResponseSchema } from '@vibequest/shared';
 import { HttpError } from '../errors.js';
 import { MAX_CLIP_BYTES, mp3DurationMs } from '../providers/elevenlabs/live.js';
 import { registerTranscription, updateSpeechJob } from '../session-store.js';
@@ -65,28 +65,6 @@ export function createAudioRouter(services: ServerServices): Router {
       }
       if (result.kind === 'start') void synthesize(id, speechId, result.job); // outside the session lock
       response.status(202).set('Retry-After', '1').json({ status: 'pending' });
-    } catch (error) { next(error); }
-  });
-
-  /**
-   * The current attempt's undelivered audio-channel PA playback, so the client can play the
-   * reviewed asset and report finishCue. Read-only: never starts or completes a cue.
-   */
-  router.get('/sessions/:id/cue-playback', async (request, response, next) => {
-    const params = sessionParamsSchema.safeParse(request.params);
-    if (!params.success) return next(new HttpError(400, 'INVALID_REQUEST', 'Invalid session identifier.'));
-    try {
-      const playback = await store.withSession(params.data.id, async (session) => {
-        const { state } = session;
-        const entry = [...state.cuePlaybacks].reverse().find((record) => record.attemptId === state.attemptId && record.channel === 'audio' && !record.delivered && !record.interrupted);
-        if (!entry) return null;
-        const cue = cues.find((candidate) => candidate.id === entry.cueId);
-        const audioAssetId = cue?.variants.find((variant) => variant.tier === state.tier)?.audioAssetId ?? cue?.audioAssetId;
-        if (!audioAssetId) return null;
-        // The engine accepts finishCue from two seconds before the playback deadline.
-        return { playbackId: entry.id, cueId: entry.cueId, audioAssetId, finishAfterMs: Math.max(0, entry.deadlineMs - 2_000 - Date.now()) };
-      });
-      response.json({ playback });
     } catch (error) { next(error); }
   });
 

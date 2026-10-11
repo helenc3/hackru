@@ -1,8 +1,8 @@
 import { useSyncExternalStore } from 'react';
 import { ApiErrorSchema, TranscriptionResponseSchema, type TranscriptionResponse } from '@vibequest/shared';
 
-/** One local audio lane: the recorder and the player never overlap. 'playing' is NPC speech (interruptible), 'announcing' is PA (not). */
-export type AudioActivity = 'idle' | 'recording' | 'playing' | 'announcing';
+/** One local audio lane: the recorder and the player never overlap. 'playing' is NPC speech (interruptible). */
+export type AudioActivity = 'idle' | 'recording' | 'playing';
 let activity: AudioActivity = 'idle';
 const listeners = new Set<() => void>();
 export function setAudioActivity(next: AudioActivity): void {
@@ -63,12 +63,4 @@ export async function fetchSpeech(sessionId: string, speechId: string, signal: A
     });
   }
   throw new AudioApiError(504, 'SPEECH_TIMEOUT', 'The reply audio took too long. Retry playback or read the reply.', true);
-}
-
-/** The server's active audio-channel PA playback for this attempt, if any. */
-export type CuePlayback = { playbackId: string; cueId: string; audioAssetId: string; finishAfterMs: number };
-export async function fetchCuePlayback(sessionId: string, signal?: AbortSignal): Promise<CuePlayback | null> {
-  const response = await fetch(`/api/sessions/${encodeURIComponent(sessionId)}/cue-playback`, { signal });
-  if (!response.ok) throw await failure(response);
-  return ((await response.json()) as { playback: CuePlayback | null }).playback;
 }

@@ -1,26 +1,28 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { NpcIdSchema, type GameAction, type PublicState, type RendererProps, type TurnRequest, type TurnResponse } from '@vibequest/shared';
+import { npcOpeners, type PublicState, type RendererProps, type TurnRequest, type TurnResponse } from '@vibequest/shared';
 import { Recorder } from '../audio/Recorder';
 import { finishConfirmation, useAudioActivity } from '../audio/audio-bus';
 import { startLiveVoice, type LiveStatus } from '../audio/live-voice';
 import '../audio/live.css';
 import { CoachPanel } from './CoachPanel';
-import { npcNames as names, type ConversationSummary, type ThreadLine as Line } from './ConversationCard';
+import { NpcActions } from './NpcActions';
+import { roleNames, type ConversationSummary, type NpcTarget, type ThreadLine as Line } from './ConversationCard';
 
 const AUTO_SEND_SECONDS = 4;
 
-export function DialoguePanel({ state, npcId, pending, turn, choices = [], onAction, onSubmit, onLiveTurn, onClose }: {
-  state: PublicState; npcId: string; pending: boolean; turn: TurnResponse | null; choices?: PublicState['interactables'];
-  onAction: RendererProps['onAction']; onSubmit: (npcId: string, input: TurnRequest['input']) => Promise<void>; onLiveTurn?: (npcId: string, turn: TurnResponse) => void; onClose: (ended?: ConversationSummary) => void;
+export function DialoguePanel({ state, npc, pending, turn, onAction, onSubmit, onLiveTurn, onClose }: {
+  state: PublicState; npc: NpcTarget; pending: boolean; turn: TurnResponse | null;
+  onAction: RendererProps['onAction']; onSubmit: (npc: NpcTarget, input: TurnRequest['input']) => Promise<void>; onLiveTurn?: (npc: NpcTarget, turn: TurnResponse) => void; onClose: (ended?: ConversationSummary) => void;
 }) {
-  const npc = NpcIdSchema.parse(npcId);
+  const name = npc.name;
   const [draft, setDraft] = useState('');
   const [transcription, setTranscription] = useState<{ id: string; original: string } | null>(null);
   const [countdown, setCountdown] = useState<number | null>(null);
-  const [thread, setThread] = useState<Line[]>([]);
+  // NEW_QUESTS: the NPC speaks first (the vendor opens with 你想喝什么？).
+  const [thread, setThread] = useState<Line[]>(() => [{ role: 'npc', text: npcOpeners[npc.role] }]);
   const threadRef = useRef<Line[]>([]); threadRef.current = thread;
   // A goodbye closes with the exchange attached so the app can show the conversation summary card.
-  const finish = useCallback(() => onClose({ npcId: npc, thread: threadRef.current }), [onClose, npc]);
+  const finish = useCallback(() => onClose({ npc, thread: threadRef.current }), [onClose, npc]);
   const [outgoing, setOutgoing] = useState<string | null>(null);
   const composing = useRef(false);
   const firstButton = useRef<HTMLButtonElement>(null);
@@ -42,7 +44,7 @@ export function DialoguePanel({ state, npcId, pending, turn, choices = [], onAct
   useEffect(() => {
     if (!liveEligible) { setLive(null); return; }
     setLive({ status: 'connecting' }); setPartial({ player: '', npc: '' });
-    const handle = startLiveVoice(state.sessionId, npc, (event) => {
+    const handle = startLiveVoice(state.sessionId, npc.role, npc.anchorId, (event) => {
       if (event.kind === 'status') {
         // A failed evaluation is a notice in the thread; the mic keeps listening. Connection problems replace the status row.
         if (event.status === 'error' && event.retryable) { setThread((lines) => [...lines, { role: 'notice', text: event.message ?? 'That turn could not be evaluated. Say it again.' }]); return; }
@@ -52,7 +54,7 @@ export function DialoguePanel({ state, npcId, pending, turn, choices = [], onAct
       if (event.kind === 'turn') {
         onLiveTurn?.(npc, event.turn);
         if (event.turn.conversationEnded) { setClosing(true); pauseRef.current?.(true); }
-        // Practice only (live mode never runs in boss): coaching and penalties stay visible in the thread.
+        // Coaching and penalties stay visible in the thread.
         const extra: Line[] = [...(event.turn.feedback ? [{ role: 'coach', feedback: event.turn.feedback } as Line] : []), ...event.turn.events.map((item) => ({ role: 'notice', text: item.message } as Line))];
         if (extra.length) setThread((lines) => [...lines, ...extra]);
         return;
@@ -63,7 +65,7 @@ export function DialoguePanel({ state, npcId, pending, turn, choices = [], onAct
     });
     pauseRef.current = handle.pause;
     return () => { pauseRef.current = null; handle.stop(); };
-  }, [liveEligible, liveAttempt, state.sessionId, npc]); // onLiveTurn is stable per session
+  }, [liveEligible, liveAttempt, state.sessionId, npc.anchorId]); // onLiveTurn is stable per session
 
   useEffect(() => { firstButton.current?.focus(); }, []);
   // A turn that already existed when the panel opened belongs to the previous conversation: never replay it (or its goodbye).
@@ -103,7 +105,7 @@ export function DialoguePanel({ state, npcId, pending, turn, choices = [], onAct
     // The world owner also ignores editable targets. Keep gameplay keys within the panel.
     if (event.key !== 'Escape') event.stopPropagation();
   }}>
-    <header><div><span className="eyebrow">CONVERSATION</span><h2 id="dialogue-title" lang="zh-Hans">{names[npc]}</h2><span className="mood-label">{state.npcMood[npc]}</span></div><button ref={firstButton} className="button secondary" onClick={() => onClose()} aria-label="Close conversation">Close · Esc</button></header>
+    <header><div><span className="eyebrow">CONVERSATION</span><h2 id="dialogue-title" lang="zh-Hans">{name}</h2><span className="mood-label">{roleNames[npc.role]} · {state.npcMood[npc.role]}</span></div><button ref={firstButton} className="button secondary" onClick={() => onClose()} aria-label="Close conversation">Close · Esc</button></header>
     {(thread.length > 0 || outgoing) && <div className="chat-thread" aria-live="polite">
       {thread.map((line, index) => line.role === 'coach'
         ? <div key={index} className="bubble coach" data-testid="live-coach"><span>{line.feedback.understood}</span><span>{line.feedback.explanation}</span><span className="mandarin-chip" lang="zh-Hans">{line.feedback.improvedExample}</span></div>
@@ -115,17 +117,17 @@ export function DialoguePanel({ state, npcId, pending, turn, choices = [], onAct
       {partial.npc && <p className="bubble npc partial" lang="zh-Hans">{partial.npc}</p>}
       {partial.player && <p className="bubble player partial" lang="zh-Hans">{partial.player}</p>}
     </div>}
-    {pending && <div className="conversation-status" role="status">{names[npc]} is thinking<span className="thinking-dots" aria-hidden="true"><i /><i /><i /></span></div>}
+    {pending && <div className="conversation-status" role="status">{name} is thinking<span className="thinking-dots" aria-hidden="true"><i /><i /><i /></span></div>}
     {closing && <div className="conversation-status" role="status" data-testid="conversation-closing">Conversation finished</div>}
     {!closing && liveActive && live && <div className="live-status" role="status" data-testid="live-status" data-status={live.status}>
       <span className={`live-mic ${live.status}`} aria-hidden="true" />
-      <span>{live.status === 'connecting' ? 'Connecting…' : live.status === 'npc-speaking' ? `${names[npc]} is speaking…` : live.status === 'paused' ? 'Mic paused' : live.status === 'error' ? live.message ?? 'Live voice hit a problem.' : 'Listening… just talk'}</span>
+      <span>{live.status === 'connecting' ? 'Connecting…' : live.status === 'npc-speaking' ? `${name} is speaking…` : live.status === 'paused' ? 'Mic paused' : live.status === 'error' ? live.message ?? 'Live voice hit a problem.' : 'Listening… just talk'}</span>
       {live.status === 'error' ? (live.retryable && <button type="button" className="button secondary" onClick={() => setLiveAttempt((count) => count + 1)}>Retry</button>)
         : <button type="button" className="button secondary" onClick={() => pauseRef.current?.(live.status !== 'paused')}>{live.status === 'paused' ? 'Resume' : 'Pause mic'}</button>}
     </div>}
     {/* After a goodbye nothing more can be said: the controls go away until the summary card replaces the panel. */}
     {!closing && <>
-    {!liveActive && <div className="recorder-mount" aria-busy={pending}><Recorder state={state} npcId={npc} onAction={onAction} onTranscript={(result) => { setTranscription({ id: result.transcriptionId, original: result.text }); setDraft(result.text); setCountdown(AUTO_SEND_SECONDS); }} /></div>}
+    {!liveActive && <div className="recorder-mount" aria-busy={pending}><Recorder state={state} npcId={npc.role} onAction={onAction} onTranscript={(result) => { setTranscription({ id: result.transcriptionId, original: result.text }); setDraft(result.text); setCountdown(AUTO_SEND_SECONDS); }} /></div>}
     <button className="button secondary" disabled={pending} onClick={() => void onAction({ type: 'setInputPreference', preference: state.inputPreference === 'voice' ? 'typed-accessibility' : 'voice' }).catch(() => undefined)}>{state.inputPreference === 'voice' ? 'Use typed Mandarin' : 'Use voice'}</button>
     {(state.inputPreference === 'typed-accessibility' || transcription) && <form onSubmit={(event) => { event.preventDefault(); void send(); }}>
       <label className="field-label" htmlFor="mandarin-input">{transcription ? 'What you said' : 'Typed Mandarin'}</label>
@@ -136,7 +138,7 @@ export function DialoguePanel({ state, npcId, pending, turn, choices = [], onAct
         }} />
       <div className="input-footer"><span>{countdown !== null ? <strong className="countdown">Sending in {countdown}…</strong> : transcription ? 'Edit if that is not what you said.' : 'Typed input does not count as spoken evidence.'}</span><button className="button primary" type="submit" disabled={pending || !draft.trim()}>Send Mandarin</button></div>
     </form>}
-    {choices.length > 0 && <div className="chat-actions" aria-label="Actions">{choices.map((item) => <button className="button secondary" key={item.id} disabled={pending} lang="zh-Hans" onClick={() => void onAction({ type: 'choose', choiceId: item.id as Extract<GameAction, { type: 'choose' }>['choiceId'] }).catch(() => undefined)}>{item.label}</button>)}</div>}
+    <NpcActions state={state} anchorId={npc.anchorId} extra={turn?.actions} pending={pending} onAction={onAction} onClose={() => onClose()} onEnd={finish} />
     </>}
     <CoachPanel state={state} turn={turn} />
   </section>;

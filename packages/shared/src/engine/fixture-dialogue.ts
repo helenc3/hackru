@@ -6,6 +6,7 @@ const examples: Record<string, { intent: Intent; slots: Slot[] }> = {
   '再见': { intent: 'farewell', slots: [] },
   '拜拜': { intent: 'farewell', slots: [] },
   '谢谢再见': { intent: 'farewell', slots: [] },
+  '谢谢': { intent: 'farewell', slots: [] },
   '我要咖啡': { intent: 'order_drink', slots: [{ key: 'drink', value: 'coffee' }] },
   '请给我一杯咖啡': { intent: 'order_drink', slots: [{ key: 'drink', value: 'coffee' }] },
   '我要茶': { intent: 'order_drink', slots: [{ key: 'drink', value: 'tea' }] },
@@ -19,19 +20,18 @@ const examples: Record<string, { intent: Intent; slots: Slot[] }> = {
   '可以': { intent: 'confirm_drink_price', slots: [] },
   '取消订单': { intent: 'cancel_order', slots: [] },
   '我不要了': { intent: 'cancel_order', slots: [] },
-  '去江滨的车在哪个站台': { intent: 'ask_direction', slots: [{ key: 'destination', value: 'jiangbin' }] },
-  '去江濱的车在哪个站台': { intent: 'ask_direction', slots: [{ key: 'destination', value: 'jiangbin' }] },
-  '去海港的车在哪个站台': { intent: 'ask_direction', slots: [{ key: 'destination', value: 'haigang' }] },
-  '是三号站台吗': { intent: 'confirm_platform', slots: [{ key: 'platform', value: '3' }] },
-  '是3号站台吗': { intent: 'confirm_platform', slots: [{ key: 'platform', value: '3' }] },
-  '是叁号站台吗': { intent: 'confirm_platform', slots: [{ key: 'platform', value: '3' }] },
-  '是二号站台吗': { intent: 'confirm_platform', slots: [{ key: 'platform', value: '2' }] },
   '请再说一遍': { intent: 'request_repeat', slots: [] },
-  '我要一张去海港的票': { intent: 'buy_ticket', slots: [{ key: 'destination', value: 'haigang' }, { key: 'quantity', value: '1' }] },
-  '请给我一张海港的车票': { intent: 'buy_ticket', slots: [{ key: 'destination', value: 'haigang' }, { key: 'quantity', value: '1' }] },
-  '海港一张': { intent: 'confirm_ticket', slots: [{ key: 'destination', value: 'haigang' }, { key: 'quantity', value: '1' }] },
-  '一张去海港的票': { intent: 'confirm_ticket', slots: [{ key: 'destination', value: 'haigang' }, { key: 'quantity', value: '1' }] },
-  'one ticket to Harbor': { intent: 'buy_ticket', slots: [{ key: 'destination', value: 'haigang' }, { key: 'quantity', value: '1' }] },
+  '请问去上海大酒店怎么走': { intent: 'ask_directions', slots: [{ key: 'destination', value: 'grand-hotel' }] },
+  '去上海大酒店怎么走': { intent: 'ask_directions', slots: [{ key: 'destination', value: 'grand-hotel' }] },
+  '上海大酒店在哪儿': { intent: 'ask_directions', slots: [{ key: 'destination', value: 'grand-hotel' }] },
+  '上海大酒店在哪里': { intent: 'ask_directions', slots: [{ key: 'destination', value: 'grand-hotel' }] },
+  '请问上海大酒店在哪儿': { intent: 'ask_directions', slots: [{ key: 'destination', value: 'grand-hotel' }] },
+  '去火车站怎么走': { intent: 'ask_directions', slots: [{ key: 'destination', value: 'other' }] },
+  '可以帮我在这里拍张照吗': { intent: 'request_photo', slots: [] },
+  '可以帮我拍张照吗': { intent: 'request_photo', slots: [] },
+  '请帮我拍张照': { intent: 'request_photo', slots: [] },
+  '能帮我拍一张照片吗': { intent: 'request_photo', slots: [] },
+  'canyoutakemyphoto': { intent: 'request_photo', slots: [] },
 };
 // Decimal digits and Mandarin digit/unit forms are normalized without guessing.
 export function parseFixturePrice(text: string): number | undefined {
@@ -60,6 +60,6 @@ export function createFixtureDialogueProvider(): DialogueProvider {
     }
     const allowed = matched && context.allowedIntents.includes(matched.intent);
     const insult = text === '你真笨';
-    return TurnEvaluationSchema.parse({ intent: allowed ? matched.intent : 'unknown', slots: allowed ? matched.slots : [], evidenceQuote: allowed ? playerText : '', intentGrade: { score: allowed ? 0.95 : 0, confidence: allowed ? 0.95 : 0.5 }, clarity: allowed ? 0.9 : 0.3, courtesy: insult ? 0 : 0.8, targetLanguageUse: playerText === 'one ticket to Harbor' ? 'no' : allowed ? 'yes' : 'uncertain', interaction: insult ? 'insult' : allowed ? matched.intent === 'request_repeat' ? 'repeat' : 'relevant' : 'irrelevant', replyZh: '请再说一遍。', coach: context.mode === 'boss' ? null : { understood: allowed ? 'Recognized a documented fixture request.' : 'This fixture phrase is not recognized.', explanation: 'Fixture mode recognizes a fixed set of example phrases.', improvedExample: '请再说一遍。' } });
+    return TurnEvaluationSchema.parse({ intent: allowed ? matched.intent : 'unknown', slots: allowed ? matched.slots : [], evidenceQuote: allowed ? playerText : '', intentGrade: { score: allowed ? 0.95 : 0, confidence: allowed ? 0.95 : 0.5 }, clarity: allowed ? 0.9 : 0.3, courtesy: insult ? 0 : 0.8, targetLanguageUse: /^[A-Za-z\s]+$/.test(text) ? 'no' : allowed ? 'yes' : 'uncertain', interaction: insult ? 'insult' : allowed ? matched.intent === 'request_repeat' ? 'repeat' : 'relevant' : 'irrelevant', replyZh: '请再说一遍。', coach: { understood: allowed ? 'Recognized a documented fixture request.' : 'This fixture phrase is not recognized.', explanation: 'Fixture mode recognizes a fixed set of example phrases.', improvedExample: '请再说一遍。' } });
   } };
 }

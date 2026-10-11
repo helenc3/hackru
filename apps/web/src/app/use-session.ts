@@ -1,11 +1,13 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { NpcIdSchema, type CreateSessionRequest, type GameAction, type GameEvent, type PublicState, type TurnRequest, type TurnResponse } from '@vibequest/shared';
+import { useCallback, useRef, useState } from 'react';
+import { type CreateSessionRequest, type GameAction, type GameEvent, type PublicState, type TurnRequest, type TurnResponse } from '@vibequest/shared';
 import { act, createSession, getState, sendTurn, SessionClientError } from './session-client';
+import { rememberedWorldId, rememberWorld } from '../city/chunk-cache';
 
 export type UiProblem = { code: string; message: string; retryable: boolean; expired: boolean };
 const storageKey = (validation: boolean) => validation ? 'vibequest.validation-session.v1' : 'vibequest.player-session.v1';
 function stored(validation: boolean): string | null { try { return localStorage.getItem(storageKey(validation)); } catch { return null; } }
 function remember(validation: boolean, id: string | null) { try { if (id) localStorage.setItem(storageKey(validation), id); else localStorage.removeItem(storageKey(validation)); } catch { /* storage can be unavailable in private mode */ } }
+export type NpcTarget = { anchorId: string; role: TurnRequest['npcId']; name: string };
 
 /** UI coordinator only: every transition and reward comes from a schema-checked server response. */
 export function useSession(validation: boolean) {
@@ -31,6 +33,8 @@ export function useSession(validation: boolean) {
     setState(next);
     remember(validation, next.sessionId);
     setResumeId(next.sessionId);
+    // Validation sessions use throwaway cities so they never touch the player's world.
+    if (!validation) rememberWorld(next.worldId);
   }, [validation]);
 
   const report = useCallback((error: unknown, token: number) => {
@@ -63,11 +67,13 @@ export function useSession(validation: boolean) {
     await enqueue(async (token) => accept(await getState(id), token));
   }, [accept, enqueue, resumeId]);
 
+  /** Reuses the remembered city (its saved terrain restores identically); a new city is reset by the caller first. */
   const start = useCallback(async (options: CreateSessionRequest) => {
     if (pending) return;
     const token = ++generation.current;
     current.current = null; setState(null); setTurn(null); setEvents([]);
-    await enqueue(async (active) => accept(await createSession({ ...options, validationMode: validation }), active), token);
+    const worldId = validation ? undefined : rememberedWorldId();
+    await enqueue(async (active) => accept(await createSession({ ...options, validationMode: validation, ...(worldId ? { worldId } : {}) }), active), token);
   }, [accept, enqueue, pending, validation]);
 
   const onAction = useCallback(async (action: GameAction) => {
@@ -86,7 +92,7 @@ export function useSession(validation: boolean) {
     await enqueue(async (token) => {
       if (interrupted && current.current) accept(await getState(current.current.sessionId), token);
       const snapshot = current.current;
-      if (!snapshot || snapshot.status !== 'active' && !['retryMission', 'startMission', 'setInputPreference', 'audioPhase', 'finishCue'].includes(action.type)) throw new SessionClientError(422, 'NO_ACTIVE_SESSION', 'Start or resume a session before interacting.', false);
+      if (!snapshot || snapshot.status !== 'active' && !['retryMission', 'startMission', 'setInputPreference', 'audioPhase'].includes(action.type)) throw new SessionClientError(422, 'NO_ACTIVE_SESSION', 'Start or resume a session before interacting.', false);
       input = { actionId, expectedVersion: snapshot.version, action };
       const response = await act(snapshot.sessionId, input);
       if (token !== generation.current) return;
@@ -96,8 +102,7 @@ export function useSession(validation: boolean) {
     }, scope);
   }, [accept, enqueue]);
 
-  const submit = useCallback(async (npcId: string, input: TurnRequest['input']) => {
-    const id = NpcIdSchema.parse(npcId);
+  const submit = useCallback(async (npc: NpcTarget, input: TurnRequest['input']) => {
     const turnId = crypto.randomUUID();
     let request: TurnRequest | undefined;
     await enqueue(async (token) => {
@@ -106,7 +111,7 @@ export function useSession(validation: boolean) {
       if (request && current.current) accept(await getState(current.current.sessionId), token);
       const snapshot = current.current;
       if (!snapshot || snapshot.status !== 'active') throw new SessionClientError(422, 'NO_ACTIVE_SESSION', 'There is no active conversation.', false);
-      request = { turnId, expectedVersion: snapshot.version, npcId: id, input };
+      request = { turnId, expectedVersion: snapshot.version, npcId: npc.role, anchorId: npc.anchorId, input };
       activeTurn.current = turnId; setTurnPending(true);
       let response: TurnResponse;
       try { response = await sendTurn(snapshot.sessionId, request); } finally {
@@ -114,17 +119,16 @@ export function useSession(validation: boolean) {
       }
       if (token !== generation.current) return;
       accept(response.state, token);
-      if (token === generation.current && response.state.version >= (current.current?.version ?? 0)) { setTurn(response); setTurnNpc(id); }
+      if (token === generation.current && response.state.version >= (current.current?.version ?? 0)) { setTurn(response); setTurnNpc(npc.anchorId); }
       setEvents((previous) => [...previous, ...response.events.filter((event) => !previous.some((known) => known.id === event.id))].slice(-8));
     });
   }, [accept, enqueue]);
 
   /** A live-voice turn evaluated server-side over the WebSocket: same bookkeeping as a POST /turns response. */
-  const applyTurn = useCallback((npcId: string, response: TurnResponse) => {
-    const id = NpcIdSchema.parse(npcId);
+  const applyTurn = useCallback((npc: NpcTarget, response: TurnResponse) => {
     const token = generation.current;
     accept(response.state, token);
-    if (response.state.version >= (current.current?.version ?? 0)) { setTurn(response); setTurnNpc(id); }
+    if (response.state.version >= (current.current?.version ?? 0)) { setTurn(response); setTurnNpc(npc.anchorId); }
     setEvents((previous) => [...previous, ...response.events.filter((event) => !previous.some((known) => known.id === event.id))].slice(-8));
   }, [accept]);
 
@@ -133,12 +137,6 @@ export function useSession(validation: boolean) {
     tail.current = Promise.resolve(); setPending(0); activeTurn.current = null; setTurnPending(false);
     retry.current = null; remember(validation, null); setResumeId(null);
   }, [validation]);
-
-  useEffect(() => {
-    if (!state?.timer || state.status !== 'active' || problem) return;
-    const interval = setInterval(() => { if (!pending) void refresh().catch(() => undefined); }, 3000);
-    return () => clearInterval(interval);
-  }, [state?.sessionId, state?.timer, state?.status, pending, problem, refresh]);
 
   return { state, pending: pending > 0, turnPending, problem, turn, turnNpc, events, resumeId, start, refresh, onAction, submit, applyTurn, abandon,
     retry: async () => { await retry.current?.(); }, dismiss: () => setProblem(null) };

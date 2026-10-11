@@ -14,6 +14,7 @@ Use this stable registry to dispatch work. Status is deliberately **planned** in
 | [Segment-007](segments/Segment-007.md) | Integrated acceptance and production build | 000, 001, 002, 003, 004, 005, 006 | A |
 | [Segment-008](segments/Segment-008.md) | Submission package and final demo readiness | 007 | C/D |
 | [Segment-009](segments/Segment-009.md) | Optional conversation pacing polish (optional) | 005, 007 | B/C |
+| [Segment-010](segments/Segment-010.md) | Shanghai city streaming and exploration quests (spec 2.0) | 007 | A + parallel agents |
 
 ## Parallel dispatch
 
@@ -27,6 +28,8 @@ File ownership is explicit in each packet. Root package/lockfile edits are restr
 
 Invocation in a repository with this kit at root: `Build Segment-003`. For a fresh account, only repository access and this request are needed; it reads the root entry point and linked documents. If the root AGENTS.md is not discovered by the client, use: `Read AGENTS.md and build Segment-003`.
 
-The machine-readable equivalent is [segment-registry.json](segment-registry.json). Completion record format and merge rules are in [BUILD_PROTOCOL.md](BUILD_PROTOCOL.md).
+The machine-readable equivalent is [segment-registry.json](segment-registry.json). Completion record format and merge rules are in `BUILD_PROTOCOL.md` (removed in 37f445d; see git history).
 
 Version 1.2: Mandarin Chinese and one voice-led world. The text harness is development-only; 003 is not a second gameplay edition, 005 is not voice-output-only, and 009 is not the first delivery of speech input. Prior 1.1 completion records require migration.
+
+Version 2.0: Segment-010 replaces the P1/P2/B1 station campaign with three exploration quests in a streamed Shanghai-style city. Segments 000–009 remain as the 1.2 history; their station-specific content is migrated by 010.

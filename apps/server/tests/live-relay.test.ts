@@ -2,9 +2,8 @@ import { createGame } from '@vibequest/shared';
 import { createServer, type Server } from 'node:http';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import WebSocket from 'ws';
-import { loadConfig } from '../src/config.js';
 import { attachLiveRelay, type LiveConnect, type LiveSession } from '../src/live/relay.js';
-import { createServices } from '../src/services.js';
+import { ANCHORS, fakeServices } from './game/helpers.js';
 
 type Fake = LiveSession & { closed: boolean; audio: string[]; signal?: AbortSignal };
 const fakes: Fake[] = [];
@@ -16,11 +15,12 @@ const connect: LiveConnect = async (params) => {
   return fake;
 };
 
-const services = createServices(loadConfig({ NODE_ENV: 'test', GEMINI_API_KEY: 'test-key' }));
+const services = fakeServices({ NODE_ENV: 'test', GEMINI_API_KEY: 'test-key' });
+const liveQuery = `npcId=vendor&anchorId=${ANCHORS.vendor.id}`;
 let server: Server; let port = 0; let sessionId = '';
 
 const open = (id: string) => new Promise<{ ws: WebSocket; events: { type: string }[] }>((resolve, reject) => {
-  const ws = new WebSocket(`ws://127.0.0.1:${port}/api/sessions/${id}/live?npcId=xiaolin`);
+  const ws = new WebSocket(`ws://127.0.0.1:${port}/api/sessions/${id}/live?${liveQuery}`);
   const events: { type: string }[] = [];
   ws.on('message', (data) => { const event = JSON.parse(data.toString()); events.push(event); if (event.type === 'ready') resolve({ ws, events }); if (event.type === 'error') reject(new Error(event.code)); });
   ws.on('error', reject);
@@ -28,8 +28,8 @@ const open = (id: string) => new Promise<{ ws: WebSocket; events: { type: string
 const tick = () => new Promise((resolve) => setTimeout(resolve, 30));
 
 beforeAll(async () => {
-  const state = createGame({ sessionId: 'live-test', attemptId: 'a1', missionId: 'P1', initialTier: 0, validationMode: true, inputPreference: 'voice', providerStatus: 'live' }, Date.now());
-  state.zoneId = 'cafe'; // validation mode skips the distance check; the zone must still match Xiaolin's
+  // The spawn vendor stands within interaction reach of the world spawn.
+  const state = createGame({ sessionId: 'live-test', worldId: 'w-test', attemptId: 'a1', missionId: 'Q1', initialTier: 0, validationMode: false, inputPreference: 'voice', providerStatus: 'live', spawn: { x: 0, z: 0 } }, Date.now());
   sessionId = (await services.sessionStore.create(state)).id;
   server = createServer();
   attachLiveRelay(server, services, { connect });
@@ -60,7 +60,7 @@ describe('live relay lifecycle', () => {
 
   it('closing before ready aborts the pending connect and closes a late-arriving Gemini session', async () => {
     release = () => undefined; // arm: next connect blocks until released
-    const ws = new WebSocket(`ws://127.0.0.1:${port}/api/sessions/${sessionId}/live?npcId=xiaolin`);
+    const ws = new WebSocket(`ws://127.0.0.1:${port}/api/sessions/${sessionId}/live?${liveQuery}`);
     await new Promise<void>((resolve) => ws.once('open', resolve));
     await tick();
     expect(fakes).toHaveLength(3);
@@ -73,8 +73,14 @@ describe('live relay lifecycle', () => {
     expect(pending.closed).toBe(true);
   });
 
-  it('rejects unknown sessions without opening Gemini', async () => {
+  it('rejects unknown sessions, missing anchors and out-of-reach NPCs without opening Gemini', async () => {
     await expect(open('nope')).rejects.toThrow('SESSION_NOT_FOUND');
+    const ws = (query: string) => new Promise<string>((resolve) => {
+      const socket = new WebSocket(`ws://127.0.0.1:${port}/api/sessions/${sessionId}/live?${query}`);
+      socket.on('message', (data) => { const event = JSON.parse(data.toString()); if (event.type === 'error') resolve(event.code); });
+    });
+    expect(await ws('npcId=vendor')).toBe('INVALID_REQUEST');
+    expect(await ws(`npcId=guide&anchorId=${ANCHORS.guide.id}`)).toBe('ACTION_FORBIDDEN');
     expect(fakes).toHaveLength(3);
   });
 });

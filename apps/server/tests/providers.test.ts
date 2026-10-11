@@ -9,14 +9,14 @@ describe('injected bootstrap services', () => {
       NODE_ENV: 'test',
     }));
     const context: TurnContext = {
-      missionId: 'P1', mode: 'practice', tier: 0, npcId: 'xiaolin',
+      missionId: 'Q1', mode: 'practice', tier: 0, npcId: 'vendor', anchorId: 'an.vendor.0-0', nameZh: '小林',
       persona: 'warm café clerk', patience: 1, allowedIntents: ['greeting', 'unknown'],
       facts: {}, history: [],
     };
     await expect(services.dialogueProvider.evaluate(context, '你好')).rejects.toMatchObject({
       status: 503, code: 'PROVIDER_UNAVAILABLE', retryable: true,
     });
-    await expect(services.speechProvider.synthesize('你好', 'xiaolin')).rejects.toMatchObject({
+    await expect(services.speechProvider.synthesize('你好', 'vendor')).rejects.toMatchObject({
       status: 503, code: 'SPEECH_UNAVAILABLE', retryable: true,
     });
     await expect(services.speechProvider.transcribe(new Uint8Array(), 'audio/webm')).rejects.toMatchObject({

@@ -1,22 +1,19 @@
 import { useEffect, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { Group, Vector3, Vector2, Raycaster, Plane } from 'three';
-import { sceneManifest, type Position, type PublicState } from '@vibequest/shared';
+import { WORLD_RULES, type Position, type PublicState } from '@vibequest/shared';
 import { distance, movePlayer, zoneAt } from './navigation';
+import type { CityHandle } from '../city/use-city';
 import { Player, type Gait } from './characters';
 import { initialPosition, type Runtime } from './runtime';
 import { useAudioActivity } from '../audio/audio-bus';
 import { DEFAULT_PITCH, orbitDistance } from './camera';
 
-export const landmarks = [
-  { label: '广场', x: 0, z: 11 }, { label: '咖啡店', x: -10, z: 7.8 },
-  { label: '售货亭', x: 8, z: 7 }, { label: '车站', x: 0, z: 1 },
-  ...[-10, 0, 10].map((x, i) => ({ label: ['一号站台', '二号站台', '三号站台'][i], x, z: -13.8 })),
-];
+export type Landmark = { label: string; x: number; z: number };
 
-export function Motion({ runtime, root, labels, state, tick, sync }: {
+export function Motion({ runtime, root, labels, marks, city, state, tick, sync }: {
   runtime: React.RefObject<Runtime>; root: React.RefObject<HTMLElement | null>;
-  labels: React.RefObject<(HTMLSpanElement | null)[]>; state: PublicState;
+  labels: React.RefObject<(HTMLSpanElement | null)[]>; marks: readonly Landmark[]; city: CityHandle; state: PublicState;
   tick: (position: Position) => void; sync: (position: Position) => void;
 }) {
   const avatar = useRef<Group>(null);
@@ -43,7 +40,9 @@ export function Motion({ runtime, root, labels, state, tick, sync }: {
   }, []);
   useFrame(({ camera, size, gl }, delta) => {
     const r = runtime.current;
-    const blocked = !r.active || r.busy || state.status !== 'active' || document.activeElement !== root.current || document.hidden;
+    city.focus(r.position);
+    // Movement waits until the chunk under the player is committed (server validates the same manifests).
+    const blocked = !city.ready(r.position) || !r.active || r.busy || state.status !== 'active' || document.activeElement !== root.current || document.hidden;
     r.groundPoint = (x, y) => {
       const bounds = gl.domElement.getBoundingClientRect();
       ray.current.setFromCamera(new Vector2((x - bounds.left) / bounds.width * 2 - 1, 1 - (y - bounds.top) / bounds.height * 2), camera);
@@ -59,11 +58,11 @@ export function Motion({ runtime, root, labels, state, tick, sync }: {
     const waypoint = r.path?.[0];
     const moving = keyed || Boolean(waypoint);
     const previous = r.position;
-    if (keyed) r.position = movePlayer(r.position, right, forward, r.yaw, delta);
+    if (keyed) r.position = movePlayer(city.view, r.position, right, forward, r.yaw, delta);
     else if (waypoint) {
       const remaining = distance(r.position, waypoint);
-      const seconds = Math.min(delta, remaining / sceneManifest.movementSpeed);
-      r.position = movePlayer(r.position, waypoint.x - r.position.x, r.position.z - waypoint.z, 0, seconds);
+      const seconds = Math.min(delta, remaining / WORLD_RULES.movementSpeed);
+      r.position = movePlayer(city.view, r.position, waypoint.x - r.position.x, r.position.z - waypoint.z, 0, seconds);
       if (distance(r.position, waypoint) < .01) r.path?.shift();
       else if (distance(previous, r.position) < .0001) r.path = [];
     }
@@ -94,7 +93,7 @@ export function Motion({ runtime, root, labels, state, tick, sync }: {
     camera.position.set(r.position.x + Math.sin(r.yaw) * orbit * Math.cos(pitch), .7 + orbit * Math.sin(pitch), r.position.z + Math.cos(r.yaw) * orbit * Math.cos(pitch));
     camera.lookAt(r.position.x, .7, r.position.z);
     camera.updateMatrixWorld();
-    landmarks.forEach((mark, i) => {
+    marks.forEach((mark, i) => {
       const node = labels.current[i];
       if (!node) return;
       const p = projected.current.set(mark.x, 1.9, mark.z).project(camera);
@@ -108,7 +107,7 @@ export function Motion({ runtime, root, labels, state, tick, sync }: {
     if (c.ui >= .1) {
       c.ui = 0;
       tick({ ...r.position });
-      root.current?.setAttribute('data-zone', zoneAt(r.position));
+      root.current?.setAttribute('data-zone', zoneAt(city.view, r.position));
     }
     if (c.elapsed >= 2) {
       root.current?.setAttribute('data-fps', (c.frames / c.elapsed).toFixed(1));
@@ -117,7 +116,7 @@ export function Motion({ runtime, root, labels, state, tick, sync }: {
     const now = performance.now();
     if ((moving && now - r.lastSync >= 300) || (!moving && c.wasMoving)) {
       r.lastSync = now;
-      if (distance(r.lastSent ?? initialPosition(state), r.position) > .02) sync({ ...r.position });
+      if (distance(r.lastSent ?? initialPosition(state), r.position) > .02 && city.ready(r.position)) sync({ ...r.position });
     }
     c.wasMoving = moving;
   });

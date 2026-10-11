@@ -113,34 +113,43 @@ export function createLiveBridge(options: {
   };
 }
 
+/** What each role steers toward; the engine, not this text, decides progress. */
+const ROLE_GOALS: Record<NpcId, string> = {
+  vendor: 'You sell drinks. Goal: the customer names a drink, you state its price, then they pay with the on-screen Pay button. Coffee is sold out; offer tea or water. After greetings or unclear speech, ask what they would like to drink.',
+  guide: 'You are a local who knows the way. If asked how to reach 上海大酒店, say the hotelRoute fact word for word. If there is no hotelRoute fact, or they ask about another place, say you are not sure of the way. Never invent roads, turns or distances.',
+  passerby: 'You are a friendly passer-by by the Huangpu River. If the learner asks you to take their photo, agree and ask them to stand at the photo spot with the river behind them; the game runs the countdown. Do not claim the photo was taken.',
+};
+
 function liveInstruction(context: TurnContext): string {
   return [
-    `You are ${context.npcId}, an NPC in a Mandarin Chinese learning game, talking with a learner by voice. Persona: ${context.persona}`,
-    'Speak only Simplified Chinese, standard Mandarin, as a real person would: at most two short sentences per reply, no English, no pinyin, no translations, no explanations, no coaching.',
-    `Immutable facts, the only truth; never invent prices, platforms, times or destinations not listed: ${JSON.stringify(context.facts)}`,
-    'Keep the conversation moving toward the mission goal. For the café: the customer names a drink, confirms its price, then pays. After greetings or unclear speech, ask what they would like.',
-    'If the customer\'s Mandarin is understood but makes no sense for the situation, ask a short clarifying question in Mandarin that includes the key vocabulary they need, for example 您要茶还是水？ so every unclear answer still teaches the needed word.',
-    'If the customer speaks English or another language, or their Mandarin is too unclear to understand, do NOT act on it: reply in simple Mandarin asking them to say it in Chinese and model the exact phrase for the current step, for example 请说中文。您可以说：我要一杯茶。 Never translate into English and never speak English yourself.',
+    `You are ${context.nameZh}, an NPC in a Mandarin Chinese learning game set in a Shanghai neighbourhood, talking with a learner by voice. Persona: ${context.persona}`,
+    'Speak only Simplified Chinese, standard Mandarin, as a real person would: at most two short sentences per reply (a verified route may be longer), no English, no pinyin, no translations, no explanations, no coaching.',
+    `Immutable facts, the only truth; never invent prices, roads, landmarks or places not listed: ${JSON.stringify(context.facts)}`,
+    ROLE_GOALS[context.npcId],
+    'If the learner\'s Mandarin is understood but makes no sense for the situation, ask a short clarifying question in Mandarin that includes the key vocabulary they need, so every unclear answer still teaches the needed word.',
+    `If the learner speaks English or another language, or their Mandarin is too unclear to understand, do NOT act on it: reply in simple Mandarin asking them to say it in Chinese and model the exact phrase for the current step, for example 请说中文。您可以说：${targetPhrase(context.npcId, undefined)} Never translate into English and never speak English yourself.`,
     'Never announce objectives, rewards, XP or game results. Rudeness gets a firm, polite boundary, never abuse.',
     'Lines starting with [game] are system notes about the game state, not the customer speaking; follow them silently and never read them aloud. They tell you the next step and the target phrase to model.',
   ].join('\n');
 }
 
-/** Authored target phrase per café node; the voice NPC models it when the learner stalls or speaks English. */
-export function targetPhrase(nodeId: string, drink: unknown): string | undefined {
-  if (nodeId === 'p1.order') return '我要一杯茶';
-  if (nodeId === 'p1.substitute') return '那就茶吧';
-  if (nodeId === 'p1.receipt') return drink === 'water' ? '水五元' : '茶十元';
-  return undefined;
+/** Authored target phrase per role (and café step); the voice NPC models it when the learner stalls or speaks English. */
+export function targetPhrase(npcId: NpcId, nodeId: string | undefined, drink?: unknown): string {
+  if (npcId === 'guide') return '请问，去上海大酒店怎么走？';
+  if (npcId === 'passerby') return '可以帮我在这里拍张照吗？';
+  if (nodeId?.endsWith('.substitute')) return '那就茶吧';
+  if (nodeId?.endsWith('.receipt')) return drink === 'water' ? '水五元' : '茶十元';
+  return '我要一杯茶';
 }
 
-export function alignmentNote(turn: TurnResponse, nodeId: string, drink: unknown): string {
+export function alignmentNote(turn: TurnResponse, npcId: NpcId, nodeId: string, drink: unknown): string {
+  // A verified route must be spoken exactly; the model's earlier reply may have improvised.
+  if (turn.events.some((event) => event.kind === 'directions') && turn.state.directions) return `[game] Say this verified route to the learner word for word, adding nothing: ${turn.state.directions.textZh}`;
   const next = turn.state.objectives.find((objective) => !objective.complete);
-  const phrase = targetPhrase(nodeId, drink);
-  return `[game] ${turn.events.length ? turn.events.map((event) => event.message).join(' ') : 'No progress this turn.'}${next ? ` Next step for the customer: ${next.label}` : ''}${phrase ? ` Target phrase the customer should say: ${phrase}` : ''}`;
+  return `[game] ${turn.events.length ? turn.events.map((event) => event.message).join(' ') : 'No progress this turn.'}${next ? ` Next step for the learner: ${next.label}` : ''} Target phrase the learner should say: ${targetPhrase(npcId, nodeId, drink)}`;
 }
 
-/** WebSocket upgrade at /api/sessions/:id/live?npcId=… on the API server (the dev proxy forwards upgrades). */
+/** WebSocket upgrade at /api/sessions/:id/live?npcId=…&anchorId=… on the API server (the dev proxy forwards upgrades). */
 export type LiveSession = Pick<Session, 'sendRealtimeInput' | 'sendClientContent' | 'close'>;
 export type LiveConnect = (params: Parameters<GoogleGenAI['live']['connect']>[0]) => Promise<LiveSession>;
 
@@ -154,22 +163,23 @@ export function attachLiveRelay(server: Server, services: ServerServices, option
     const url = new URL(request.url ?? '/', 'http://localhost');
     const match = /^\/api\/sessions\/([^/]+)\/live$/.exec(url.pathname);
     if (!match) { socket.destroy(); return; }
-    wss.handleUpgrade(request, socket, head, (ws) => void open(ws, decodeURIComponent(match[1]!), url.searchParams.get('npcId') ?? ''));
+    wss.handleUpgrade(request, socket, head, (ws) => void open(ws, decodeURIComponent(match[1]!), url.searchParams.get('npcId') ?? '', url.searchParams.get('anchorId') ?? ''));
   });
 
-  async function open(ws: WebSocket, sessionId: string, npcIdRaw: string): Promise<void> {
+  async function open(ws: WebSocket, sessionId: string, npcIdRaw: string, anchorIdRaw: string): Promise<void> {
     const send = (event: ServerEvent) => { if (ws.readyState === ws.OPEN) ws.send(JSON.stringify(event)); };
     const fail = (code: string, message: string) => { send({ type: 'error', code, message, retryable: false }); ws.close(4000, code); };
     const npcId = NpcIdSchema.safeParse(npcIdRaw);
     if (!npcId.success) return fail('INVALID_REQUEST', 'Unknown NPC.');
+    if (!/^[A-Za-z0-9][A-Za-z0-9._:-]{0,119}$/.test(anchorIdRaw)) return fail('INVALID_REQUEST', 'Unknown NPC anchor.');
+    const anchorId = anchorIdRaw;
     const apiKey = services.config.geminiApiKey;
     if (!apiKey) return fail('LIVE_UNAVAILABLE', 'Live voice is not configured on this server.');
     let context: TurnContext;
     try {
       context = await store.withSession(sessionId, async (session) => {
         if (session.state.providerStatus !== 'live') throw new HttpError(422, 'LIVE_UNAVAILABLE', 'Live voice needs a live-provider session.');
-        if (session.state.mode !== 'practice') throw new HttpError(422, 'LIVE_UNAVAILABLE', 'The boss uses the recorded conversation flow.');
-        return dialogueContext(session.state, npcId.data);
+        return dialogueContext(session.state, npcId.data, anchorId, services.worlds.view(session.state.worldId));
       });
     } catch (error) {
       return fail(error instanceof HttpError || error instanceof EngineRuleError ? error.code : 'LIVE_UNAVAILABLE', error instanceof Error ? error.message : 'Live voice is unavailable.');
@@ -201,9 +211,9 @@ export function attachLiveRelay(server: Server, services: ServerServices, option
           const record = { id: transcriptionId, sessionId, attemptId: session.state.attemptId, originalText: text, createdAtMs: nowMs, expiresAtMs: nowMs + TRANSCRIPTION_TTL_MS };
           if (!registerTranscription(session, record, nowMs)) throw new HttpError(409, 'ATTEMPT_ABANDONED', 'The mission was retried.', true);
         });
-        return runTurn(services, sessionId, { turnId: randomUUID(), expectedVersion: 0, npcId: npcId.data, input: { text, source: 'stt', transcriptionId } }, { checkVersion: false, spokenReply });
+        return runTurn(services, sessionId, { turnId: randomUUID(), expectedVersion: 0, npcId: npcId.data, anchorId, input: { text, source: 'stt', transcriptionId } }, { checkVersion: false, spokenReply });
       },
-      note: async (turn) => store.withSession(sessionId, async (session) => alignmentNote(turn, session.state.nodeId, session.state.flags['p1.drink'])),
+      note: async (turn) => store.withSession(sessionId, async (session) => alignmentNote(turn, npcId.data, session.state.nodeId, session.state.flags['q1.drink'])),
     });
     active.set(sessionId, release);
     ws.on('message', (data, isBinary) => { if (isBinary) bridge.onClientAudio(Buffer.isBuffer(data) ? data : Buffer.from(data as ArrayBuffer)); else bridge.onClientText(data.toString()); });
@@ -236,7 +246,7 @@ export function attachLiveRelay(server: Server, services: ServerServices, option
     }
     if (torn) { try { session.close(); } catch { /* closed */ } return; } // client left while Gemini was connecting
     gemini = session;
-    console.info(JSON.stringify({ live: 'open', npcId: npcId.data, model: services.config.geminiLiveModel }));
+    console.info(JSON.stringify({ live: 'open', npcId: npcId.data, anchorId, model: services.config.geminiLiveModel }));
     send({ type: 'ready', npcId: npcId.data, sampleRate: 24000 });
   }
 }

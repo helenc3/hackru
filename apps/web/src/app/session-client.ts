@@ -15,9 +15,9 @@ import {
   type TurnResponse,
 } from '@vibequest/shared';
 
-/** A transport seam, not a fixture engine. Segment-001 implements these routes. */
+/** A transport seam, not a fixture engine. The server implements these routes. */
 export type CreateSessionInput = Pick<CreateSessionRequest, 'initialTier' | 'providerMode'>
-  & Partial<Pick<CreateSessionRequest, 'validationMode' | 'inputPreference'>>;
+  & Partial<Pick<CreateSessionRequest, 'validationMode' | 'inputPreference' | 'worldId'>>;
 export type ActionResult = ActionResponse;
 export type EventListener = (event: GameEvent) => void;
 

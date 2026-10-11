@@ -25,15 +25,15 @@ async function fakeAudio(page: Page) {
   });
 }
 const counter = (page: Page, name: string) => page.evaluate((key) => Number((window as unknown as Record<string, unknown>)[key]), name);
-const liveState = () => PublicStateSchema.parse({ ...fixtureState('P1'), providerStatus: 'live' });
+const liveState = () => PublicStateSchema.parse({ ...fixtureState('Q1'), providerStatus: 'live' });
 
 async function openPanel(page: Page) {
   await installScriptedApi(page);
   // Registered last, so it wins: the session starts with live providers.
   await page.route('**/api/sessions', (route) => route.fulfill({ json: { state: liveState() } }));
   await page.goto('/');
-  await page.getByRole('button', { name: 'Start Practice', exact: true }).click();
-  await page.getByRole('button', { name: '小林 · Talk', exact: true }).click();
+  await page.getByRole('button', { name: 'Start exploring', exact: true }).click();
+  await page.getByRole('button', { name: '老王 · Talk', exact: true }).click();
   return page.getByTestId('dialogue-panel');
 }
 
@@ -44,7 +44,7 @@ test('live voice streams mic audio, renders transcripts, applies turns and honou
   const texts: string[] = [];
   await page.routeWebSocket(/\/api\/sessions\/[^/]+\/live/, (ws) => {
     urls.push(ws.url());
-    ws.send(JSON.stringify({ type: 'ready', npcId: 'xiaolin', sampleRate: 24000 }));
+    ws.send(JSON.stringify({ type: 'ready', npcId: 'vendor', sampleRate: 24000 }));
     ws.onMessage((message) => {
       if (typeof message === 'string') { texts.push(message); return; }
       binaryFrames.push(message.length);
@@ -62,14 +62,14 @@ test('live voice streams mic audio, renders transcripts, applies turns and honou
   const status = panel.getByTestId('live-status');
   // The scripted server answers the first mic frame within milliseconds, so a slow runner may already see the reply playing.
   await expect(status).toHaveAttribute('data-status', /^(live|npc-speaking)$/);
-  expect(urls[0]).toMatch(/^ws:\/\/[^/]+\/api\/sessions\/ui-player-P1\/live\?npcId=xiaolin$/);
+  expect(urls[0]).toMatch(/^ws:\/\/[^/]+\/api\/sessions\/ui-player-Q1\/live\?npcId=vendor&anchorId=ui\.vendor$/);
   expect(await counter(page, '__gum')).toBe(1);
   await expect(panel.getByRole('button', { name: 'Start recording' })).toHaveCount(0);
   await expect(panel.getByTestId('npc-reply')).toHaveText('一杯茶十元。');
   await expect(panel.locator('.bubble.player')).toHaveText('我要一杯茶。');
   expect(binaryFrames[0]).toBeGreaterThanOrEqual(1280); // ≥ one 40 ms PCM16 frame at 16 kHz
   await expect(page.getByTestId('quest-panel').locator('li[data-complete="true"]')).toHaveCount(1);
-  await expect(page.getByLabel('Mission updates')).toContainText('Order placed.');
+  await expect(page.getByLabel('Quest updates')).toContainText('Order placed.');
   await expect(panel.getByTestId('live-coach')).toContainText('Say the price back to confirm.');
   await expect(panel.getByTestId('live-coach').locator('.mandarin-chip')).toHaveText('茶十元。');
   await expect(panel.locator('.thread-notice')).toHaveText('Order placed.');
@@ -87,7 +87,7 @@ test('live voice streams mic audio, renders transcripts, applies turns and honou
 test('interrupted flushes queued NPC audio', async ({ page }) => {
   await fakeAudio(page);
   await page.routeWebSocket(/\/live/, (ws) => {
-    ws.send(JSON.stringify({ type: 'ready', npcId: 'xiaolin', sampleRate: 24000 }));
+    ws.send(JSON.stringify({ type: 'ready', npcId: 'vendor', sampleRate: 24000 }));
     let first = true;
     ws.onMessage((message) => {
       if (typeof message === 'string' || !first) return;
@@ -116,7 +116,7 @@ test('a 4xxx close falls back to the batch recorder without opening the mic', as
 test('a farewell turn followed by the server closing ends the conversation', async ({ page }) => {
   await fakeAudio(page);
   await page.routeWebSocket(/\/api\/sessions\/[^/]+\/live/, (ws) => {
-    ws.send(JSON.stringify({ type: 'ready', npcId: 'xiaolin', sampleRate: 24000 }));
+    ws.send(JSON.stringify({ type: 'ready', npcId: 'vendor', sampleRate: 24000 }));
     let sent = false;
     ws.onMessage((message) => {
       if (typeof message === 'string' || sent) return;

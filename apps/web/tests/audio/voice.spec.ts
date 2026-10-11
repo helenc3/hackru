@@ -35,8 +35,8 @@ const counter = (page: Page, name: string) => page.evaluate((key) => Number((win
 
 async function openPanel(page: Page) {
   await page.goto('/');
-  await page.getByRole('button', { name: 'Start Practice', exact: true }).click();
-  await page.getByRole('button', { name: '小林 · Talk', exact: true }).click();
+  await page.getByRole('button', { name: 'Start exploring', exact: true }).click();
+  await page.getByRole('button', { name: '老王 · Talk', exact: true }).click();
   return page.getByTestId('dialogue-panel');
 }
 function phases(api: Awaited<ReturnType<typeof installScriptedApi>>) {
@@ -174,39 +174,12 @@ test('restarting during a pending reply drops the old audio', async ({ page }) =
   await panel.getByRole('textbox').fill('请给我一杯茶。');
   await panel.getByRole('button', { name: 'Send Mandarin' }).click();
   await expect(page.getByTestId('audio-controller')).toContainText('Preparing reply audio');
-  await page.getByRole('button', { name: 'Restart mission' }).click();
+  await page.getByRole('button', { name: 'Restart quest' }).click();
   release = true;
   await page.waitForTimeout(500);
   expect(await counter(page, '__plays')).toBe(0);
   expect(phases(api)).toEqual([]);
   expect(api.remaining()).toBe(0);
-});
-
-test('PA plays the reviewed asset and reports finishCue only after it ends', async ({ page }) => {
-  await fakeMedia(page);
-  const cue = { id: 'p1.station-directions' as const, label: '去车站的路线', audioAssetId: 'p1.station-directions.tier-1' };
-  const steps: Step[] = [
-    { action: { type: 'playCue', cueId: 'p1.station-directions', channel: 'audio' }, patch: { visibleCues: [cue] } },
-    { action: { type: 'finishCue', playbackId: 'pb-1' } },
-  ];
-  const api = await installScriptedApi(page, { steps });
-  let delivered = false;
-  await page.route('**/api/sessions/*/cue-playback', (route) => route.fulfill({ json: { playback: delivered ? null : { playbackId: 'pb-1', cueId: cue.id, audioAssetId: cue.audioAssetId, finishAfterMs: 300 } } }));
-  await page.route('**/audio/*.mp3', (route) => route.fulfill({ contentType: 'audio/mpeg', body: Buffer.from('ID3fake') }));
-  await page.goto('/');
-  await page.getByRole('button', { name: 'Start Practice', exact: true }).click();
-  await page.evaluate(() => { (window as unknown as Record<string, boolean>).__holdPlayback = true; });
-  await page.getByRole('button', { name: 'Listen' }).click();
-  const controls = page.getByTestId('audio-controller');
-  await expect(controls).toContainText('Playing announcement');
-  expect(await counter(page, '__plays')).toBe(1);
-  expect(api.remaining()).toBe(1); // nothing reported while audio plays
-  await page.evaluate(() => { (window as unknown as Record<string, boolean>).__holdPlayback = false; });
-  await expect.poll(() => api.remaining()).toBe(0);
-  delivered = true;
-  await page.waitForTimeout(300);
-  expect(await counter(page, '__plays')).toBe(1); // later state versions never replay it
-  expect(api.failures).toEqual([]);
 });
 
 test('deferred turn: retry never waits for Gemini, the old reply stays silent, and failed-turn recovery reuses one turn', async ({ page }) => {
@@ -241,7 +214,7 @@ test('deferred turn: retry never waits for Gemini, the old reply stays silent, a
   await expect.poll(() => turns.length).toBe(1);
 
   // Retry while Gemini is still pending: the retry commits without waiting for the turn.
-  await page.getByRole('button', { name: 'Restart mission' }).click();
+  await page.getByRole('button', { name: 'Restart quest' }).click();
   await expect.poll(() => api.remaining()).toBe(0);
   const retried = api.requests.find((request) => (request.body as { action?: { type: string } } | null)?.action?.type === 'retryMission');
   expect(retried).toBeTruthy();
@@ -259,7 +232,7 @@ test('deferred turn: retry never waits for Gemini, the old reply stays silent, a
 
   // A failed turn in the new attempt recovers with the same turn ID and a refreshed version.
   const fresh = page.getByTestId('dialogue-panel');
-  if (!(await fresh.isVisible())) await page.getByRole('button', { name: '小林 · Talk', exact: true }).click();
+  if (!(await fresh.isVisible())) await page.getByRole('button', { name: '老王 · Talk', exact: true }).click();
   if (await fresh.getByRole('button', { name: 'Use typed Mandarin' }).isVisible()) await fresh.getByRole('button', { name: 'Use typed Mandarin' }).click();
   await fresh.getByRole('textbox').fill('请给我一杯茶。');
   await fresh.getByRole('button', { name: 'Send Mandarin' }).click();

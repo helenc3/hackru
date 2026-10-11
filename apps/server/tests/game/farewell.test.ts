@@ -2,19 +2,19 @@ import { describe, expect, it } from 'vitest';
 import { campaign } from './helpers.js';
 
 describe('farewell turns', () => {
-  it('reports conversationEnded and pays at the counter through the same guards as the pay choice', async () => {
+  it('reports conversationEnded and offers End conversation, but a goodbye never pays', async () => {
     const game = await campaign();
-    await game.move('cafe'); await game.inspect('p1.entrance-sign'); await game.choose('p1.enter-plaza-door');
+    const hello = await game.talk('你好。');
+    expect(hello.body.actions).toEqual([]);
     await game.talk('我要茶。');
-    const unpaid = await game.talk('再见。');
-    expect(unpaid.body.conversationEnded).toBe(true);
-    expect(game.state.objectives.find((objective) => objective.id === 'p1.receipt')?.complete).toBe(false);
-    await game.talk('茶十元。');
-    const paid = await game.talk('谢谢，再见。');
-    expect(paid.body.conversationEnded).toBe(true); expect(paid.body.npcReply).toBe('谢谢，慢走！');
-    expect(game.state.objectives.find((objective) => objective.id === 'p1.receipt')?.complete).toBe(true);
-    await game.choose('p1.pay-cafe', 422);
-    const plain = await game.talk('请再说一遍。');
+    const bye = await game.talk('再见。');
+    expect(bye.body.conversationEnded).toBe(true);
+    expect(bye.body.actions).toEqual([{ kind: 'pay', anchorId: 'an.vendor.spawn', drink: 'tea', priceCny: 10 }, { kind: 'end-conversation' }]);
+    expect(game.state).toMatchObject({ status: 'active', purchases: [], inventory: { cny: 20 } });
+    await game.pay();
+    expect(game.state).toMatchObject({ status: 'cleared', inventory: { cny: 10, drinks: ['tea'] } });
+    expect(game.state.npcActions).toEqual([{ anchorId: 'an.vendor.spawn', action: { kind: 'end-conversation' } }]);
+    const plain = await game.talk('请再说一遍。', 'vendor', undefined, 422); // the attempt has ended
     expect(plain.body.conversationEnded).toBeUndefined();
   });
 });

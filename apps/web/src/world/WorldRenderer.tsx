@@ -1,13 +1,15 @@
-import { Component, useEffect, useRef, useState, type ReactNode } from 'react';
+import { Component, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Canvas, useThree } from '@react-three/fiber';
-import { type Position, type RendererProps } from '@vibequest/shared';
-import { distance, nearbyTargets, targetAction, zoneAt, walkingPath } from './navigation';
+import { VISIBLE_RADIUS_CHUNKS, chunkOf, chunkOrigin, text, type ChunkManifest, type Position, type RendererProps } from '@vibequest/shared';
+import { distance, nearbyTargets, targetAction, walkingPath } from './navigation';
+import { registerWalkHandler } from './walk-request';
 import { DEFAULT_PITCH, dragOrbit } from './camera';
 import { Cue } from './decor';
-import { District } from './District';
 import { DestinationMarker } from './DestinationMarker';
-import { Motion, landmarks } from './Motion';
+import { Motion, type Landmark } from './Motion';
 import { initialPosition, type Runtime } from './runtime';
+import { CityScene } from '../city/CityScene';
+import { useCity, type CityHandle } from '../city/use-city';
 import './world.css';
 
 function webGlIsAvailable(): boolean {
@@ -53,9 +55,29 @@ function ContextLossHandler({ onFailure }: { onFailure: () => void }) {
   return null;
 }
 
-/** Presentation-only world. Every interaction uses the frozen shared callbacks. */
-/** `preview` renders the same district behind the welcome screen; it is inert and must not look like the live world to tests or assistive tech. */
-export function WorldRenderer({ state, onAction, onTalk, preview = false }: RendererProps & { preview?: boolean }) {
+/** DOM labels for landmark and NPC anchors in the visible 3 × 3 (names come from the reviewed text catalog). */
+function anchorLabels(city: CityHandle, position: Position): Landmark[] {
+  const centre = chunkOf(position);
+  const out: Landmark[] = [];
+  for (const manifest of city.manifests.values()) {
+    if (Math.max(Math.abs(manifest.coord.cx - centre.cx), Math.abs(manifest.coord.cz - centre.cz)) > VISIBLE_RADIUS_CHUNKS) continue;
+    const origin = chunkOrigin(manifest.coord);
+    for (const anchor of manifest.anchors) {
+      const row = anchor.nameKey ? text(anchor.kind === 'npc' ? 'npc-name' : 'landmark', anchor.nameKey) : undefined;
+      if (row && (anchor.kind === 'landmark' || anchor.kind === 'npc')) out.push({ label: row.zh, x: origin.x + anchor.x, z: origin.z + anchor.z });
+    }
+  }
+  return out.slice(0, 24);
+}
+
+/**
+ * Presentation-only world. Every interaction uses the frozen shared callbacks. The renderer owns
+ * city streaming (useCity): restore cached manifests, then stream around the player.
+ * `preview` renders a local seeded city behind the welcome screen; it is inert and must not look like
+ * the live world to tests or assistive tech. `manifests` gives a static city (fixtures/tests).
+ */
+export function WorldRenderer({ state, onAction, onTalk, preview = false, manifests }: RendererProps & { preview?: boolean; manifests?: readonly ChunkManifest[] }) {
+  const city = useCity(preview ? null : state, { manifests });
   const [hasWebGl, setHasWebGl] = useState(webGlIsAvailable);
   const [position, setPosition] = useState(() => initialPosition(state));
   const [busy, setBusy] = useState(false);
@@ -64,15 +86,23 @@ export function WorldRenderer({ state, onAction, onTalk, preview = false }: Rend
   const current = useRef({ state, onAction, onTalk });
   current.current = { state, onAction, onTalk };
   const runtime = useRef<Runtime>({ position: initialPosition(state), yaw: 0, keys: new Set(), active: false, busy: false, syncing: false, lastSync: 0, lastSent: null, pending: null, generation: 0 });
+  runtime.current.view = city.view; runtime.current.ready = city.ready;
   const syncPromise = useRef<Promise<void>>(Promise.resolve());
   const drag = useRef<{ x: number; y: number; startX: number; startY: number; moved: boolean; pointerId: number } | null>(null);
-  const sessionKey = `${state.sessionId}:${state.missionId}`;
+  const sessionKey = `${state.sessionId}:${state.worldId}`;
   useEffect(() => {
     const r = runtime.current;
     r.generation++; r.position = initialPosition(current.current.state); r.lastSent = null; r.pending = null;
     r.keys.clear(); r.path = []; r.busy = false; r.syncing = false; syncPromise.current = Promise.resolve();
     setPosition({ ...r.position }); setBusy(false);
   }, [sessionKey]);
+  // UI buttons (e.g. "Go to photo spot") walk the player like a ground click.
+  const view = useRef(city.view); view.current = city.view;
+  useEffect(() => preview ? undefined : registerWalkHandler((target) => {
+    const r = runtime.current;
+    root.current?.focus();
+    r.keys.clear(); r.path = walkingPath(view.current, r.position, target);
+  }), [preview]);
   useEffect(() => {
     const clear = () => { runtime.current.keys.clear(); runtime.current.path = []; runtime.current.active = false; drag.current = null; };
     window.addEventListener('blur', clear);
@@ -84,7 +114,7 @@ export function WorldRenderer({ state, onAction, onTalk, preview = false }: Rend
     const r = runtime.current;
     const generation = r.generation;
     if (r.lastSent && distance(r.lastSent, next) < .02) return;
-    await current.current.onAction({ type: 'moveZone', zoneId: zoneAt(next), position: next });
+    await current.current.onAction({ type: 'move', position: next });
     if (generation === r.generation) r.lastSent = { ...next };
   }
 
@@ -123,7 +153,7 @@ export function WorldRenderer({ state, onAction, onTalk, preview = false }: Rend
       if (generation !== r.generation) return;
       if (target.kind === 'npc') current.current.onTalk(target.id);
       else {
-        const action = targetAction(target);
+        const action = targetAction(target, current.current.state.photo);
         if (action) await current.current.onAction(action);
         if (generation !== r.generation) return;
       }
@@ -133,8 +163,11 @@ export function WorldRenderer({ state, onAction, onTalk, preview = false }: Rend
   }
 
   const nearby = nearbyTargets(state, position);
+  const marks = useMemo(() => anchorLabels(city, position), [city.revision, Math.floor(position.x / 10), Math.floor(position.z / 10)]);
+  const loading = !preview && !city.ready(position);
   const movementKeys = ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
-  return <section ref={root} tabIndex={0} className="world-renderer district-world" aria-label="Mandarin district — keyboard or click to move" data-testid={preview ? 'world-preview' : 'world-renderer'}
+  return <section ref={root} tabIndex={0} className="world-renderer district-world" aria-label="Shanghai streets — keyboard or click to move" data-testid={preview ? 'world-preview' : 'world-renderer'}
+    data-world-id={city.worldId} data-chunks={city.manifests.size} data-city-status={city.status}
     onFocus={(event) => { runtime.current.active = event.target === root.current; }}
     onBlur={() => { runtime.current.keys.clear(); runtime.current.path = []; runtime.current.active = false; }}
     onKeyDown={(event) => {
@@ -166,20 +199,22 @@ export function WorldRenderer({ state, onAction, onTalk, preview = false }: Rend
       if (!gesture || gesture.pointerId !== event.pointerId) return;
       if (!gesture.moved && !runtime.current.busy && current.current.state.status === 'active') {
         const point = runtime.current.groundPoint?.(event.clientX, event.clientY);
-        if (point) { runtime.current.keys.clear(); runtime.current.path = walkingPath(runtime.current.position, point); }
+        if (point) { runtime.current.keys.clear(); runtime.current.path = walkingPath(city.view, runtime.current.position, point); }
       }
       drag.current = null;
       if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
     }}
     onPointerCancel={() => { drag.current = null; }}>
-    {hasWebGl ? <CanvasBoundary onFailure={() => { runtime.current.keys.clear(); runtime.current.path = []; runtime.current.active = false; setHasWebGl(false); }}><Canvas dpr={[1, 1.5]} camera={{ position: [0, 8.5, 19], fov: 52, near: .1, far: 85 }} gl={{ antialias: true, powerPreference: 'high-performance' }}
+    {hasWebGl ? <CanvasBoundary onFailure={() => { runtime.current.keys.clear(); runtime.current.path = []; runtime.current.active = false; setHasWebGl(false); }}><Canvas dpr={[1, 1.5]} camera={{ position: [state.position.x, 8.5, state.position.z + 9], fov: 52, near: .1, far: 150 }} gl={{ antialias: true, powerPreference: 'high-performance' }}
       fallback={<CompatibilityRecovery />}>
       <ContextLossHandler onFailure={() => { runtime.current.keys.clear(); runtime.current.path = []; runtime.current.active = false; setHasWebGl(false); }} />
-      <District targets={state.interactables} runtime={runtime} /><Cue at={nearby[0]?.position} /><Motion runtime={runtime} root={root} labels={labels} state={state} tick={setPosition} sync={sync} /><DestinationMarker runtime={runtime} />
+      <CityScene city={city} runtime={runtime} position={position} /><Cue at={nearby[0]?.position} /><Motion runtime={runtime} root={root} labels={labels} marks={marks} city={city} state={state} tick={setPosition} sync={sync} /><DestinationMarker runtime={runtime} />
     </Canvas></CanvasBoundary> : <CompatibilityRecovery />}
     {hasWebGl && <>
-      <div className="district-labels" aria-hidden="true">{landmarks.map((mark, i) => <span key={mark.label} ref={(node) => { labels.current[i] = node; }} className="district-landmark" lang="zh-Hans">{mark.label}</span>)}</div>
-      <div className="world-caption"><span className="live-dot" />The district<span>Third-person navigation</span></div>
+      <div className="district-labels" aria-hidden="true">{marks.map((mark, i) => <span key={`${mark.label}@${mark.x},${mark.z}`} ref={(node) => { labels.current[i] = node; }} className="district-landmark" lang="zh-Hans">{mark.label}</span>)}</div>
+      <div className="world-caption"><span className="live-dot" />Shanghai<span>Third-person navigation</span></div>
+      {loading && <div className="world-note" role="status" data-testid="city-loading">Building the neighbourhood…</div>}
+      {city.error && !preview && <div className="world-note" role="status" data-testid="city-error">{city.error}</div>}
       <div className="district-nearby" aria-label="Nearby interactions">{nearby.map((target, i) => <button key={target.id} disabled={busy || state.status !== 'active'} onClick={() => void interact(target.id)} data-target-id={target.id}><span lang="zh-Hans">{target.label}</span>{i === 0 ? ' · E' : ''}</button>)}</div>
       <div className="world-note">WASD / arrows or click to walk · Drag sideways to orbit, up / down to tilt · E to interact</div>
     </>}

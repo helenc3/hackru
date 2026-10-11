@@ -1,12 +1,15 @@
-import { sceneManifest, type Position, type PublicState } from '@vibequest/shared';
+import type { Position, PublicState } from '@vibequest/shared';
+import type { Walkable } from './navigation';
 
 export type Runtime = {
   position: Position; yaw: number; keys: Set<string>; active: boolean;
   busy: boolean; syncing: boolean; lastSync: number; lastSent: Position | null;
   pending: Position | null; generation: number;
   pitch?: number; path?: Position[]; groundPoint?: (x: number, y: number) => Position | null;
+  /** Collision over committed manifests; movement waits until the player's chunk is committed. */
+  view?: Walkable; ready?: (position: Position) => boolean;
 };
 
-export function initialPosition(state: PublicState): Position {
-  return { ...(state.zoneId === 'plaza' ? sceneManifest.spawn : sceneManifest.zones.find((zone) => zone.id === state.zoneId)?.center ?? sceneManifest.spawn) };
+export function initialPosition(state: Pick<PublicState, 'position'>): Position {
+  return { ...state.position };
 }

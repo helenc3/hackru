@@ -7,6 +7,7 @@ import { createApp } from '../src/app.js';
 import { loadConfig } from '../src/config.js';
 import { MAX_TRANSCRIPTION_REQUEST_BYTES } from '../src/routes/audio.js';
 import { createServices } from '../src/services.js';
+import { ANCHORS, fakeServices } from './game/helpers.js';
 
 const developmentConfig = () =>
   loadConfig({ NODE_ENV: 'test', ENABLE_DEMO_FIXTURES: 'true', ENABLE_VALIDATION_HARNESS: 'true' });
@@ -14,12 +15,13 @@ const sessionRequest = { initialTier: 0, providerMode: 'fixture' };
 const actionRequest = {
   actionId: 'bootstrap-action',
   expectedVersion: 0,
-  action: { type: 'inspect', targetId: 'p1.entrance-sign' },
+  action: { type: 'inspect', targetId: 'an.sign.menu' },
 };
 const turnRequest = {
   turnId: 'bootstrap-turn',
   expectedVersion: 0,
-  npcId: 'xiaolin',
+  npcId: 'vendor',
+  anchorId: 'an.vendor.spawn',
   input: { text: '你好，我想要一杯茶。', source: 'typed' },
 };
 
@@ -38,7 +40,7 @@ describe('bootstrap API boundary', () => {
       buildId: 'segment-007',
       specVersion: '1.2',
       providers: { geminiConfigured: true, elevenlabsConfigured: true },
-      features: { validationHarness: true, fixtures: true },
+      features: { validationHarness: true, fixtures: true, cityProvider: 'fallback' },
       segments: { engine: 'implemented', dialogue: 'live', speech: 'live' },
     });
     expect(response.text).not.toContain('test-gemini-secret');
@@ -51,13 +53,14 @@ describe('bootstrap API boundary', () => {
       .get('/api/health')
       .expect(200);
     expect(response.body.providers).toEqual({ geminiConfigured: false, elevenlabsConfigured: false });
-    expect(response.body.features).toEqual({ validationHarness: false, fixtures: false });
+    expect(response.body.features).toEqual({ validationHarness: false, fixtures: false, cityProvider: 'fallback' });
   });
 
-  it('creates sessions and returns honest errors for unknown session IDs', async () => {
-    const app = createApp({ config: developmentConfig() });
-    const created = await request(app).post('/api/sessions').send(sessionRequest).expect(201);
-    expect(created.body.state).toMatchObject({ missionId: 'P1', status: 'active', xp: 0, version: 0 });
+  it('creates sessions in a world and returns honest errors for unknown session IDs', async () => {
+    const app = createApp({ services: fakeServices() });
+    const created = await request(app).post('/api/sessions').send({ ...sessionRequest, worldId: 'w-chosen' }).expect(201);
+    expect(created.body.state).toMatchObject({ missionId: 'Q1', worldId: 'w-chosen', status: 'active', xp: 0, version: 0, position: { x: 0, z: 0 } });
+    expect(created.body.state.interactables.map((target: { id: string }) => target.id)).toContain(ANCHORS.vendor.id);
     await request(app).get(`/api/sessions/${created.body.state.sessionId}`).expect(200);
     for (const response of await Promise.all([
       request(app).get('/api/sessions/bootstrap-session'),

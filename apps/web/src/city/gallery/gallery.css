@@ -1,0 +1,19 @@
+.gallery { position: relative; min-height: 100vh; padding: 1.5rem; background: #fff6e8; color: #2a1838; font: 14px/1.4 system-ui, sans-serif; }
+.gallery-header nav { display: flex; flex-wrap: wrap; gap: .5rem; margin: .75rem 0; }
+.gallery-header button[aria-pressed='true'] { background: #2a1838; color: #fff6e8; }
+.gallery-grid { display: grid; gap: 1.5rem; }
+.gallery-entry h3 { margin: 0; }
+.gallery-meta { opacity: .8; }
+.gallery-meta .pending { color: #b5482c; }
+.gallery-problems { color: #b00020; }
+.gallery-variants { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: .5rem; }
+.gallery-cell { margin: 0; }
+.gallery-cell[data-status='error'], .gallery-cell[data-status='missing-component'] { outline: 2px solid #b00020; }
+.gallery-view { width: 100%; height: 160px; border-radius: 6px; background: #f2e8dc; }
+.gallery-cell figcaption { font-size: 12px; text-align: center; }
+/* One shared WebGL context paints every tracked View; it sits over the page and lets pointer events through. */
+.gallery-port { position: fixed !important; inset: 0; pointer-events: none; }
+.gallery-neighbourhood { margin-top: 2rem; }
+.gallery-neighbourhood-canvas { height: 520px !important; border-radius: 8px; }
+.gallery-budget { display: grid; grid-template-columns: auto auto; gap: .25rem 1rem; width: max-content; }
+.gallery-budget[data-within-budget='false'] dd { color: #b00020; }

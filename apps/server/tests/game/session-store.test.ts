@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { baselineInternalState, baselineTranscriptionRecord, BASELINE_NOW_MS } from '@vibequest/shared';
 import { createSessionStore, invalidateAttemptArtifacts, registerSpeechJob, registerTranscription, resolveTranscription, updateSpeechJob, type SpeechJob } from '../../src/session-store.js';
 
-const speech = (): SpeechJob => ({ id: 'speech-1', sessionId: baselineInternalState.sessionId, attemptId: baselineInternalState.attemptId, turnId: 'turn-1', replyZh: '一杯茶十元。', voiceKey: 'xiaolin', operationId: 'playback-1', status: 'pending' });
+const speech = (): SpeechJob => ({ id: 'speech-1', sessionId: baselineInternalState.sessionId, attemptId: baselineInternalState.attemptId, turnId: 'turn-1', replyZh: '一杯茶十元。', voiceKey: 'vendor', operationId: 'playback-1', status: 'pending' });
 
 describe('atomic session storage and audio handoff', () => {
   it('serializes each session, allows other sessions, and releases a failed lock', async () => {

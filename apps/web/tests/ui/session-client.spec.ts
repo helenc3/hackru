@@ -1,6 +1,11 @@
 import { test, expect } from '@playwright/test';
 import { createSessionClient, SessionClientError } from '../../src/app/session-client';
-import { baselineActionRequest, baselineActionResponse, baselineBossTurnResponse, baselineTurnRequest } from '@vibequest/shared';
+import type { ActionRequest, TurnRequest } from '@vibequest/shared';
+import { fixtureState } from '../../../../fixtures/ui/scripted-api';
+
+const baselineActionRequest: ActionRequest = { actionId: 'fixture-action-001', expectedVersion: 0, action: { type: 'move', position: { x: 20, z: 21 } } };
+const baselineActionResponse = { state: fixtureState('Q1'), events: [] };
+const baselineTurnRequest: TurnRequest = { turnId: 'fixture-turn-001', expectedVersion: 0, npcId: 'vendor', anchorId: 'ui.vendor', input: { text: '我要水。', source: 'typed' } };
 
 const response = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } });
 
@@ -15,9 +20,12 @@ test('transport validates responses and deduplicates committed event delivery', 
   expect(events).toEqual(['reward-once']); expect(calls).toHaveLength(2);
   expect(JSON.parse(calls[0].body as string)).toEqual(baselineActionRequest);
 });
-test('transport rejects leaked active-boss coaching and private state', async () => {
-  const client = createSessionClient({ fetch: (async () => response({ ...baselineBossTurnResponse, feedback: { understood: 'secret', explanation: 'solution', improvedExample: '海港' } })) as typeof fetch });
-  await expect(client.sendTurn('fixture-session', { ...baselineTurnRequest, npcId: 'laozhou' })).rejects.toMatchObject({ code: 'INVALID_RESPONSE', retryable: false });
+test('transport rejects responses that leak private state or break the contract', async () => {
+  const leaked = { turnId: 'fixture-turn-001', state: { ...fixtureState('Q1'), secretFacts: { teaPriceCny: '10' } }, events: [], npcReply: '好的。' };
+  const client = createSessionClient({ fetch: (async () => response(leaked)) as typeof fetch });
+  await expect(client.sendTurn('fixture-session', baselineTurnRequest)).rejects.toMatchObject({ code: 'INVALID_RESPONSE', retryable: false });
+  // An anchorless turn never leaves the client.
+  await expect(client.sendTurn('fixture-session', { ...baselineTurnRequest, anchorId: undefined } as unknown as TurnRequest)).rejects.toThrow();
 });
 test('transport distinguishes network, timeout and malformed response failures', async () => {
   const offline = createSessionClient({ fetch: (async () => { throw new TypeError('Network failed'); }) as typeof fetch });

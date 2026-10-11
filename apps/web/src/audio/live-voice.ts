@@ -23,9 +23,9 @@ function b64ToInt16(data: string): Int16Array {
   return new Int16Array(bytes.buffer, 0, bytes.byteLength >> 1);
 }
 
-export function startLiveVoice(sessionId: string, npcId: string, listener: (event: LiveEvent) => void): LiveHandle {
+export function startLiveVoice(sessionId: string, npcId: string, anchorId: string, listener: (event: LiveEvent) => void): LiveHandle {
   const protocol = location.protocol === 'https:' ? 'wss' : 'ws';
-  const ws = new WebSocket(`${protocol}://${location.host}/api/sessions/${encodeURIComponent(sessionId)}/live?npcId=${encodeURIComponent(npcId)}`);
+  const ws = new WebSocket(`${protocol}://${location.host}/api/sessions/${encodeURIComponent(sessionId)}/live?npcId=${encodeURIComponent(npcId)}&anchorId=${encodeURIComponent(anchorId)}`);
   let ctx: AudioContext | null = null;
   let stream: MediaStream | null = null;
   let ready = false, stopped = false, paused = false, speaking = false;

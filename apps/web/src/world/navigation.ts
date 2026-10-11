@@ -1,84 +1,75 @@
-import { ChoiceIdSchema, CueIdSchema, sceneManifest, type GameAction, type Position, type PublicState } from '@vibequest/shared';
+import { CHUNK_SIZE, ChoiceIdSchema, WORLD_RULES, type GameAction, type Position, type PublicState, type WorldView, type ZoneId } from '@vibequest/shared';
 
-export function zoneAt(position: Position) {
-  // Specific zones precede the overlapping plaza; unzoned paths keep their
-  // nearest authored zone, so crossing a corridor never teleports the player.
-  const inside = sceneManifest.zones.filter(({ bounds: b }) => position.x >= b.minX && position.x <= b.maxX && position.z >= b.minZ && position.z <= b.maxZ);
-  return (inside.find((zone) => zone.id !== 'plaza') ?? inside[0] ?? [...sceneManifest.zones].sort((a, b) => distance(position, a.center) - distance(position, b.center))[0]).id;
-}
+/** The movement subset of WorldView. Client prediction uses the same committed manifests as server validation. */
+export type Walkable = Pick<WorldView, 'walkable'>;
 
 export function distance(a: Position, b: Position) {
   return Math.hypot(a.x - b.x, a.z - b.z);
 }
 
-export function collides(position: Position) {
-  const r = sceneManifest.playerRadius;
-  return sceneManifest.colliders.some(({ bounds: b }) => {
-    const x = Math.max(b.minX, Math.min(position.x, b.maxX));
-    const z = Math.max(b.minZ, Math.min(position.z, b.maxZ));
-    return Math.hypot(position.x - x, position.z - z) < r - 1e-7;
-  });
+export function zoneAt(view: Pick<WorldView, 'districtAt'>, position: Position): ZoneId {
+  return view.districtAt(position);
+}
+
+/** WorldView.walkable already tests the player's circle (WORLD_RULES.playerRadius) — the server's exact rule. */
+export function collides(view: Walkable, position: Position) {
+  return !view.walkable(position);
 }
 
 /** Small axis-separated steps avoid tunnelling and allow tangential sliding. */
-export function movePlayer(position: Position, right: number, forward: number, yaw: number, seconds: number): Position {
+export function movePlayer(view: Walkable, position: Position, right: number, forward: number, yaw: number, seconds: number): Position {
   const length = Math.hypot(right, forward);
   if (!length) return position;
-  const travel = sceneManifest.movementSpeed * Math.max(0, Math.min(seconds, 0.1));
+  const travel = WORLD_RULES.movementSpeed * Math.max(0, Math.min(seconds, 0.1));
   const dx = (right * Math.cos(yaw) - forward * Math.sin(yaw)) / length * travel;
   const dz = (-right * Math.sin(yaw) - forward * Math.cos(yaw)) / length * travel;
-  const steps = Math.max(1, Math.ceil(travel / (sceneManifest.playerRadius / 2)));
-  const r = sceneManifest.playerRadius;
-  const b = sceneManifest.bounds;
+  const steps = Math.max(1, Math.ceil(travel / (WORLD_RULES.playerRadius / 2)));
   let next = { ...position };
   for (let i = 0; i < steps; i++) {
-    const x = { ...next, x: Math.max(b.minX + r, Math.min(next.x + dx / steps, b.maxX - r)) };
-    if (!collides(x)) next = x;
-    const z = { ...next, z: Math.max(b.minZ + r, Math.min(next.z + dz / steps, b.maxZ - r)) };
-    if (!collides(z)) next = z;
+    const x = { ...next, x: next.x + dx / steps };
+    if (!collides(view, x)) next = x;
+    const z = { ...next, z: next.z + dz / steps };
+    if (!collides(view, z)) next = z;
   }
   return next;
 }
 
-export function nearbyTargets(state: PublicState, position: Position) {
-  const priority = { sign: 0, npc: 1, pa: 2, choice: 3 };
-  return state.interactables.filter((target) => distance(target.position, position) <= sceneManifest.interactionRadius)
+export function nearbyTargets(state: Pick<PublicState, 'interactables'>, position: Position) {
+  const priority = { sign: 0, npc: 1, 'photo-spot': 2, choice: 3, landmark: 4 };
+  return state.interactables.filter((target) => target.kind !== 'landmark' && distance(target.position, position) <= WORLD_RULES.interactionRadius)
     .sort((a, b) => distance(a.position, position) - distance(b.position, position) || priority[a.kind] - priority[b.kind]);
 }
 
-export function targetAction(target: PublicState['interactables'][number]): GameAction | null {
+/** NPCs open a conversation (onTalk) and landmarks are labels only; both return null. */
+export function targetAction(target: PublicState['interactables'][number], photo?: PublicState['photo']): GameAction | null {
   if (target.kind === 'sign') return { type: 'inspect', targetId: target.id };
-  if (target.kind === 'pa') {
-    const id = CueIdSchema.safeParse(target.id);
-    return id.success ? { type: 'playCue', cueId: id.data, channel: 'audio' } : null;
-  }
+  if (target.kind === 'photo-spot') return { type: 'choose', choiceId: 'q3.start-photo', anchorId: photo?.viewpointAnchorId ?? target.id };
   if (target.kind === 'choice') {
-    const id = ChoiceIdSchema.safeParse(target.id);
-    return id.success ? { type: 'choose', choiceId: id.data } : null;
+    const id = ChoiceIdSchema.safeParse(target.choiceId);
+    return id.success ? { type: 'choose', choiceId: id.data, anchorId: target.id } : null;
   }
   return null;
 }
 
-/** Route through a half-meter grid using collision-safe segments. */
-export function walkingPath(start: Position, destination: Position): Position[] {
-  const b = sceneManifest.bounds, radius = sceneManifest.playerRadius, step = .5;
-  const valid = (p: Position) => p.x >= b.minX + radius && p.x <= b.maxX - radius && p.z >= b.minZ + radius && p.z <= b.maxZ - radius && !collides(p);
+/** Route through a half-metre grid using collision-safe segments; bounded to the loaded neighbourhood. */
+export function walkingPath(view: Walkable, start: Position, destination: Position, maxNodes = 6_000): Position[] {
+  const step = .5;
   const clear = (a: Position, end: Position) => {
-    const count = Math.max(1, Math.ceil(distance(a, end) / (radius / 2)));
-    for (let i = 1; i <= count; i++) if (!valid({ x: a.x + (end.x - a.x) * i / count, z: a.z + (end.z - a.z) * i / count })) return false;
+    const count = Math.max(1, Math.ceil(distance(a, end) / (WORLD_RULES.playerRadius / 2)));
+    for (let i = 1; i <= count; i++) if (collides(view, { x: a.x + (end.x - a.x) * i / count, z: a.z + (end.z - a.z) * i / count })) return false;
     return true;
   };
-  if (!valid(destination)) return [];
+  if (collides(view, destination) || distance(start, destination) > CHUNK_SIZE * 1.5) return [];
   if (clear(start, destination)) return [destination];
   const queue = [start], parents = [-1], seen = new Set(['0,0']);
-  for (let i = 0; i < queue.length; i++) {
-    const here = queue[i];
+  for (let i = 0; i < queue.length && queue.length < maxNodes; i++) {
+    const here = queue[i]!;
     if (distance(here, destination) <= step * 1.5 && clear(here, destination)) {
       const path = [destination];
-      for (let j = i; j > 0; j = parents[j]) path.unshift(queue[j]);
+      for (let j = i; j > 0; j = parents[j]!) path.unshift(queue[j]!);
       return path;
     }
-    for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+    for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
       const next = { x: here.x + dx * step, z: here.z + dz * step };
       const key = `${Math.round((next.x - start.x) / step)},${Math.round((next.z - start.z) / step)}`;
       if (seen.has(key)) continue;

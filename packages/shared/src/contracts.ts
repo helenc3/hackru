@@ -186,7 +186,7 @@ export type TurnEvaluation = z.infer<typeof TurnEvaluationSchema>;
 export const TurnContextSchema = z.strictObject({ missionId: MissionIdSchema, mode: ModeSchema, tier: TierSchema, npcId: NpcIdSchema, anchorId: identifier, nameZh: shortText, persona: z.string().min(1).max(500), patience: z.number().int().min(0).max(5), allowedIntents: z.array(IntentSchema).min(1).max(10), facts: z.record(identifier, z.string().max(500)), history: z.array(z.strictObject({ role: z.enum(['player', 'npc']), text: z.string().max(500) })).max(12) });
 export type TurnContext = z.infer<typeof TurnContextSchema>;
 export interface DialogueProvider { evaluate(context: TurnContext, playerText: string): Promise<TurnEvaluation> }
-export interface SpeechProvider { synthesize(text: string, voiceKey: string): Promise<Uint8Array>; synthesizePcm?(text: string, voiceKey: string): Promise<Uint8Array>; transcribe(audio: Uint8Array, mimeType: string): Promise<string> }
+export interface SpeechProvider { synthesize(text: string, voiceKey: string): Promise<Uint8Array>; synthesizePcm?(text: string, voiceKey: string): Promise<Uint8Array>; /** PCM16LE 24 kHz chunks as they are generated; every chunk has an even byte length. */ streamPcm?(text: string, voiceKey: string): AsyncIterable<Uint8Array>; transcribe(audio: Uint8Array, mimeType: string): Promise<string> }
 
 // Context-dependent validation stays reusable for the provider owner. Validation only:
 // confidence thresholds and progression belong to the engine.

@@ -7,6 +7,62 @@ const message = (value: Record<string, unknown>) => value as unknown as LiveServ
 const turnResponse = (events: { message: string }[]) => ({ turnId: 't', events, npcReply: 'x', state: { objectives: [{ id: 'a', label: 'Confirm the price.', complete: false }] } }) as unknown as TurnResponse;
 
 describe('live bridge', () => {
+  const tick = () => new Promise((resolve) => setTimeout(resolve, 0));
+  const live = { sendAudio: () => undefined, sendNote: () => undefined, close: () => undefined };
+  const reply = (text: string) => [message({ data: 'X', serverContent: { outputTranscription: { text } } }), message({ serverContent: { turnComplete: true } })];
+
+  it('hears Gemini\'s reply even when it finishes before the evaluation (no REPLY_WAIT timeout)', async () => {
+    let evaluated!: () => void;
+    const seen: (string | undefined)[] = [];
+    const bridge = createLiveBridge({ send: () => undefined, live, note: () => undefined,
+      turn: async (_, spoken) => { await new Promise<void>((resolve) => { evaluated = resolve; }); seen.push(await Promise.race([spoken(), new Promise<string>((resolve) => setTimeout(() => resolve('timed out'), 50))])); return turnResponse([]); } });
+    bridge.onLiveMessage(message({ serverContent: { inputTranscription: { text: '你好' } } }));
+    for (const m of reply('你好啊！')) bridge.onLiveMessage(m);
+    await tick(); evaluated(); await new Promise((resolve) => setTimeout(resolve, 80));
+    expect(seen).toEqual(['你好啊！']);
+  });
+
+  it('treats the reply text as final at generationComplete, without waiting for turnComplete', async () => {
+    const replies: (string | undefined)[] = [];
+    const bridge = createLiveBridge({ send: () => undefined, live, note: () => undefined, turn: async (_, spoken) => { replies.push(await spoken()); return turnResponse([]); } });
+    bridge.onLiveMessage(message({ serverContent: { inputTranscription: { text: '你好' } } }));
+    bridge.onLiveMessage(message({ data: 'X', serverContent: { outputTranscription: { text: '你好啊，' } } }));
+    bridge.onLiveMessage(message({ serverContent: { generationComplete: true } }));
+    bridge.onLiveMessage(message({ serverContent: { outputTranscription: { text: '要喝点什么？' } } })); // a late piece resets the grace
+    await new Promise((resolve) => setTimeout(resolve, 400)); // no turnComplete yet: Gemini is still "playing" its suppressed audio
+    expect(replies).toEqual(['你好啊，要喝点什么？']);
+  });
+
+  it('speaks Gemini\'s finished text before the engine commits, once, when the engine keeps it', async () => {
+    const spoken: string[] = []; const events: ServerEvent[] = [];
+    let commit!: () => void;
+    const bridge = createLiveBridge({ send: (event) => events.push(event), live, note: () => undefined, speculate: true,
+      speak: async (text, _signal, onAudio) => { spoken.push(text); onAudio(); },
+      turn: async (_, spokenText) => { const text = await spokenText(); await new Promise<void>((resolve) => { commit = resolve; }); return { ...turnResponse([]), npcReply: text! }; } });
+    bridge.onLiveMessage(message({ serverContent: { inputTranscription: { text: '我要水' } } }));
+    for (const m of reply('好嘞，水五块。')) bridge.onLiveMessage(m);
+    await tick();
+    expect(spoken).toEqual(['好嘞，水五块。']); // already speaking while the engine evaluates
+    expect(events.some((event) => event.type === 'turn')).toBe(false);
+    commit(); await tick(); await tick();
+    expect(spoken).toEqual(['好嘞，水五块。']);
+    expect(events.at(-1)?.type).toBe('turn');
+  });
+
+  it('the engine stays authoritative: unheard speculation is cancelled, heard speculation finishes first', async () => {
+    for (const heard of [false, true]) {
+      const spoken: string[] = []; const aborted: string[] = [];
+      const bridge = createLiveBridge({ send: () => undefined, live, note: () => undefined, speculate: true,
+        speak: async (text, signal, onAudio) => { spoken.push(text); if (heard || text === '算了，我忙着呢。') onAudio(); await new Promise((resolve) => setTimeout(resolve, 5)); if (signal.aborted) aborted.push(text); },
+        turn: async (_, spokenText) => { await spokenText(); await tick(); return { ...turnResponse([]), npcReply: '算了，我忙着呢。' }; } });
+      bridge.onLiveMessage(message({ serverContent: { inputTranscription: { text: '今天天气不错' } } }));
+      for (const m of reply('是啊，天气真好！')) bridge.onLiveMessage(m);
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(spoken).toEqual(['是啊，天气真好！', '算了，我忙着呢。']);
+      expect(aborted).toEqual(heard ? [] : ['是啊，天气真好！']);
+    }
+  });
+
   it('uses character speech instead of the model audio and waits before closing a farewell', async () => {
     const events: ServerEvent[] = [];
     let finishSpeech!: () => void;

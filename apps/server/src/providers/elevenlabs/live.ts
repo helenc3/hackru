@@ -46,6 +46,27 @@ export function voiceFor(voiceIds: ElevenLabsSpeechOptions['voiceIds'], voiceKey
 export function createElevenLabsSpeechProvider(options: ElevenLabsSpeechOptions): SpeechProvider {
   const client = new ElevenLabsClient({ apiKey: options.apiKey });
   return {
+    async *streamPcm(text, voiceKey) {
+      const line = text.trim();
+      if (!line || line.length > MAX_REPLY_CHARS) throw new HttpError(422, 'INVALID_SPEECH_TEXT', 'NPC speech must be 1-240 characters.');
+      const voiceId = voiceFor(options.voiceIds, voiceKey);
+      let stream: ReadableStream<Uint8Array>;
+      try {
+        stream = await client.textToSpeech.stream(voiceId,
+          { text: line, modelId: options.ttsModel, outputFormat: 'pcm_24000', languageCode: 'zh' },
+          { timeoutInSeconds: options.ttsTimeoutSeconds ?? 5, maxRetries: 0 });
+      } catch { throw speechUnavailable(); }
+      // PCM16 samples are 2 bytes; network chunks may split one, so carry an odd byte to the next chunk.
+      let carry: Uint8Array = new Uint8Array(0);
+      try {
+        for await (const chunk of stream) {
+          const joined = new Uint8Array(carry.length + chunk.length); joined.set(carry); joined.set(chunk, carry.length);
+          const even = joined.length - (joined.length % 2);
+          carry = joined.slice(even);
+          if (even) yield joined.subarray(0, even);
+        }
+      } catch { throw speechUnavailable(); }
+    },
     async synthesizePcm(text, voiceKey) {
       const line = text.trim();
       if (!line || line.length > MAX_REPLY_CHARS) throw new HttpError(422, 'INVALID_SPEECH_TEXT', 'NPC speech must be 1-240 characters.');

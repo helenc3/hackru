@@ -26,6 +26,8 @@ export interface Bridge { onLiveMessage(message: LiveServerMessage): void; onCli
 const MAX_SESSION_MS = 10 * 60_000;
 const REPLY_WAIT_MS = 8_000;
 const FAREWELL_WAIT_MS = 4_000;
+/** Gemini's text is final at generationComplete (≈1.5 s), long before turnComplete (after its own audio length); late transcript pieces reset this grace. */
+const TEXT_SETTLE_MS = 150;
 
 /** Pure message bridge: Gemini Live frames in, protocol events out, one engine turn per finished utterance. */
 export function createLiveBridge(options: {
@@ -35,7 +37,16 @@ export function createLiveBridge(options: {
   note: (turn: TurnResponse) => Promise<string | undefined> | string | undefined;
   /** True when the turn leaves only a button to finish the task: the session ends like a goodbye. */
   ends?: (turn: TurnResponse) => boolean;
-  speak?: (text: string) => Promise<void>;
+  /** Voices a line; stops sending when `signal` aborts and calls `onAudio` as each chunk goes out. */
+  speak?: (text: string, signal: AbortSignal, onAudio: () => void) => Promise<void>;
+  /**
+   * Speculative speech: start voicing Gemini's reply text as soon as it is complete, while the engine
+   * still evaluates the turn. The engine stays authoritative: if its committed line differs (the verified
+   * hotel route, the authored line when the NPC leaves, any grounded override), unheard speculative audio
+   * is cancelled, and heard audio finishes before the engine's line is spoken. Off for turns whose facts
+   * cannot be spoken before evaluation (the Q2 guide's route); progress and buttons only ever come from the turn.
+   */
+  speculate?: boolean;
 }): Bridge {
   let inputText = '';
   let outputText = '';
@@ -55,10 +66,36 @@ export function createLiveBridge(options: {
     if (!text) return;
     const outputsBefore = outputs;
     options.send({ type: 'playerTranscript', text, final: true });
-    const spokenReply = afterModelTurn ? () => Promise.resolve(lastOutput) : nextOutput;
-    options.turn(text, spokenReply).then(async (turn) => {
+    // Listen for Gemini's reply now, not after evaluation: it usually finishes first, and a late listener waited out REPLY_WAIT_MS.
+    const reply = afterModelTurn ? Promise.resolve(lastOutput) : nextOutput();
+    const startedMs = Date.now();
+    const timing: Record<string, number> = {};
+    const mark = (name: string) => { timing[name] ??= Date.now() - startedMs; };
+    let settled = false;
+    let early: { text: string; heard: boolean; abort: AbortController; done: Promise<boolean> } | undefined;
+    const speak = (line: string, signal: AbortSignal, onHeard?: () => void) => options.speak!(line, signal, () => { mark('firstAudioMs'); onHeard?.(); }).then(() => true, () => false);
+    void reply.then((spoken) => {
+      mark('geminiTextMs');
+      const line = spoken?.trim();
+      if (!options.speak || !options.speculate || !line || closed || settled) return;
+      const abort = new AbortController();
+      const entry = { text: line, heard: false, abort, done: Promise.resolve(false) };
+      entry.done = speak(line, abort.signal, () => { entry.heard = true; });
+      early = entry;
+    });
+    options.turn(text, () => reply).then(async (turn) => {
+      settled = true; mark('evalMs');
       if (closed) return;
-      if (options.speak) await options.speak(turn.npcReply);
+      if (options.speak) {
+        const line = turn.npcReply.trim();
+        const spokeIt = early && early.text === line ? await early.done : false;
+        if (!spokeIt) {
+          if (early?.heard) await early.done; else early?.abort.abort();
+          const ok = await speak(line, new AbortController().signal);
+          if (!ok && !closed) options.send({ type: 'error', code: 'SPEECH_UNAVAILABLE', message: 'Mandarin speech is temporarily unavailable.', retryable: true });
+        }
+      }
+      console.info(JSON.stringify({ live: 'turn-timing', speculative: Boolean(early), ...timing }));
       if (closed) return;
       options.send({ type: 'turn', turn });
       if (turn.conversationEnded || options.ends?.(turn)) {
@@ -78,9 +115,21 @@ export function createLiveBridge(options: {
     });
   }
 
+  // The reply text is complete once per model turn: early at generationComplete (+grace), else at turnComplete.
+  let textDone = false;
+  let settle: ReturnType<typeof setTimeout> | undefined;
+  function finishText() {
+    clearTimeout(settle); settle = undefined;
+    if (textDone || closed) return;
+    textDone = true;
+    if (outputText.trim()) options.send({ type: 'npcTranscript', text: outputText, final: true });
+    completeOutput(outputText);
+  }
+
   function close(reason: string) {
     if (closed) return;
     closed = true;
+    clearTimeout(settle);
     completeOutput('');
     options.send({ type: 'closed', reason });
     options.live.close();
@@ -103,10 +152,12 @@ export function createLiveBridge(options: {
         startTurn(false);
         outputText += content.outputTranscription.text;
         options.send({ type: 'npcTranscript', text: outputText, final: false });
+        if (settle) { clearTimeout(settle); settle = setTimeout(finishText, TEXT_SETTLE_MS); }
       }
+      if (content.generationComplete && !textDone && !settle) settle = setTimeout(finishText, TEXT_SETTLE_MS);
       if (content.turnComplete) {
-        if (outputText.trim()) options.send({ type: 'npcTranscript', text: outputText, final: true });
-        completeOutput(outputText);
+        finishText();
+        textDone = false;
         startTurn(true); // Models that never flag `finished` still get one turn per exchange.
       }
     },
@@ -204,13 +255,21 @@ export function attachLiveRelay(server: Server, services: ServerServices, option
     const bridge = createLiveBridge({
       send,
       ends: (turn) => Boolean(pendingGoalAction(turn.state.npcActions, turn.state.inventory.cny, npcId.data)),
-      speak: async (text) => {
+      speculate: !(npcId.data === 'guide' && context.missionId === 'Q2'), // the route is only known after evaluation
+      speak: async (text, signal, onAudio) => {
         const epoch = speechEpoch;
-        if (!services.speechProvider.synthesizePcm) throw new HttpError(503, 'SPEECH_UNAVAILABLE', 'Mandarin speech is temporarily unavailable.', true);
-        const audio = await services.speechProvider.synthesizePcm(text, voiceKey);
-        if (torn || epoch !== speechEpoch) return;
-        for (let offset = 0; offset < audio.length; offset += 16_384) {
-          send({ type: 'audio', data: Buffer.from(audio.subarray(offset, offset + 16_384)).toString('base64') });
+        const provider = services.speechProvider;
+        // Stream when the provider can, so the first words play while the rest is still being generated.
+        const chunks = provider.streamPcm ? provider.streamPcm(text, voiceKey) : (async function* () {
+          if (!provider.synthesizePcm) throw new HttpError(503, 'SPEECH_UNAVAILABLE', 'Mandarin speech is temporarily unavailable.', true);
+          yield await provider.synthesizePcm(text, voiceKey);
+        })();
+        for await (const audio of chunks) {
+          if (torn || signal.aborted || epoch !== speechEpoch) return; // leaving the loop cancels the provider stream
+          for (let offset = 0; offset < audio.length; offset += 16_384) {
+            send({ type: 'audio', data: Buffer.from(audio.subarray(offset, offset + 16_384)).toString('base64') });
+          }
+          onAudio();
         }
       },
       live: {

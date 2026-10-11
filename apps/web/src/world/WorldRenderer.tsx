@@ -9,15 +9,6 @@ import { Motion, landmarks } from './Motion';
 import { initialPosition, type Runtime } from './runtime';
 import './world.css';
 
-function webGlIsAvailable(): boolean {
-  try {
-    const context = document.createElement('canvas').getContext('webgl2');
-    if (!context) return false;
-    context.getExtension('WEBGL_lose_context')?.loseContext();
-    return true;
-  } catch { return false; }
-}
-
 function CompatibilityRecovery() {
   return <div className="compatibility-screen" data-testid="webgl-recovery" role="status">
     <span className="compatibility-icon" aria-hidden="true">◇</span>
@@ -37,7 +28,10 @@ class CanvasBoundary extends Component<{ children: ReactNode; onFailure: () => v
 
 /** Presentation-only world. Every interaction uses the frozen shared callbacks. */
 export function WorldRenderer({ state, onAction, onTalk }: RendererProps) {
-  const [hasWebGl, setHasWebGl] = useState(webGlIsAvailable);
+  const [hasWebGl, setHasWebGl] = useState(true);
+  const [contextLost, setContextLost] = useState(false);
+  const contextCleanup = useRef<(() => void) | null>(null);
+  useEffect(() => () => { contextCleanup.current?.(); }, []);
   const [position, setPosition] = useState(() => initialPosition(state));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -92,7 +86,7 @@ export function WorldRenderer({ state, onAction, onTalk }: RendererProps) {
 
   async function interact(id: string) {
     const r = runtime.current;
-    if (r.busy || current.current.state.status !== 'active' || !hasWebGl) return;
+    if (r.busy || current.current.state.status !== 'active' || !hasWebGl || contextLost) return;
     const target = nearbyTargets(current.current.state, r.position).find((item) => item.id === id);
     if (!target) return;
     const generation = r.generation;
@@ -119,7 +113,7 @@ export function WorldRenderer({ state, onAction, onTalk }: RendererProps) {
     onFocus={(event) => { runtime.current.active = event.target === root.current; }}
     onBlur={() => { runtime.current.keys.clear(); runtime.current.active = false; }}
     onKeyDown={(event) => {
-      if (event.target !== root.current || event.nativeEvent.isComposing) return;
+      if (event.target !== root.current || event.nativeEvent.isComposing || contextLost || !hasWebGl) return;
       if (movementKeys.includes(event.code)) { event.preventDefault(); runtime.current.keys.add(event.code); }
       if (event.code === 'KeyE' && !event.repeat) { event.preventDefault(); const target = nearbyTargets(current.current.state, runtime.current.position)[0]; if (target) void interact(target.id); }
     }}
@@ -133,10 +127,26 @@ export function WorldRenderer({ state, onAction, onTalk }: RendererProps) {
     onPointerUp={(event) => { drag.current = null; if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId); }}
     onPointerCancel={() => { drag.current = null; }}>
     {hasWebGl ? <CanvasBoundary onFailure={() => { runtime.current.keys.clear(); runtime.current.active = false; setHasWebGl(false); }}><Canvas dpr={[1, 1.5]} camera={{ position: [0, 8.5, 19], fov: 52, near: .1, far: 85 }} gl={{ antialias: true, powerPreference: 'high-performance' }}
-      onCreated={({ gl }) => { gl.domElement.addEventListener('webglcontextlost', (event) => { event.preventDefault(); runtime.current.keys.clear(); runtime.current.active = false; setHasWebGl(false); }, { once: true }); }} fallback={<CompatibilityRecovery />}>
+      onCreated={({ gl }) => {
+        contextCleanup.current?.();
+        const canvas = gl.domElement;
+        const lost = (event: Event) => {
+          event.preventDefault();
+          runtime.current.keys.clear(); runtime.current.active = false; drag.current = null;
+          setContextLost(true);
+        };
+        const restored = () => setContextLost(false);
+        canvas.addEventListener('webglcontextlost', lost);
+        canvas.addEventListener('webglcontextrestored', restored);
+        contextCleanup.current = () => {
+          canvas.removeEventListener('webglcontextlost', lost);
+          canvas.removeEventListener('webglcontextrestored', restored);
+        };
+      }}>
       <District targets={state.interactables} runtime={runtime} /><Cue at={nearby[0]?.position} /><Motion runtime={runtime} root={root} labels={labels} state={state} tick={setPosition} sync={sync} />
     </Canvas></CanvasBoundary> : <CompatibilityRecovery />}
-    {hasWebGl && <>
+    {contextLost && <div className="compatibility-screen" data-testid="webgl-reconnecting" role="status"><h3>Reconnecting to the district…</h3><p>The graphics connection was interrupted. Your session is preserved while the browser restores it.</p><Button className="button secondary" onClick={() => window.location.reload()}>Reload preview</Button></div>}
+    {hasWebGl && !contextLost && <>
       <div className="district-labels" aria-hidden="true">{landmarks.map((mark, i) => <span key={mark.label} ref={(node) => { labels.current[i] = node; }} className="district-landmark" lang="zh-Hans">{mark.label}</span>)}</div>
       <div className="district-nearby" aria-label="Nearby interactions">{nearby.map((target, i) => <Button key={target.id} disabled={busy || state.status !== 'active'} onClick={() => void interact(target.id)} data-target-id={target.id}><span lang="zh-Hans">{target.label}</span>{i === 0 ? ' · E' : ''}</Button>)}</div>
       {error && <div className="district-error" role="alert">{error}<Button onClick={() => { setError(''); root.current?.focus(); }}>Dismiss</Button></div>}

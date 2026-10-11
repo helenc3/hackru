@@ -52,7 +52,6 @@ for (const kiosk of [false, true]) test(`validation café ${kiosk ? 'kiosk' : 's
   const api = await installScriptedApi(page, { validation: true, steps: cafeSteps(kiosk) });
   await page.goto(`${devUrl}/__validation`);
   await page.getByRole('button', { name: 'Start validation session' }).click();
-  await page.getByRole('button', { name: "Let's play", exact: true }).click();
   await cafe(page, kiosk);
   await expect(page.getByTestId('result-panel')).toContainText('SIMULATED RESULT');
   expect(api.remaining()).toBe(0); expect(api.failures).toEqual([]);
@@ -61,7 +60,6 @@ for (const kiosk of [false, true]) test(`validation café ${kiosk ? 'kiosk' : 's
 for (const confirmation of [false, true]) test(`validation platform ${confirmation ? 'confirmation' : 'direct'} route repairs wrong boarding`, async ({ page, devUrl }) => {
   const api = await installScriptedApi(page, { mission: 'P2', validation: true, steps: platformSteps(confirmation, true) });
   await page.goto(`${devUrl}/__validation`); await page.getByRole('button', { name: 'Start validation session' }).click();
-  await page.getByRole('button', { name: "Let's play", exact: true }).click();
   await platform(page, confirmation, true);
   expect(api.remaining()).toBe(0); expect(api.failures).toEqual([]);
 });
@@ -69,7 +67,6 @@ for (const fail of [false, true]) test(`validation boss ${fail ? 'fails and retr
   const steps: Step[] = [...bossSteps(fail), ...(fail ? [{ action: { type: 'retryMission' as const }, patch: { ...missionPatch('B1', 180), sessionId: 'ui-validation-B1', badges: [] } }] : [])];
   const api = await installScriptedApi(page, { mission: 'B1', validation: true, steps });
   await page.goto(`${devUrl}/__validation`); await page.getByRole('button', { name: 'Start validation session' }).click();
-  await page.getByRole('button', { name: "Let's play", exact: true }).click();
   await boss(page, fail);
   if (fail) { await expect(page.getByTestId('result-panel')).not.toContainText('Station Navigator'); await page.getByRole('button', { name: 'Retry mission' }).click(); await expect(page.getByTestId('result-panel')).toHaveCount(0); }
   else await expect(page.getByTestId('result-panel')).toContainText('Simulated badge: Station Navigator');
@@ -81,7 +78,6 @@ test('one validation session completes all three missions through the shared API
     ...platformSteps(), { action: { type: 'startMission', missionId: 'B1' }, patch: missionPatch('B1', 180) }, ...bossSteps(),
   ] });
   await page.goto(`${devUrl}/__validation`); await page.getByRole('button', { name: 'Start validation session' }).click();
-  await page.getByRole('button', { name: "Let's play", exact: true }).click();
   await cafe(page); await page.getByRole('button', { name: 'Next practice mission' }).click();
   await platform(page); await page.getByRole('button', { name: 'Enter boss mission' }).click(); await boss(page);
   expect(api.remaining()).toBe(0); expect(api.failures).toEqual([]);
@@ -98,7 +94,6 @@ test('validation entry needs server permission and cannot resume a player sessio
 test('rapid developer location actions dispatch serially with fresh versions', async ({ page, devUrl }) => {
   const api = await installScriptedApi(page, { validation: true });
   await page.goto(`${devUrl}/__validation`); await page.getByRole('button', { name: 'Start validation session' }).click();
-  await page.getByRole('button', { name: "Let's play", exact: true }).click();
   await expect(page.getByTestId('validation-harness')).toBeVisible();
   await page.getByTestId('validation-harness').evaluate((panel) => {
     const buttons = [...panel.querySelectorAll('button')];

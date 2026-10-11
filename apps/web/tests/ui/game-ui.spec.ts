@@ -5,7 +5,6 @@ async function start(page: import('@playwright/test').Page) {
   await page.goto('/');
   await page.getByRole('button', { name: 'Start Practice', exact: true }).click();
   await expect(page.getByTestId('game-shell')).toBeVisible();
-  await page.getByRole('button', { name: "Let's play", exact: true }).click();
 }
 async function typedPanel(page: import('@playwright/test').Page, npc = '小林') {
   await page.getByRole('button', { name: `${npc} · Talk`, exact: true }).click();

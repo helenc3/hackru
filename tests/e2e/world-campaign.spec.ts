@@ -68,7 +68,6 @@ test('player world clears the café mission against the real server and matches 
   await page.getByRole('combobox', { name: 'Conversation provider' }).click();
   await page.getByRole('option', { name: 'Fixture demonstration · scripted', exact: true }).click();
   await page.getByRole('button', { name: 'Start Practice', exact: true }).click();
-  await page.getByRole('button', { name: "Let's play", exact: true }).click();
   await expect(page.getByTestId('world-renderer')).toHaveAttribute('data-position-z', /./);
   await expect(page.getByText('Fixture demonstration · scripted responses')).toBeVisible();
   await expect(page.locator('[data-testid="validation-harness"]')).toHaveCount(0);

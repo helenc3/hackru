@@ -34,7 +34,6 @@ async function openPanel(page: Page) {
   await page.route('**/api/sessions', (route) => route.fulfill({ json: { state: liveState() } }));
   await page.goto('/');
   await page.getByRole('button', { name: 'Start Practice', exact: true }).click();
-  await page.getByRole('button', { name: "Let's play", exact: true }).click();
   await page.getByRole('button', { name: '小林 · Talk', exact: true }).click();
   return page.getByTestId('dialogue-panel');
 }

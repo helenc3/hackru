@@ -11,11 +11,11 @@ function Popup({ title, description, children }: { title: string; description: s
     <Dialog.Close asChild><Button className="icon-button popup-close" aria-label={`Close ${title}`}>×</Button></Dialog.Close>{children}
   </Dialog.Content></Theme></Dialog.Portal>;
 }
-function Controls() {
+export function Controls() {
   return <dl className="controls-list"><dt>WASD / Arrow keys</dt><dd>Walk</dd><dt>Drag the world</dt><dd>Turn the camera</dd><dt>E</dt><dd>Interact with the nearest target</dd><dt>Click the world</dt><dd>Return to movement controls</dd></dl>;
 }
 export function GameMenus({ pending, restartPending, active, onRestart, onLeave, onRefresh }: { pending: boolean; restartPending: boolean; active: boolean; onRestart: () => void; onLeave: () => void; onRefresh: () => void }) {
-  const [controls, setControls] = useState(true);
+  const [controls, setControls] = useState(false);
   const [settings, setSettings] = useState(false);
   const audio = useAudioSettings();
   const [audioOpen, setAudioOpen] = useState(false);

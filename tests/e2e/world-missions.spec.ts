@@ -69,7 +69,6 @@ async function playP1(page: Page) {
   await page.getByRole('combobox', { name: 'Conversation provider' }).click();
   await page.getByRole('option', { name: 'Fixture demonstration · scripted', exact: true }).click();
   await page.getByRole('button', { name: 'Start Practice', exact: true }).click();
-  await page.getByRole('button', { name: "Let's play", exact: true }).click();
   await expect(page.getByTestId('world-renderer')).toHaveAttribute('data-position-z', /./);
   await walk(page, 'w', 'z', 6.1, -1);
   await walk(page, 'a', 'x', -9.8, -1);

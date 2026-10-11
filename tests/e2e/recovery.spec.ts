@@ -41,7 +41,6 @@ async function start(page: Page, provider: 'live' | 'fixture', base = '') {
   await page.getByRole('combobox', { name: 'Conversation provider' }).click();
   await page.getByRole('option', { name: provider === 'live' ? 'Live AI' : 'Fixture demonstration · scripted', exact: true }).click();
   await page.getByRole('button', { name: 'Start Practice', exact: true }).click();
-  await page.getByRole('button', { name: "Let's play", exact: true }).click();
   await expect(page.getByTestId('world-renderer')).toHaveAttribute('data-position-z', /./);
 }
 
@@ -149,7 +148,6 @@ test('server restart expires the stored session and a fresh start works', async 
     await page.getByRole('combobox', { name: 'Conversation provider' }).click();
   await page.getByRole('option', { name: 'Fixture demonstration · scripted', exact: true }).click();
     await page.getByRole('button', { name: 'Start Practice', exact: true }).click();
-  await page.getByRole('button', { name: "Let's play", exact: true }).click();
     await expect(page.getByTestId('world-renderer')).toHaveAttribute('data-position-z', /./);
     const fresh = await sessionId(page);
     expect(fresh).toBeTruthy();

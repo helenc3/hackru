@@ -168,3 +168,17 @@ input:focus-visible, textarea:focus-visible, select:focus-visible { outline: var
 .game-main > .validation-panel { position: absolute; top: 150px; left: 20px; z-index: 8; width: min(420px, 40vw); max-height: calc(100dvh - 180px); overflow-y: auto; padding: 16px; background: var(--cream); border: var(--outline); border-radius: var(--radius-lg); }
 .game-world .audio-status { left: 20px; right: auto; bottom: 80px; }
 .mission-notice { position: absolute; z-index: 6; left: 20px; bottom: 140px; max-width: min(420px, calc(100% - 40px)); padding: 10px 14px; background: var(--cream); border: var(--outline); border-radius: 12px; font-size: 12px; font-weight: 700; }
+
+.intro-columns { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 28px; margin-top: 24px; }
+.intro-setup { min-width: 0; }
+.intro-setup fieldset { margin-top: 0; }
+.intro-setup .setup-row { align-items: flex-start; flex-direction: column; gap: 8px; }
+.intro-setup .setup-row p { margin: 0; }
+.intro-setup audio { max-width: 100%; margin-top: 12px; }
+.intro-controls { border-left: 2px solid var(--ink); padding-left: 28px; }
+.intro-controls h3 { margin: 0 0 10px; font-size: 20px; }
+@media (max-width: 640px) {
+  .intro-columns { grid-template-columns: 1fr; }
+  .intro-controls { border-left: 0; border-top: 2px solid var(--ink); padding: 24px 0 0; }
+  .learner-options { flex-wrap: wrap; }
+}

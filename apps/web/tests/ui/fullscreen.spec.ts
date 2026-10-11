@@ -4,11 +4,15 @@ import { installScriptedApi } from '../../../../fixtures/ui/scripted-api';
 test('fullscreen HUD, shared popups and audio controls', async ({ page }) => {
   await installScriptedApi(page);
   await page.goto('/');
+  const intro = page.getByTestId('start-panel');
+  await expect(intro).toContainText('How much Mandarin have you used?');
+  await expect(intro.locator('.intro-controls')).toContainText('WASD');
+  await expect(intro.getByRole('button', { name: /Close/ })).toHaveCount(0);
+  const setupBounds = await intro.locator('.intro-setup').boundingBox();
+  const controlsBounds = await intro.locator('.intro-controls').boundingBox();
+  expect(setupBounds!.x + setupBounds!.width).toBeLessThan(controlsBounds!.x);
   await page.getByRole('button', { name: 'Start Practice', exact: true }).click();
   const controls = page.getByRole('dialog', { name: 'Controls', exact: true });
-  await expect(controls).toBeVisible();
-  await expect(controls).toContainText('WASD');
-  await controls.getByRole('button', { name: "Let's play" }).click();
   await expect(controls).toHaveCount(0);
   const world = await page.getByTestId('world-renderer').boundingBox();
   const viewport = page.viewportSize()!;
@@ -48,7 +52,6 @@ test('Radix learner choices and provider menu remain keyboard accessible', async
   await page.getByRole('option', { name: 'Fixture demonstration · scripted', exact: true }).click();
   await expect(provider).toContainText('Fixture demonstration');
   await page.getByRole('button', { name: 'Start Practice', exact: true }).click();
-  await page.getByRole('button', { name: "Let's play", exact: true }).click();
   await page.getByRole('button', { name: '入口告示 · Read sign' }).click();
   await expect(page.getByRole('dialog', { name: 'Inspected sign' })).toBeVisible();
   await page.keyboard.press('Escape');

@@ -23,7 +23,6 @@ test('journey music fades in, ducks throughout conversation, restores and mutes'
   await installScriptedApi(page);
   await page.goto('/');
   await page.getByRole('button', { name: 'Start Practice', exact: true }).click();
-  await page.getByRole('button', { name: "Let's play", exact: true }).click();
   const levels = () => page.evaluate(() => (window as unknown as { musicLevels: { value: number; seconds: number }[] }).musicLevels);
   // Unlock with a gesture that remains valid if the async label changes meanwhile.
   await page.keyboard.press('Shift');

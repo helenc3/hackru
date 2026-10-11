@@ -36,7 +36,6 @@ const counter = (page: Page, name: string) => page.evaluate((key) => Number((win
 async function openPanel(page: Page) {
   await page.goto('/');
   await page.getByRole('button', { name: 'Start Practice', exact: true }).click();
-  await page.getByRole('button', { name: "Let's play", exact: true }).click();
   await page.getByRole('button', { name: '小林 · Talk', exact: true }).click();
   return page.getByTestId('dialogue-panel');
 }
@@ -196,7 +195,6 @@ test('PA plays the reviewed asset and reports finishCue only after it ends', asy
   await page.route('**/audio/*.mp3', (route) => route.fulfill({ contentType: 'audio/mpeg', body: Buffer.from('ID3fake') }));
   await page.goto('/');
   await page.getByRole('button', { name: 'Start Practice', exact: true }).click();
-  await page.getByRole('button', { name: "Let's play", exact: true }).click();
   await page.evaluate(() => { (window as unknown as Record<string, boolean>).__holdPlayback = true; });
   await page.getByRole('button', { name: 'Listen' }).click();
   const controls = page.getByTestId('audio-controller');

@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../../../../tests/support/browser-test';
 import { installScriptedApi } from '../../../../fixtures/ui/scripted-api';
 import type { PublicState } from '@vibequest/shared';
 

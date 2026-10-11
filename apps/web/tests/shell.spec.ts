@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../../../tests/support/browser-test';
 
 test('implemented engine starts an authoritative production session', async ({ page }) => {
   await page.goto('/');

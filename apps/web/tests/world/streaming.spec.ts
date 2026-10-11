@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../../../../tests/support/browser-test';
 import { chunkKey, type ChunkCoord } from '@vibequest/shared';
 import { ChunkStreamer, distanceToChunk, wantedChunks } from '../../src/city/streamer';
 import { fixtureChunk } from '../../../../fixtures/world/city';

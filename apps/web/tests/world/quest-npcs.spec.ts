@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../../../../tests/support/browser-test';
 
 // The welcome preview renders the seeded spawn box (fallback chunks), so the quest givers must be standing there.
 test('the seeded spawn box shows 老王 in view and 小李 on the avenue east of spawn', async ({ page }) => {

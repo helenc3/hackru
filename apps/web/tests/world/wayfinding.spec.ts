@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../../../../tests/support/browser-test';
 import { chunkKey, createWorldView, generateFallbackChunk, questTarget, seedFromWorldId, type ChunkManifest, type MissionId, type Position } from '@vibequest/shared';
 import { distance, movePlayer, nextLeg } from '../../src/world/navigation';
 

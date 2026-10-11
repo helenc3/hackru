@@ -14,6 +14,7 @@ import { initialPosition, type Runtime } from './runtime';
 import { CityScene } from '../city/CityScene';
 import { useCity, type CityHandle } from '../city/use-city';
 import './world.css';
+import { testProfile } from './test-profile';
 
 function webGlIsAvailable(): boolean {
   try {
@@ -211,7 +212,7 @@ export function WorldRenderer({ state, onAction, onTalk, preview = false, manife
       if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
     }}
     onPointerCancel={() => { drag.current = null; }}>
-    {hasWebGl ? <CanvasBoundary onFailure={() => { runtime.current.keys.clear(); runtime.current.path = []; runtime.current.active = false; setHasWebGl(false); }}><Canvas dpr={[1, 1.5]} camera={{ position: [state.position.x, 8.5, state.position.z + 9], fov: 52, near: .1, far: 150 }} gl={{ antialias: true, powerPreference: 'high-performance' }}
+    {hasWebGl ? <CanvasBoundary onFailure={() => { runtime.current.keys.clear(); runtime.current.path = []; runtime.current.active = false; setHasWebGl(false); }}><Canvas dpr={testProfile().lightweight ? .5 : [1, 1.5]} camera={{ position: [state.position.x, 8.5, state.position.z + 9], fov: 52, near: .1, far: 150 }} gl={{ antialias: !testProfile().lightweight, powerPreference: 'high-performance' }}
       fallback={<CompatibilityRecovery />}>
       <ContextLossHandler onFailure={() => { runtime.current.keys.clear(); runtime.current.path = []; runtime.current.active = false; setHasWebGl(false); }} />
       <CityScene city={city} runtime={runtime} position={position} /><Cue at={nearby[0]?.position} /><Motion runtime={runtime} root={root} labels={labels} marks={marks} city={city} state={state} tick={setPosition} sync={sync} /><DestinationMarker runtime={runtime} />

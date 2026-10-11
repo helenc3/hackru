@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Page } from '../../../../tests/support/browser-test';
 import { TurnRequestSchema, TurnResponseSchema } from '@vibequest/shared';
 import { installScriptedApi } from '../../../../fixtures/ui/scripted-api';
 

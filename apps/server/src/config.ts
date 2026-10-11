@@ -20,6 +20,7 @@ const environmentSchema = z.object({
   ELEVENLABS_PA_MODEL: z.string().trim().min(1).default('eleven_v4'),
   ELEVENLABS_STT_MODEL: z.string().trim().min(1).default('scribe_v2'),
   ENABLE_DEMO_FIXTURES: booleanEnvironmentSchema,
+  E2E_FAST_MOVEMENT: booleanEnvironmentSchema,
   ENABLE_VALIDATION_HARNESS: booleanEnvironmentSchema,
   /** Claude city composition is opt-in; without it the seeded fallback generator builds every chunk. */
   ENABLE_CLAUDE_CITY: booleanEnvironmentSchema,
@@ -48,6 +49,7 @@ export interface ServerConfig {
   cityModel: string;
   dictionaryModel: string;
   enableDemoFixtures: boolean;
+  e2eFastMovement?: boolean;
   enableValidationHarness: boolean;
 }
 
@@ -81,6 +83,7 @@ export function loadConfig(environment: NodeJS.ProcessEnv = process.env): Server
     cityModel: env.CITY_MODEL,
     dictionaryModel: env.DICTIONARY_MODEL,
     enableDemoFixtures: env.ENABLE_DEMO_FIXTURES,
+    e2eFastMovement: env.ENABLE_DEMO_FIXTURES && env.E2E_FAST_MOVEMENT,
     enableValidationHarness: env.ENABLE_VALIDATION_HARNESS,
   };
 }

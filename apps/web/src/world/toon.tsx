@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { DataTexture, NearestFilter, RedFormat } from 'three';
+import { testProfile } from './test-profile';
 import { Outlines } from '@react-three/drei';
 
 /** Shared "Toon Spike × Powerpuff × Genshin" look: ink outlines, 3-step cel ramp, candy palette. */
@@ -35,7 +36,7 @@ export function Toon({ color, outline = true, thickness = 2.4, emissive, emissiv
 }) {
   return <>
     <meshToonMaterial color={color} gradientMap={gradientMap()} emissive={emissive ?? '#000000'} emissiveIntensity={emissiveIntensity} transparent={transparent} opacity={opacity} />
-    {outline && <Outlines color={INK} thickness={thickness} />}
+    {outline && !testProfile().lightweight && <Outlines color={INK} thickness={thickness} />}
   </>;
 }
 
@@ -49,5 +50,5 @@ export function useReducedMotion(): boolean {
     query.addEventListener('change', update);
     return () => query.removeEventListener('change', update);
   }, []);
-  return reduced;
+  return reduced || testProfile().lightweight;
 }

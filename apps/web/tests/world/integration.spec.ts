@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../../../../tests/support/browser-test';
 import { spawn, type ChildProcess } from 'node:child_process';
 import path from 'node:path';
 import { createServer } from 'node:net';
@@ -45,6 +45,10 @@ test('streams server-owned terrain again after reload without uploading browser 
   const world = page.getByTestId('world-renderer');
   await page.goto(fixtureUrl);
   await expect.poll(async () => Number(await world.getAttribute('data-chunks'))).toBeGreaterThanOrEqual(9);
+  expect(await page.locator('canvas').evaluate((canvas: HTMLCanvasElement) => ({
+    pixelRatio: canvas.width / canvas.clientWidth,
+    antialias: canvas.getContext('webgl2')?.getContextAttributes()?.antialias,
+  }))).toEqual({ pixelRatio: .5, antialias: false });
   expect(restored).toEqual([]);
   expect(requested.flat().some((coord) => chunkKey(coord) === '0,0')).toBe(true);
   expect(requested.every((batch) => batch.length <= 6)).toBe(true);

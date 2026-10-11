@@ -17,10 +17,10 @@ export function collides(view: Walkable, position: Position) {
 }
 
 /** Small axis-separated steps avoid tunnelling and allow tangential sliding. */
-export function movePlayer(view: Walkable, position: Position, right: number, forward: number, yaw: number, seconds: number): Position {
+export function movePlayer(view: Walkable, position: Position, right: number, forward: number, yaw: number, seconds: number, movementMultiplier = 1): Position {
   const length = Math.hypot(right, forward);
   if (!length) return position;
-  const travel = WORLD_RULES.movementSpeed * Math.max(0, Math.min(seconds, 0.1));
+  const travel = WORLD_RULES.movementSpeed * movementMultiplier * Math.max(0, Math.min(seconds, 0.1));
   const dx = (right * Math.cos(yaw) - forward * Math.sin(yaw)) / length * travel;
   const dz = (-right * Math.sin(yaw) - forward * Math.cos(yaw)) / length * travel;
   const steps = Math.max(1, Math.ceil(travel / (WORLD_RULES.playerRadius / 2)));

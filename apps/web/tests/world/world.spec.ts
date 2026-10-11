@@ -1,4 +1,6 @@
-﻿import { expect, test, type Page } from '@playwright/test';
+﻿import { expect, test, type Page } from '../../../../tests/support/browser-test';
+
+test.use({ renderProfile: 'full' });
 import { spawn, type ChildProcess } from 'node:child_process';
 import path from 'node:path';
 import { createServer } from 'node:net';

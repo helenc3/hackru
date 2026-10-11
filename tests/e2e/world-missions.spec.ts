@@ -1,7 +1,9 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from '../support/browser-test';
 import { harness } from './helpers';
 
 // Edge journeys against the real server through the developer harness (fixture dialogue).
+
+test.use({ movementMultiplier: 4 });
 
 test('Q1: ambiguous requests clarify and completed quests cannot restart or purchase again', async ({ request }) => {
   const h = await harness(request);

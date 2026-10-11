@@ -1,4 +1,4 @@
-import { test as base } from '@playwright/test';
+import { test as base } from '../../../../tests/support/browser-test';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { createServer } from 'node:net';
 import { fileURLToPath } from 'node:url';

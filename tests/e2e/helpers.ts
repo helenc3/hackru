@@ -1,4 +1,5 @@
 import { expect, type APIRequestContext, type Page } from '@playwright/test';
+import { test } from '../support/browser-test';
 import { walkingPath } from '../../apps/web/src/world/navigation';
 import { GENERATION_RULES, GOAL_WARMUP_EXCHANGES, chunkOf, chunkKey, createWorldView, planChunk, seedFromWorldId, type ChunkManifest, type GameAction, type Position, type PublicState } from '@vibequest/shared';
 
@@ -10,6 +11,9 @@ export const SESSION_KEY = 'vibequest.player-session.v1';
  * street network one obstacle-aware leg at a time, so routes do not depend on the world's seed.
  */
 export async function walkToQuestTarget(page: Page) {
+  return test.step('world: compass walking and streamed route planning', () => walkToQuestTargetImpl(page));
+}
+async function walkToQuestTargetImpl(page: Page) {
   const compass = page.getByTestId('quest-compass');
   await expect(compass).toBeVisible({ timeout: 15000 });
   await page.getByTestId('walk-there').click();
@@ -46,6 +50,9 @@ async function walkAxis(page: Page, axis: 'x' | 'z', destination: number) {
 
 /** Walk an axis-aligned route; each waypoint changes x then z. */
 export async function walkRoute(page: Page, waypoints: Position[]) {
+  return test.step('world: route walking and chunk prefetch', () => walkRouteImpl(page, waypoints));
+}
+async function walkRouteImpl(page: Page, waypoints: Position[]) {
   const world = page.getByTestId('world-renderer');
   const id = await sessionId(page);
   const state = await serverState(page.request, id!);
@@ -134,6 +141,9 @@ export async function startWorld(page: Page, provider: 'live' | 'fixture' = 'fix
 
 /** The spawn box is committed (movement unlocks once the player's chunk is). */
 export async function worldReady(page: Page) {
+  return test.step('world: wait for streamed chunks', () => worldReadyImpl(page));
+}
+async function worldReadyImpl(page: Page) {
   const world = page.getByTestId('world-renderer');
   // A new attempt remounts the world, which streams the server-owned chunks again.
   await expect(world).toHaveAttribute('data-city-status', 'streaming', { timeout: 60000 });

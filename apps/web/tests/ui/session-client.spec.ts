@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../../../../tests/support/browser-test';
 import { createSessionClient, SessionClientError } from '../../src/app/session-client';
 import type { ActionRequest, TurnRequest } from '@vibequest/shared';
 import { fixtureState } from '../../../../fixtures/ui/scripted-api';

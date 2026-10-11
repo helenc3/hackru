@@ -1,7 +1,7 @@
 import { test, expect } from './dev-page';
 import { installScriptedApi } from '../../../../fixtures/ui/scripted-api';
 import { drinkSteps, hotelSteps, missionPatch, photoSteps } from '../../../../fixtures/validation/campaigns';
-import type { Page } from '@playwright/test';
+import type { Page } from '../../../../tests/support/browser-test';
 
 const target = (page: Page, name: string) => page.getByTestId('validation-harness').getByRole('button', { name, exact: true });
 async function open(page: Page, npc: string) {

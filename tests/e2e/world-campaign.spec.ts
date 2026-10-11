@@ -1,5 +1,5 @@
-import { expect, test, type Page } from '@playwright/test';
-import { planChunk, seedFromWorldId, type ChunkManifest, type PublicState } from '@vibequest/shared';
+import { expect, test, type Page } from '../support/browser-test';
+import { chunkOf, GENERATION_RULES, planChunk, seedFromWorldId, type ChunkManifest, type PublicState } from '@vibequest/shared';
 import { harness, hashes, interact, playerState, riversidePlan, say, spawnCoordsIn, startWorld, walkToQuestTarget, worldReady, chat } from './helpers';
 
 /** Planner-reserved guide in chunk (1,0): the Q2 helper on the row-0 avenue's north sidewalk. */
@@ -18,6 +18,8 @@ const nextQuest = async (page: Page, missionId: string) => {
   await page.waitForTimeout(500); // let the remounted world leave its first frame
   await worldReady(page);
 };
+
+test.use({ movementMultiplier: 4 });
 
 test('player world: buy a drink, get verified hotel directions, and a river photo — the world survives a reload', async ({ page, request }) => {
   test.setTimeout(300_000);
@@ -102,16 +104,28 @@ test('player world: buy a drink, get verified hotel directions, and a river phot
   state = await playerState(page, request);
   expect(state).toMatchObject({ status: 'cleared', completedMissionIds: ['Q1', 'Q2', 'Q3'], badges: ['shanghai-explorer'], photo: { status: 'captured' } });
 
-  // Revisit after unloading: the spawn meshes unloaded three chunks back; a reload restores the identical spawn terrain.
+  // Reload at the river: streaming resumes around the saved player, preserving that terrain.
+  const centre = chunkOf(state.position);
+  const coords = Array.from({ length: 9 }, (_, i) => ({ cx: centre.cx + i % 3 - 1, cz: centre.cz + Math.floor(i / 3) - 1 }));
+  const beforeReload: ChunkManifest[] = [];
+  for (let i = 0; i < coords.length; i += GENERATION_RULES.batchSize) {
+    const response = await request.post(`/api/sessions/${state.sessionId}/chunks`, { data: { coords: coords.slice(i, i + GENERATION_RULES.batchSize), urgent: true } });
+    expect(response.status()).toBe(200);
+    beforeReload.push(...(await response.json()).chunks);
+  }
+  expect(Object.keys(hashes(beforeReload))).toHaveLength(9);
+  const resumedChunks = () => committed.filter((chunk) => Math.abs(chunk.coord.cx - centre.cx) <= 1 && Math.abs(chunk.coord.cz - centre.cz) <= 1);
   chunkRequests.length = 0; committed.length = 0;
   await page.reload();
   await page.getByRole('button', { name: 'Continue Session' }).click();
   await worldReady(page);
-  // Layouts are server-owned and stream around the player: from the river only the spawn chunks within the prefetch ring come back.
-  await expect.poll(() => committed.filter((chunk) => Math.abs(chunk.coord.cx) <= 1 && Math.abs(chunk.coord.cz) <= 1).length).toBeGreaterThan(0);
+  // Also verify any revisited spawn chunks, while the complete resume box follows the saved player.
   const revisited = hashes(committed.filter((chunk) => Math.abs(chunk.coord.cx) <= 1 && Math.abs(chunk.coord.cz) <= 1));
-  for (const [key, hash] of Object.entries(revisited)) expect(hash, `spawn chunk ${key} changed`).toBe(spawnBefore[key]); // identical terrain, never regenerated
-  expect(chunkRequests.flatMap(spawnCoordsIn)).not.toEqual([]);
+  for (const [key, hash] of Object.entries(revisited)) expect(hash, `spawn chunk ${key} changed`).toBe(spawnBefore[key]);
+  await expect.poll(() => Object.keys(hashes(resumedChunks())).length).toBe(9);
+  expect(hashes(resumedChunks())).toEqual(hashes(beforeReload));
+  expect(chunkRequests.length).toBeGreaterThan(0);
+  expect((await playerState(page, request)).position).toEqual(state.position);
   expect((await playerState(page, request)).completedMissionIds).toEqual(['Q1', 'Q2', 'Q3']);
 });
 

@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Page } from '../../../../tests/support/browser-test';
 import { installScriptedApi } from '../../../../fixtures/ui/scripted-api';
 
 const water = { simplified: '水', traditional: '水', pinyin: 'shuǐ', english: ['water', 'river'] };

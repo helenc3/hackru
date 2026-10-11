@@ -13,6 +13,12 @@ describe('server-only configuration', () => {
     expect(loadConfig({ PORT: '5050' }).port).toBe(5050);
   });
 
+  it('enables faster test movement only with explicit fixture authorization', () => {
+    expect(loadConfig({ E2E_FAST_MOVEMENT: 'true' }).e2eFastMovement).toBe(false);
+    expect(loadConfig({ ENABLE_DEMO_FIXTURES: 'true' }).e2eFastMovement).toBe(false);
+    expect(loadConfig({ ENABLE_DEMO_FIXTURES: 'true', E2E_FAST_MOVEMENT: 'true' }).e2eFastMovement).toBe(true);
+  });
+
   it('treats empty optional credential settings as unconfigured', () => {
     const config = loadConfig({ GEMINI_API_KEY: ' ', ELEVENLABS_API_KEY: '' });
     expect(config.geminiApiKey).toBeUndefined();

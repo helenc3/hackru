@@ -157,7 +157,7 @@ function pay(state: InternalState, anchor: WorldAnchor, nowMs: number, events: E
   events.push({ id: `${state.attemptId}.purchase-${state.purchases.length}`, kind: 'objective', message: `Paid ¥${price} for ${drink}.` });
 }
 
-export function applyAction(state: InternalState, raw: GameAction, nowMs: number, world: WorldView): EngineResult {
+export function applyAction(state: InternalState, raw: GameAction, nowMs: number, world: WorldView, movementMultiplier: 1 | 4 = 1): EngineResult {
   const action = GameActionSchema.parse(raw);
   nowMs = Math.floor(nowMs); // timestamps are integer ms
   const result = synchronizeGame(state, nowMs);
@@ -183,7 +183,7 @@ export function applyAction(state: InternalState, raw: GameAction, nowMs: number
       requireRule(world.walkable(position), 'That position is not walkable or not yet loaded.');
       // Elapsed time is measured between accepted arrivals; the slack absorbs ~250 ms of request jitter while still rejecting teleports.
       // ponytail: slack is per request; use a token bucket if cheating ever matters.
-      requireRule(next.validationMode || distance(position, state.position) <= WORLD_RULES.movementSpeed * Math.max(0, nowMs - (state.lastMovementAtMs ?? nowMs)) / 1000 + 1, 'Movement exceeds the authored speed.');
+      requireRule(next.validationMode || distance(position, state.position) <= WORLD_RULES.movementSpeed * movementMultiplier * Math.max(0, nowMs - (state.lastMovementAtMs ?? nowMs)) / 1000 + 1, 'Movement exceeds the authored speed.');
       next.position = position; next.zoneId = world.districtAt(position); next.lastMovementAtMs = nowMs;
       explore(next, world, nowMs);
       break;

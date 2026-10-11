@@ -99,7 +99,7 @@ export function createGameRouter(services: ServerServices): Router {
         if (body.action.type === 'audioPhase' && body.action.phase === 'playing') speechPlayback(candidate, body.action.operationId, nowMs);
         if (body.action.type === 'audioPhase' && body.action.phase === 'recording' && [...session.speechJobs.values()].some((job) => job.operationId === (body.action as { operationId: string }).operationId)) throw new HttpError(422, 'INVALID_AUDIO_OPERATION', 'Speech operations cannot be used for recording.');
         const world = viewOf(services, session);
-        const engine = applyAction(candidate.state, body.action, nowMs, world);
+        const engine = applyAction(candidate.state, body.action, nowMs, world, services.config.e2eFastMovement && candidate.state.providerStatus === 'fixture' ? 4 : 1);
         if (engine.state.attemptId !== session.state.attemptId) invalidateAttemptArtifacts(session);
         session.state = engine.state;
         session.state.version++;

@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../../../../tests/support/browser-test';
 import { installScriptedApi } from '../../../../fixtures/ui/scripted-api';
 
 async function start(page: import('@playwright/test').Page) {

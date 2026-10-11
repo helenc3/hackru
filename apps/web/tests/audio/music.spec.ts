@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../../../../tests/support/browser-test';
 import { installScriptedApi } from '../../../../fixtures/ui/scripted-api';
 
 test('journey music fades in, ducks throughout conversation, restores and mutes', async ({ page }) => {

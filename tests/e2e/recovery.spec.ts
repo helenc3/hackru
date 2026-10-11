@@ -1,6 +1,6 @@
 import { spawn, type ChildProcess } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page } from '../support/browser-test';
 import type { PublicState } from '@vibequest/shared';
 import { harness, HARNESS, interact, playerState, serverState, sessionId, SMALL_TALK, startWorld, walkToQuestTarget } from './helpers';
 
@@ -24,6 +24,8 @@ async function reachVendor(page: Page, request: Parameters<typeof playerState>[1
   return panel;
 }
 const progress = (state: PublicState) => ({ missionId: state.missionId, status: state.status, objectives: state.objectives, inventory: state.inventory, xp: state.xp, badges: state.badges, purchases: state.purchases });
+
+test.use({ movementMultiplier: 4 });
 
 test('live AI outage shows a retryable recovery, keeps the draft, and changes no progress', async ({ page, request }) => {
   await startWorld(page, 'live');

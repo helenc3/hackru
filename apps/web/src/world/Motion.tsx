@@ -7,6 +7,7 @@ import type { CityHandle } from '../city/use-city';
 import { Player, type Gait } from './characters';
 import { initialPosition, type Runtime } from './runtime';
 import { useAudioActivity } from '../audio/audio-bus';
+import { testProfile } from './test-profile';
 import { DEFAULT_PITCH, orbitDistance } from './camera';
 
 export type Landmark = { id?: string; label: string; x: number; z: number };
@@ -63,11 +64,12 @@ export function Motion({ runtime, root, labels, marks, city, state, tick, sync }
     const waypoint = r.path?.[0];
     const moving = keyed || Boolean(waypoint);
     const previous = r.position;
-    if (keyed) r.position = movePlayer(city.view, r.position, right, forward, r.yaw, delta);
+    const multiplier = state.providerStatus === 'fixture' ? testProfile().movementMultiplier : 1;
+    if (keyed) r.position = movePlayer(city.view, r.position, right, forward, r.yaw, delta, multiplier);
     else if (waypoint) {
       const remaining = distance(r.position, waypoint);
-      const seconds = Math.min(delta, remaining / WORLD_RULES.movementSpeed);
-      r.position = movePlayer(city.view, r.position, waypoint.x - r.position.x, r.position.z - waypoint.z, 0, seconds);
+      const seconds = Math.min(delta, remaining / (WORLD_RULES.movementSpeed * multiplier));
+      r.position = movePlayer(city.view, r.position, waypoint.x - r.position.x, r.position.z - waypoint.z, 0, seconds, multiplier);
       if (distance(r.position, waypoint) < .01) r.path?.shift();
       else if (distance(previous, r.position) < .0001) r.path = [];
     }

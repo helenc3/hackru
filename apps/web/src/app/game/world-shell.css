@@ -1,0 +1,76 @@
+/* Full-bleed world: the shell is exactly one viewport, the world fills main, everything else overlays it. */
+
+.game-shell {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.game-topbar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 0;
+  padding: 6px 20px;
+  border-bottom: var(--outline);
+  font-size: 12px;
+  font-weight: 700;
+  background: var(--cream);
+}
+
+.game-topbar .brand {
+  font-size: 20px;
+}
+
+.game-topbar .language-chip {
+  padding: 4px 10px;
+}
+
+.game-topbar .button {
+  padding: 7px 11px;
+  font-size: 11px;
+}
+
+.game-topbar .environment-banner {
+  margin-left: auto;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ink);
+  border: 2px solid var(--ink);
+  border-radius: var(--radius-pill);
+  background: repeating-linear-gradient(135deg, var(--lemon) 0 10px, #ffdb85 10px 20px);
+}
+
+.game-topbar .environment-banner + .button, .game-topbar > .button:first-of-type {
+  margin-left: auto;
+}
+
+.game-topbar .environment-banner ~ .button {
+  margin-left: 0;
+}
+
+.game-main {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  padding: 0;
+  margin: 0;
+  max-width: none;
+  width: auto;
+  overflow: hidden;
+}
+
+.game-world {
+  position: absolute;
+  inset: 0;
+}
+
+.game-world .world-renderer {
+  height: 100%;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}

@@ -1,0 +1,45 @@
+.compatibility-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 13px;
+  height: 100%;
+  padding: 35px;
+  text-align: center;
+  background: radial-gradient(circle at 50% 45%, var(--cream) 0 38%, var(--peach) 75%);
+  color: var(--ink);
+}
+
+.compatibility-icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  border: var(--outline);
+  background: var(--lemon);
+  box-shadow: var(--shadow-sticker-sm);
+  display: grid;
+  place-items: center;
+  font-size: 30px;
+  font-weight: 800;
+  color: var(--ink);
+}
+
+.compatibility-screen h3 {
+  font-size: 20px;
+  font-weight: 800;
+}
+
+.compatibility-screen p {
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.7;
+  max-width: 330px;
+}
+
+.compatibility-screen small {
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.7;
+  max-width: 350px;
+}

@@ -1,0 +1,12 @@
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important;
+  }
+
+  .button:hover, .button:active, .voice-control button:hover, .voice-control button:active,
+  .district-nearby button:hover, .district-nearby button:active, .district-error button:hover, .district-error button:active {
+    transform: none !important;
+  }
+}

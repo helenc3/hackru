@@ -1,0 +1,12 @@
+.game-shell .brand > span.brand-dot, .welcome-screen .brand > span.brand-dot {
+  width: auto;
+  height: auto;
+  margin: 0;
+  display: inline;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: none;
+  color: var(--raspberry);
+  font-size: inherit;
+}

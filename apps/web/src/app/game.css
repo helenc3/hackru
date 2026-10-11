@@ -1,123 +1,13 @@
-input, textarea, select { font: inherit; color: inherit; }
-textarea, select, input:not([type=radio]) { border: var(--outline); background: #fff; color: var(--ink); border-radius: 12px; padding: 11px; }
-input:focus-visible, textarea:focus-visible, select:focus-visible { outline: var(--focus); outline-offset: 0; box-shadow: var(--focus-ring); }
-.welcome-screen { max-width: 1000px; padding-top: 50px; }
-.welcome-screen > .language-chip { float: right; }
-.welcome-screen h1 { margin: 50px 0 20px; }
-.welcome-footer { margin: 22px 0; color: var(--text-muted); }
-.start-panel { padding: 26px; border: var(--outline); border-radius: var(--radius-lg); background: var(--cream); box-shadow: var(--shadow-sticker); margin-bottom: 24px; }
-.start-panel h2 { font-size: 25px; margin: 10px 0; }
-.start-panel p { color: var(--text-muted); font-size: 13px; line-height: 1.7; }
-.start-panel fieldset { border: 0; padding: 0; margin: 20px 0; display: flex; gap: 25px; }
-.start-panel legend { font-size: 13px; font-weight: 800; margin-bottom: 12px; }
-.start-panel label { font-size: 13px; font-weight: 600; }
-.start-panel input[type=radio] { accent-color: var(--plum); margin-right: 8px; }
-.field-label { display: flex; flex-direction: column; gap: 8px; margin: 14px 0; font-size: 13px; font-weight: 700; }
-.setup-row { display: flex; align-items: center; gap: 18px; margin-top: 15px; }
-.start-actions, .result-actions { display: flex; gap: 12px; margin-top: 24px; }
-.start-actions > .primary { max-width: 260px; }
-.environment-notice { padding-top: 15px; color: var(--plum) !important; font-weight: 700; }
-.quest-panel .eyebrow { display: inline-block; color: var(--ink); background: var(--lemon); border: 2px solid var(--ink); border-radius: var(--radius-pill); padding: 3px 10px; font-size: 10px; }
-.quest-panel h2 { font-size: 23px; margin: 14px 0; }
-.mission-clock { font-variant-numeric: tabular-nums; font-size: 30px; font-weight: 800; margin: 20px 0; }
-.mission-clock > span { display: block; font-size: 11px; font-weight: 600; color: var(--text-muted); margin-top: 6px; }
-.objective-list { list-style: none; display: grid; gap: 17px; padding: 0; font-size: 13px; line-height: 1.6; margin: 23px 0; }
-.objective-list li { display: flex; gap: 12px; }
-.objective-list li > span:first-child { flex-shrink: 0; display: grid; place-items: center; width: 22px; height: 22px; border: 2px solid var(--ink); border-radius: 50%; background: #fff; font-size: 12px; font-weight: 800; line-height: 1; }
-.objective-list li[data-complete=true] { color: var(--text-muted); }
-.objective-list li[data-complete=true] span:first-child { background: var(--lime); color: var(--ink); animation: vq-check .35s var(--bounce); }
-.controls-note { color: var(--text-muted); font-size: 11px; line-height: 1.8; }
-.inventory-bar > span:first-child { margin-right: auto; }
-.inventory-bar .button { padding: 9px 11px; }
-.interaction-dock h2, .interaction-dock > p { display: none; }
-.interaction-dock > div, .choice-dock, .validation-controls { display: flex; gap: 8px; flex-wrap: wrap; }
-.cue-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; font-size: 12px; font-weight: 700; }
-.sign-overlay > button { float: right; }
-.sign-overlay h3 { font-size: 14px; margin-bottom: 14px; }
-.sign-overlay p { font-size: 21px; font-weight: 700; line-height: 1.8; white-space: pre-line; }
-.dialogue-panel header { display: flex; align-items: center; justify-content: space-between; }
-.dialogue-panel h2 { font-size: 28px; margin: 7px 0; }
-.dialogue-panel .eyebrow { display: inline-block; color: var(--ink); background: var(--blossom); border: 2px solid var(--ink); border-radius: var(--radius-pill); padding: 3px 10px; }
-.mood-label { font-size: 12px; font-weight: 600; color: var(--text-muted); }
-.conversation-status { font-size: 12px; color: var(--text-muted); margin: 0 0 12px; display: flex; align-items: center; gap: 6px; }
-.thinking-dots i { display: inline-block; width: 6px; height: 6px; margin-left: 3px; border-radius: 50%; background: var(--plum); animation: vq-think 1.1s infinite; }
-.thinking-dots i:nth-child(2) { animation-delay: .18s; } .thinking-dots i:nth-child(3) { animation-delay: .36s; }
-@keyframes vq-think { 0%, 60%, 100% { opacity: .25; transform: translateY(0); } 30% { opacity: 1; transform: translateY(-3px); } }
-.chat-thread { display: flex; flex-direction: column; gap: 10px; margin: 18px 0 14px; }
-.bubble { position: relative; max-width: 85%; padding: 12px 16px; border: var(--outline); border-radius: var(--radius-md); font-size: 20px; font-weight: 600; line-height: 1.6; box-shadow: var(--shadow-sticker-sm); }
-.bubble.npc { align-self: flex-start; background: #f4eeff; }
-.bubble.player { align-self: flex-end; background: var(--lemon); }
-.bubble.sending { opacity: .6; }
-.countdown { color: var(--plum); }
-.chat-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px; }
-.game-shell[data-dialogue-open="true"] .choice-dock { display: none; }
-.recorder-mount { margin-bottom: 15px; }
-.voice-control button:first-of-type { touch-action: none; -webkit-user-select: none; user-select: none; }
-.recorder-mount[aria-busy=true] { opacity: .65; }
-.dialogue-panel textarea { width: 100%; font-size: 18px; line-height: 1.7; resize: vertical; }
-.input-footer { display: flex; align-items: center; justify-content: space-between; gap: 15px; }
-.input-footer > span { font-size: 11px; color: var(--text-muted); line-height: 1.6; }
-.dialogue-panel .input-footer .button.primary { width: auto; flex-shrink: 0; }
-.coach-panel { border-top: 3px dashed var(--lavender); margin-top: 22px; padding-top: 18px; }
-.coach-panel h3 { font-size: 15px; margin: 16px 0 10px; }
-.coach-panel p { font-size: 12px; line-height: 1.7; margin-top: 7px; }
-.coach-panel .improved-example { font-size: 18px; font-weight: 700; background: var(--cream); border: 2px solid var(--ink); border-radius: 12px; padding: 8px 12px; }
-.vibe-meter { display: grid; gap: 9px; }
-.vibe-meter > div { display: grid; grid-template-columns: 90px 1fr 40px; gap: 8px; font-size: 11px; font-weight: 700; align-items: center; }
-.vibe-meter meter { width: 100%; accent-color: var(--raspberry); }
-.recovery-panel strong, .recovery-panel h2, .recovery-panel h3 { color: var(--plum); }
-.recovery-panel > p { margin: 6px 0; }
-.recovery-panel > code { display: block; color: var(--plum); font-size: 11px; }
-.recovery-panel > div { display: flex; gap: 9px; margin-top: 12px; }
-.result-panel > .eyebrow { display: inline-block; color: var(--ink); background: var(--mint); border: 2px solid var(--ink); border-radius: var(--radius-pill); padding: 3px 10px; }
-.result-panel h2 { font-size: 28px; margin: 12px 0; }
-.result-panel > p { font-size: 13px; line-height: 1.7; color: var(--text-muted); }
-.earned-badge { display: inline-block; padding: 9px 14px; margin-top: 15px; margin-right: 8px; color: var(--ink); background: var(--lemon); border: var(--outline); border-radius: var(--radius-pill); box-shadow: var(--shadow-sticker-sm); font-size: 13px; font-weight: 800; animation: vq-wiggle .6s var(--bounce) .2s; }
-.validation-panel h3 { margin: 16px 0 10px; }
-.validation-panel details { margin-top: 20px; }
-.game-shell .brand > span.brand-dot, .welcome-screen .brand > span.brand-dot { width: auto; height: auto; margin: 0; display: inline; border: 0; border-radius: 0; box-shadow: none; background: none; color: var(--raspberry); font-size: inherit; }
-
-/* Full-bleed world: the shell is exactly one viewport, the world fills main, everything else overlays it. */
-.game-shell { height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
-.game-topbar { flex-shrink: 0; display: flex; align-items: center; gap: 14px; margin: 0; padding: 6px 20px; border-bottom: var(--outline); font-size: 12px; font-weight: 700; background: var(--cream); }
-.game-topbar .brand { font-size: 20px; }
-.game-topbar .language-chip { padding: 4px 10px; }
-.game-topbar .button { padding: 7px 11px; font-size: 11px; }
-.game-topbar .environment-banner { margin-left: auto; padding: 4px 10px; font-size: 11px; font-weight: 700; color: var(--ink); border: 2px solid var(--ink); border-radius: var(--radius-pill); background: repeating-linear-gradient(135deg, var(--lemon) 0 10px, #ffdb85 10px 20px); }
-.game-topbar .environment-banner + .button, .game-topbar > .button:first-of-type { margin-left: auto; }
-.game-topbar .environment-banner ~ .button { margin-left: 0; }
-.game-main { flex: 1; min-height: 0; position: relative; padding: 0; margin: 0; max-width: none; width: auto; overflow: hidden; }
-.game-world { position: absolute; inset: 0; }
-.game-world .world-renderer { height: 100%; border: 0; border-radius: 0; box-shadow: none; }
-/* Overlays. z-order: panels (dialogue/sign/result) above HUD above world. */
-.quest-panel { position: absolute; top: 14px; left: 20px; z-index: 6; width: 270px; max-height: calc(100% - 150px); overflow-y: auto; background: var(--cream); border: var(--outline); border-radius: var(--radius-lg); box-shadow: var(--shadow-sticker); padding: 14px 16px; font-size: 12px; }
-.quest-panel header { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.quest-panel h2 { font-size: 18px; margin: 8px 0; }
-.quest-panel .button { padding: 5px 9px; font-size: 10px; }
-.quest-panel .objective-list { gap: 10px; margin: 14px 0 8px; font-size: 12px; }
-.quest-panel .mission-clock { font-size: 24px; margin: 12px 0; }
-.quest-panel .controls-note { margin: 0; }
-.quest-panel[data-collapsed=true] { width: auto; max-width: 270px; }
-.quest-progress { font-size: 11px; font-weight: 700; color: var(--plum); }
-.hud-bottom-left { position: absolute; left: 20px; bottom: 16px; z-index: 6; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; max-width: calc(100% - 420px); pointer-events: none; }
-.hud-bottom-left > * { pointer-events: auto; }
-.interaction-dock > div:empty { display: none; }
-.inventory-bar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin: 0; padding: 6px 12px; border: var(--outline); border-radius: var(--radius-md); box-shadow: var(--shadow-sticker-sm); font-size: 12px; font-weight: 700; background: var(--cream); }
-.hud-bottom-right { position: absolute; right: 20px; bottom: 16px; z-index: 6; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; max-width: 26%; }
-.game-main .audio-status { margin: 0; padding: 6px 10px; min-width: 240px; max-width: 100%; flex-wrap: wrap; justify-content: flex-end; background: var(--cream); border: var(--outline); border-radius: var(--radius-md); box-shadow: var(--shadow-sticker-sm); }
-.game-main .audio-status .button { padding: 6px 9px; font-size: 11px; }
-.session-footer { display: flex; align-items: center; gap: 8px; padding: 3px 10px; color: var(--text-muted); font-size: 10px; background: #fffdf5cc; border: 2px solid var(--ink); border-radius: var(--radius-pill); }
-.session-footer .button { padding: 4px 8px; font-size: 10px; }
-.hud-music { display: contents; }
-.hud-music .button { padding: 6px 9px; font-size: 11px; }
-.sign-overlay, .recovery-panel, .result-panel { position: absolute; top: 60px; left: 50%; transform: translateX(-50%); z-index: 15; width: min(560px, 70%); max-height: calc(100% - 180px); overflow-y: auto; margin: 0; }
-.sign-overlay { padding: 20px; background: var(--cream); border: var(--outline); border-radius: var(--radius-lg); box-shadow: var(--shadow-sticker); animation: vq-pop .28s var(--bounce); }
-.recovery-panel { background: #fff1c9; border: var(--outline); border-radius: var(--radius-md); box-shadow: var(--shadow-sticker); padding: 18px; font-size: 13px; line-height: 1.7; animation: vq-pop .28s var(--bounce); }
-.result-panel { background: #eaf8f3; border: var(--outline); border-radius: var(--radius-lg); box-shadow: var(--shadow-sticker); padding: 25px; animation: vq-pop .28s var(--bounce); }
-.game-main > .action-notice { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); z-index: 7; margin: 0; max-width: 50%; }
-.event-feed { position: absolute; left: 50%; bottom: 100px; transform: translateX(-50%); z-index: 7; width: min(520px, 50%); padding: 10px 15px; background: var(--cream); border: var(--outline); border-radius: var(--radius-md); box-shadow: var(--shadow-sticker-sm); font-size: 12px; line-height: 1.6; animation: vq-pop .28s var(--bounce); }
-.event-feed p { margin: 2px 0; }
-.game-main > .coach-panel { position: absolute; top: 14px; right: 20px; z-index: 10; width: min(440px, 40%); max-height: calc(100% - 180px); overflow-y: auto; padding: 16px; margin: 0; border: var(--outline); border-radius: var(--radius-lg); background: var(--cream); box-shadow: var(--shadow-sticker); }
-.dialogue-panel { position: absolute; z-index: 20; top: 14px; right: 20px; width: min(520px, 46%); max-height: calc(100% - 150px); overflow-y: auto; padding: 20px; border: 4px solid var(--ink); border-radius: var(--radius-lg); background: linear-gradient(180deg, #fff3fa 0%, #f4eeff 100%); box-shadow: 8px 8px 0 var(--ink); animation: vq-pop .28s var(--bounce); }
-.game-main > .validation-panel { position: absolute; top: 14px; left: 300px; z-index: 8; width: 420px; max-height: calc(100% - 150px); overflow-y: auto; margin: 0; }
-.game-shell[data-dialogue-open="true"] .world-note { display: none; }
+/* Imports preserve the legacy cascade order. Keep later integration rules after base styles. */
+@import './game/forms-start.css';
+@import './game/quest-inventory.css';
+@import './game/interactions.css';
+@import './game/dialogue.css';
+@import './game/practice-feedback.css';
+@import './game/outcomes.css';
+@import './game/validation.css';
+@import './game/brand-overrides.css';
+@import './game/world-shell.css';
+@import './game/hud.css';
+@import './game/panel-overlays.css';
+@import './game/validation-overlay.css';

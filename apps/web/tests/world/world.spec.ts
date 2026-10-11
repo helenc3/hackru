@@ -125,6 +125,25 @@ test('failed callbacks offer retry; a lost WebGL context preserves the shell', a
   await expect(page.getByTestId('reward-state')).toContainText('"xp":0');
 });
 
+test('a detached canvas context loss does not show compatibility recovery', async ({ page }) => {
+  await open(page);
+  await page.locator('canvas').evaluate((canvas) => {
+    const parent = canvas.parentNode!;
+    const next = canvas.nextSibling;
+    parent.removeChild(canvas);
+    try {
+      canvas.dispatchEvent(new Event('webglcontextlost', { cancelable: true }));
+    } finally {
+      parent.insertBefore(canvas, next);
+    }
+  });
+  // Allow a state update from the old listener to reach the DOM.
+  await page.waitForTimeout(100);
+  // Canvas fallback HTML exists even with WebGL; recovery must not replace it.
+  await expect(page.locator('[data-testid="webgl-recovery"]:not(canvas *)')).toHaveCount(0);
+  await expect(page.locator('canvas')).toBeVisible();
+});
+
 test('world renders frames and camera-relative controls; demo laptop meets 30 fps', async ({ page }) => {
   // Segment-004 requires 30 FPS on the actual demo laptop. Cloud runners use
   // software WebGL: always exercise rendering/controls here, and explicitly

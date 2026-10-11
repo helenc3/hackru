@@ -1,0 +1,82 @@
+.quest-panel .eyebrow {
+  display: inline-block;
+  color: var(--ink);
+  background: var(--lemon);
+  border: 2px solid var(--ink);
+  border-radius: var(--radius-pill);
+  padding: 3px 10px;
+  font-size: 10px;
+}
+
+.quest-panel h2 {
+  font-size: 23px;
+  margin: 14px 0;
+}
+
+.mission-clock {
+  font-variant-numeric: tabular-nums;
+  font-size: 30px;
+  font-weight: 800;
+  margin: 20px 0;
+}
+
+.mission-clock > span {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-top: 6px;
+}
+
+.objective-list {
+  list-style: none;
+  display: grid;
+  gap: 17px;
+  padding: 0;
+  font-size: 13px;
+  line-height: 1.6;
+  margin: 23px 0;
+}
+
+.objective-list li {
+  display: flex;
+  gap: 12px;
+}
+
+.objective-list li > span:first-child {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: 2px solid var(--ink);
+  border-radius: 50%;
+  background: #fff;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.objective-list li[data-complete=true] {
+  color: var(--text-muted);
+}
+
+.objective-list li[data-complete=true] span:first-child {
+  background: var(--lime);
+  color: var(--ink);
+  animation: vq-check .35s var(--bounce);
+}
+
+.controls-note {
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.8;
+}
+
+.inventory-bar > span:first-child {
+  margin-right: auto;
+}
+
+.inventory-bar .button {
+  padding: 9px 11px;
+}

@@ -1,0 +1,25 @@
+.skill-debrief {
+  margin-top: 18px;
+  background: #eaf8f3;
+  border: var(--outline);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sticker);
+}
+
+.skill-debrief h3 {
+  margin: 14px 0 6px;
+  font-size: 15px;
+}
+
+.skill-debrief p {
+  margin-top: 6px;
+}
+
+.skill-debrief dt {
+  font-weight: 800;
+}
+
+.skill-debrief dd {
+  margin: 0 0 8px;
+  color: var(--text-muted);
+}

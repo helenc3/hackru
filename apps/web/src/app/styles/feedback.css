@@ -1,0 +1,45 @@
+.action-notice {
+  border: var(--outline);
+  background: #fff1c9;
+  color: var(--ink);
+  font-size: 12px;
+  line-height: 1.7;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sticker-sm);
+  padding: 13px 16px;
+  margin-top: 18px;
+}
+
+.debrief-slot {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  background: #eaf8f3;
+  border: var(--outline);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sticker-sm);
+  padding: 16px 19px;
+  margin-top: 23px;
+}
+
+.debrief-icon {
+  color: var(--plum);
+  font-size: 24px;
+}
+
+.debrief-slot strong {
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.debrief-slot p {
+  color: var(--text-muted);
+  font-size: 10px;
+  margin-top: 6px;
+}
+
+.debrief-slot > .small-label {
+  margin-left: auto;
+  font-size: 10px;
+}

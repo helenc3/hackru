@@ -1,0 +1,77 @@
+.brand {
+  display: flex;
+  align-items: center;
+  font-weight: 800;
+  font-size: 23px;
+  letter-spacing: -.9px;
+}
+
+.brand > span:first-child {
+  width: 34px;
+  height: 34px;
+  border: var(--outline);
+  background: var(--lemon);
+  color: var(--ink);
+  border-radius: 10px;
+  box-shadow: 2px 2px 0 var(--ink);
+  display: grid;
+  place-items: center;
+  font-size: 20px;
+  margin-right: 9px;
+}
+
+.brand-dot {
+  color: var(--lemon);
+}
+
+.eyebrow {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 1.7px;
+  text-transform: uppercase;
+}
+
+.live-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--lime);
+  border: 1.5px solid var(--ink);
+  flex-shrink: 0;
+  animation: vq-pulse 1.8s ease-in-out infinite;
+}
+
+main {
+  padding: 0 40px 28px;
+  max-width: 1650px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+h1 {
+  font-size: clamp(25px, 2.9vw, 39px);
+  font-weight: 800;
+  letter-spacing: -.02em;
+  margin: 10px 0 9px;
+}
+
+.language-chip {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+  font-size: 11px;
+  font-weight: 700;
+  background: var(--cream);
+  border: var(--outline);
+  border-radius: var(--radius-pill);
+  box-shadow: var(--shadow-sticker-sm);
+  color: var(--ink);
+}
+
+.language-chip > span {
+  font-size: 16px;
+  color: var(--plum);
+}

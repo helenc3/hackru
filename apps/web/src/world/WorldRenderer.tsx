@@ -1,5 +1,5 @@
 import { Component, useEffect, useRef, useState, type ReactNode } from 'react';
-import { Canvas } from '@react-three/fiber';
+import { Canvas, useThree } from '@react-three/fiber';
 import { type Position, type RendererProps } from '@vibequest/shared';
 import { distance, nearbyTargets, targetAction, zoneAt, walkingPath } from './navigation';
 import { pointerAngle, angularDisplacement } from './camera';
@@ -34,6 +34,23 @@ class CanvasBoundary extends Component<{ children: ReactNode; onFailure: () => v
   static getDerivedStateFromError() { return { failed: true }; }
   componentDidCatch() { this.props.onFailure(); }
   render() { return this.state.failed ? <CompatibilityRecovery /> : this.props.children; }
+}
+
+function ContextLossHandler({ onFailure }: { onFailure: () => void }) {
+  const gl = useThree((state) => state.gl);
+  useEffect(() => {
+    const canvas = gl.domElement;
+    const handleLoss = (event: Event) => {
+      // R3F deliberately loses the context when disposing a canvas. Only a
+      // connected, mounted scene should report a compatibility failure.
+      if (!canvas.isConnected) return;
+      event.preventDefault();
+      onFailure();
+    };
+    canvas.addEventListener('webglcontextlost', handleLoss);
+    return () => canvas.removeEventListener('webglcontextlost', handleLoss);
+  }, [gl, onFailure]);
+  return null;
 }
 
 /** Presentation-only world. Every interaction uses the frozen shared callbacks. */
@@ -164,7 +181,8 @@ export function WorldRenderer({ state, onAction, onTalk }: RendererProps) {
     }}
     onPointerCancel={() => { drag.current = null; }}>
     {hasWebGl ? <CanvasBoundary onFailure={() => { runtime.current.keys.clear(); runtime.current.path = []; runtime.current.active = false; setHasWebGl(false); }}><Canvas dpr={[1, 1.5]} camera={{ position: [0, 8.5, 19], fov: 52, near: .1, far: 85 }} gl={{ antialias: true, powerPreference: 'high-performance' }}
-      onCreated={({ gl }) => { gl.domElement.addEventListener('webglcontextlost', (event) => { event.preventDefault(); runtime.current.keys.clear(); runtime.current.path = []; runtime.current.active = false; setHasWebGl(false); }, { once: true }); }} fallback={<CompatibilityRecovery />}>
+      fallback={<CompatibilityRecovery />}>
+      <ContextLossHandler onFailure={() => { runtime.current.keys.clear(); runtime.current.path = []; runtime.current.active = false; setHasWebGl(false); }} />
       <District targets={state.interactables} runtime={runtime} /><Cue at={nearby[0]?.position} /><Motion runtime={runtime} root={root} labels={labels} state={state} tick={setPosition} sync={sync} /><DestinationMarker runtime={runtime} />
     </Canvas></CanvasBoundary> : <CompatibilityRecovery />}
     {hasWebGl && <>

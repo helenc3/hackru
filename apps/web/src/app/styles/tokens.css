@@ -1,0 +1,39 @@
+:root {
+  font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  /* Candy palette — mirrors apps/web/src/world/toon.tsx so UI and world match. */
+  --ink: #2a1838;
+  --ink-soft: #4b3561;
+  --cream: #fff6e8;
+  --peach: #ffd1a8;
+  --sky: #8fd3ff;
+  --lavender: #c9b8ff;
+  --lemon: #ffd166;
+  --coral: #ff8a65;
+  --raspberry: #d94f6b;
+  --plum: #7a2e4a;
+  --mint: #8fd6c1;
+  --teal: #3fa7d6;
+  --blossom: #ffb3d9;
+  --lime: #7ed957;
+  --navy: #3b5bdb;
+  --text: var(--ink);
+  --text-muted: #5e4a73;
+  --border: var(--ink);
+  --green: var(--plum);
+  --muted: var(--text-muted);
+  --radius-lg: 22px;
+  --radius-md: 14px;
+  --radius-pill: 999px;
+  --outline: 3px solid var(--ink);
+  --shadow-sticker: 5px 5px 0 var(--ink);
+  --shadow-sticker-sm: 3px 3px 0 var(--ink);
+  --focus: 3px solid var(--lemon);
+  /* Lemon alone is ~1.3:1 on cream; the ink halo keeps the focus ring at 11:1. */
+  --focus-ring: 0 0 0 6px var(--ink);
+  --bounce: cubic-bezier(.34, 1.56, .64, 1);
+  color: var(--text);
+  background: linear-gradient(180deg, #fff6e8 0%, #f3ecff 100%) fixed;
+}

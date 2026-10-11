@@ -1,0 +1,44 @@
+.coach-panel {
+  border-top: 3px dashed var(--lavender);
+  margin-top: 22px;
+  padding-top: 18px;
+}
+
+.coach-panel h3 {
+  font-size: 15px;
+  margin: 16px 0 10px;
+}
+
+.coach-panel p {
+  font-size: 12px;
+  line-height: 1.7;
+  margin-top: 7px;
+}
+
+.coach-panel .improved-example {
+  font-size: 18px;
+  font-weight: 700;
+  background: var(--cream);
+  border: 2px solid var(--ink);
+  border-radius: 12px;
+  padding: 8px 12px;
+}
+
+.vibe-meter {
+  display: grid;
+  gap: 9px;
+}
+
+.vibe-meter > div {
+  display: grid;
+  grid-template-columns: 90px 1fr 40px;
+  gap: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  align-items: center;
+}
+
+.vibe-meter meter {
+  width: 100%;
+  accent-color: var(--raspberry);
+}

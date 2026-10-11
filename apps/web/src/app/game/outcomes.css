@@ -1,0 +1,54 @@
+.recovery-panel strong, .recovery-panel h2, .recovery-panel h3 {
+  color: var(--plum);
+}
+
+.recovery-panel > p {
+  margin: 6px 0;
+}
+
+.recovery-panel > code {
+  display: block;
+  color: var(--plum);
+  font-size: 11px;
+}
+
+.recovery-panel > div {
+  display: flex;
+  gap: 9px;
+  margin-top: 12px;
+}
+
+.result-panel > .eyebrow {
+  display: inline-block;
+  color: var(--ink);
+  background: var(--mint);
+  border: 2px solid var(--ink);
+  border-radius: var(--radius-pill);
+  padding: 3px 10px;
+}
+
+.result-panel h2 {
+  font-size: 28px;
+  margin: 12px 0;
+}
+
+.result-panel > p {
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--text-muted);
+}
+
+.earned-badge {
+  display: inline-block;
+  padding: 9px 14px;
+  margin-top: 15px;
+  margin-right: 8px;
+  color: var(--ink);
+  background: var(--lemon);
+  border: var(--outline);
+  border-radius: var(--radius-pill);
+  box-shadow: var(--shadow-sticker-sm);
+  font-size: 13px;
+  font-weight: 800;
+  animation: vq-wiggle .6s var(--bounce) .2s;
+}

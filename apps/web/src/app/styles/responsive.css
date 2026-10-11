@@ -1,0 +1,30 @@
+@media (min-width: 1450px) {
+  main {
+    padding-left: 54px;
+    padding-right: 54px;
+  }
+
+  .world-renderer {
+    height: 420px;
+  }
+}
+
+@media (max-width: 1100px) {
+  .brand {
+    font-size: 20px;
+  }
+
+  main {
+    padding-left: 25px;
+    padding-right: 25px;
+  }
+
+  .language-chip {
+    padding: 6px 9px;
+    font-size: 10px;
+  }
+
+  .debrief-slot > .small-label {
+    display: none;
+  }
+}

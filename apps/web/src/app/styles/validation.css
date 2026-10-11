@@ -1,0 +1,19 @@
+.validation-panel {
+  border: 3px dashed var(--ink);
+  border-radius: var(--radius-md);
+  padding: 15px;
+  margin-top: 20px;
+  background: #fff1c9;
+  font-size: 12px;
+}
+
+.validation-panel p {
+  margin-top: 8px;
+  line-height: 1.7;
+}
+
+.validation-panel pre {
+  font-size: 11px;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}

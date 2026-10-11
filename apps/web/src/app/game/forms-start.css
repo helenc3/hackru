@@ -1,0 +1,112 @@
+input, textarea, select {
+  font: inherit;
+  color: inherit;
+}
+
+textarea, select, input:not([type=radio]) {
+  border: var(--outline);
+  background: #fff;
+  color: var(--ink);
+  border-radius: 12px;
+  padding: 11px;
+}
+
+input:focus-visible, textarea:focus-visible, select:focus-visible {
+  outline: var(--focus);
+  outline-offset: 0;
+  box-shadow: var(--focus-ring);
+}
+
+.welcome-screen {
+  max-width: 1000px;
+  padding-top: 50px;
+}
+
+.welcome-screen > .language-chip {
+  float: right;
+}
+
+.welcome-screen h1 {
+  margin: 50px 0 20px;
+}
+
+.welcome-footer {
+  margin: 22px 0;
+  color: var(--text-muted);
+}
+
+.start-panel {
+  padding: 26px;
+  border: var(--outline);
+  border-radius: var(--radius-lg);
+  background: var(--cream);
+  box-shadow: var(--shadow-sticker);
+  margin-bottom: 24px;
+}
+
+.start-panel h2 {
+  font-size: 25px;
+  margin: 10px 0;
+}
+
+.start-panel p {
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.start-panel fieldset {
+  border: 0;
+  padding: 0;
+  margin: 20px 0;
+  display: flex;
+  gap: 25px;
+}
+
+.start-panel legend {
+  font-size: 13px;
+  font-weight: 800;
+  margin-bottom: 12px;
+}
+
+.start-panel label {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.start-panel input[type=radio] {
+  accent-color: var(--plum);
+  margin-right: 8px;
+}
+
+.field-label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 14px 0;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.setup-row {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  margin-top: 15px;
+}
+
+.start-actions, .result-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.start-actions > .primary {
+  max-width: 260px;
+}
+
+.environment-notice {
+  padding-top: 15px;
+  color: var(--plum) !important;
+  font-weight: 700;
+}

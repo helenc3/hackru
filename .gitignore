@@ -23,6 +23,9 @@ npm-debug.log*
 # local Claude settings
 .claude/settings.local.json
 
+# local Impeccable configuration
+.impeccable/config.json
+
 # Generated verification outputs (all workspaces)
 test-results/
 playwright-report/

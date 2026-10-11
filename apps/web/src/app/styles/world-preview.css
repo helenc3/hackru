@@ -1,0 +1,92 @@
+.world-renderer {
+  position: relative;
+  height: 375px;
+  border-radius: 24px;
+  border: 4px solid var(--ink);
+  box-shadow: var(--shadow-sticker);
+  overflow: hidden;
+  background: var(--peach);
+}
+
+.world-caption {
+  position: absolute;
+  top: 15px;
+  left: 16px;
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  padding: 6px 12px;
+  background: var(--lemon);
+  color: var(--ink);
+  border: var(--outline);
+  border-radius: var(--radius-pill);
+  box-shadow: var(--shadow-sticker-sm);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.world-caption .live-dot {
+  background: var(--lime);
+}
+
+.world-caption > span:last-child {
+  border-left: 2px solid var(--ink);
+  padding-left: 8px;
+  margin-left: 2px;
+  font-weight: 600;
+  color: var(--ink);
+  font-size: 10px;
+}
+
+.world-location {
+  position: absolute;
+  padding: 6px 12px;
+  background: var(--cream);
+  border: var(--outline);
+  box-shadow: var(--shadow-sticker-sm);
+  border-radius: var(--radius-pill);
+  pointer-events: none;
+}
+
+.world-location > span {
+  display: block;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 1px;
+}
+
+.world-location > small {
+  display: block;
+  color: var(--text-muted);
+  font-size: 10px;
+  margin-top: 3px;
+}
+
+.world-location.cafe {
+  top: 42%;
+  left: 13%;
+}
+
+.world-location.station {
+  top: 23%;
+  left: 60%;
+}
+
+.world-location.plaza {
+  top: 71%;
+  left: 46%;
+}
+
+.world-note {
+  position: absolute;
+  bottom: 12px;
+  left: 15px;
+  right: 15px;
+  background: var(--ink);
+  color: var(--cream);
+  border-radius: var(--radius-pill);
+  padding: 7px 14px;
+  font-size: 11px;
+  font-weight: 600;
+  text-align: center;
+}

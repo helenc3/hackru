@@ -6,7 +6,6 @@ import { BackgroundMusic } from '../audio/BackgroundMusic';
 import { StartPanel } from '../ui/StartPanel';
 import { DialoguePanel } from '../ui/DialoguePanel';
 import { QuestPanel } from '../ui/QuestPanel';
-import { InventoryBar } from '../ui/InventoryBar';
 import { ResultPanel } from '../ui/ResultPanel';
 import { RecoveryPanel } from '../ui/RecoveryPanel';
 import { ConversationCard, type ConversationSummary, type NpcTarget } from '../ui/ConversationCard';
@@ -116,9 +115,6 @@ export function App() {
     <main className="game-main">
       <div className="game-world" id="world"><WorldRenderer key={attempt} conversationOpen={Boolean(npc)} state={state} onAction={onAction} onTalk={onTalk} /></div>
       <QuestPanel state={state} results={results} onReview={openReview} conversationOpen={Boolean(npc)} />
-      <div className="hud-bottom-left">
-        <InventoryBar state={state} pending={session.pending} onAction={onAction} />
-      </div>
       <RecoveryPanel problem={session.problem} pending={session.pending} state={state} onRetry={session.retry} onRefresh={session.refresh} onNew={leave} onDismiss={session.dismiss} />
       {session.events.length > 0 && <section className="event-feed" aria-label="Quest updates" aria-live="polite">{session.events.slice(-3).map((event) => <p key={event.id}>{event.message}</p>)}</section>}
       {npc && state.status === 'active' && <DialoguePanel key={`${state.sessionId}:${state.missionId}:${npc.anchorId}`} state={state} npc={npc} pending={session.pending} turn={session.turnNpc === npc.anchorId ? session.turn : null} onAction={onAction} onSubmit={session.submit} onLiveTurn={session.applyTurn} onClose={closeConversation} />}

@@ -55,7 +55,6 @@ test('one validation session completes all three quests through the shared API, 
   expect(await page.evaluate(() => localStorage.getItem('vibequest.player-session.v1'))).toBeNull();
   // Validation sessions never claim the player's saved city.
   expect(await page.evaluate(() => localStorage.getItem('vibequest.worldId'))).toBeNull();
-  await expect(page.getByTestId('inventory-bar')).toContainText('Simulated XP');
 });
 test('validation permission and serial developer relocations', async ({ page, devUrl }) => {
   await installScriptedApi(page, { validation: false });

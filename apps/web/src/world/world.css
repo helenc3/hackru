@@ -168,9 +168,10 @@
   font-size: 13px;
   font-weight: 700;
 }
-.quest-compass-arrow { display: inline-block; width: 24px; height: 24px; flex-shrink: 0; color: var(--raspberry); }
+.quest-compass-arrow { display: inline-block; width: 24px; height: 24px; flex-shrink: 0; color: var(--raspberry); transition: transform .12s linear; }
 .quest-compass-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .quest-compass .button { padding: 4px 10px; font-size: 12px; }
+@media (prefers-reduced-motion: reduce) { .quest-compass-arrow { transition: none; } }
 /* Animate the key only: the containing name is positioned by the camera each frame. */
 .npc-interact-key {
   display: inline-block;

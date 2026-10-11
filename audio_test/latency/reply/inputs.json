@@ -1,0 +1,79 @@
+[
+  {
+    "id": "tea",
+    "text": "请给我一杯茶。",
+    "context": {
+      "missionId": "P1",
+      "mode": "practice",
+      "tier": 1,
+      "npcId": "xiaolin",
+      "persona": "Warm, encouraging café owner; Mandarin Chinese.",
+      "patience": 5,
+      "allowedIntents": [
+        "order_drink",
+        "accept_substitute",
+        "cancel_order",
+        "confirm_drink_price",
+        "greeting",
+        "request_repeat",
+        "unknown"
+      ],
+      "facts": {
+        "coffee": "unavailable",
+        "teaPrice": "10 CNY",
+        "waterPrice": "5 CNY"
+      },
+      "history": []
+    }
+  },
+  {
+    "id": "coffee",
+    "text": "我想买一杯咖啡。如果没有咖啡，我可以买什么？多少钱？",
+    "context": {
+      "missionId": "P1",
+      "mode": "practice",
+      "tier": 1,
+      "npcId": "xiaolin",
+      "persona": "Warm, encouraging café owner; Mandarin Chinese.",
+      "patience": 5,
+      "allowedIntents": [
+        "order_drink",
+        "accept_substitute",
+        "cancel_order",
+        "confirm_drink_price",
+        "greeting",
+        "request_repeat",
+        "unknown"
+      ],
+      "facts": {
+        "coffee": "unavailable",
+        "teaPrice": "10 CNY",
+        "waterPrice": "5 CNY"
+      },
+      "history": []
+    }
+  },
+  {
+    "id": "ticket",
+    "text": "我要一张去海港的票。",
+    "context": {
+      "missionId": "B1",
+      "mode": "boss",
+      "tier": 1,
+      "npcId": "laozhou",
+      "persona": "Busy, formal ticket agent; Mandarin Chinese.",
+      "patience": 3,
+      "allowedIntents": [
+        "buy_ticket",
+        "confirm_ticket",
+        "request_repeat",
+        "greeting",
+        "unknown"
+      ],
+      "facts": {
+        "haigangFare": "15 CNY"
+      },
+      "history": []
+    }
+  }
+]

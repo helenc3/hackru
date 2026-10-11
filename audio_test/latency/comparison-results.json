@@ -1,0 +1,73 @@
+[
+  {
+    "provider": "gemini",
+    "model": "gemini-3.8-live",
+    "index": 1,
+    "setupMs": 266,
+    "inputDurationMs": 3280,
+    "streamMs": 3349,
+    "endToFirstAudioMs": 1565,
+    "startToFirstAudioMs": 4914,
+    "transcript": "走到车站, 售票处在右边。",
+    "response": "好的，我知道了，售票处在右边。",
+    "audioBytes": 142082
+  },
+  {
+    "provider": "eleven",
+    "model": "gemini-2.5-flash + eleven_v3_conversational",
+    "index": 1,
+    "setupMs": 752,
+    "inputDurationMs": 3280,
+    "streamMs": 3345,
+    "endToFirstAudioMs": 918,
+    "startToFirstAudioMs": 4263,
+    "transcript": "走到车站，售票处在右边。",
+    "response": "好的。",
+    "audioBytes": 30720
+  },
+  {
+    "provider": "eleven",
+    "model": "gemini-2.5-flash + eleven_v3_conversational",
+    "index": 2,
+    "setupMs": 248,
+    "inputDurationMs": 3280,
+    "streamMs": 3344,
+    "endToFirstAudioMs": 1138,
+    "startToFirstAudioMs": 4482,
+    "transcript": "走到车站，售票处在右边。",
+    "response": "好的。",
+    "audioBytes": 28160
+  },
+  {
+    "provider": "gemini",
+    "model": "gemini-3.8-live",
+    "index": 2,
+    "error": "closed 1011 Internal error encountered."
+  },
+  {
+    "provider": "gemini",
+    "model": "gemini-3.8-live",
+    "index": 3,
+    "setupMs": 237,
+    "inputDurationMs": 3280,
+    "streamMs": 3348,
+    "endToFirstAudioMs": 3525,
+    "startToFirstAudioMs": 6873,
+    "transcript": "走到车站, 售票处在右边。",
+    "response": "好的，我看到售票处在右边了。",
+    "audioBytes": 137762
+  },
+  {
+    "provider": "eleven",
+    "model": "gemini-2.5-flash + eleven_v3_conversational",
+    "index": 3,
+    "setupMs": 264,
+    "inputDurationMs": 3280,
+    "streamMs": 3354,
+    "endToFirstAudioMs": 1088,
+    "startToFirstAudioMs": 4442,
+    "transcript": "走到车站，售票处在右边。",
+    "response": "好的。",
+    "audioBytes": 30720
+  }
+]

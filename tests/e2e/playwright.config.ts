@@ -9,7 +9,8 @@ process.env.E2E_HARNESS_URL = `http://127.0.0.1:${port + 1}`;
 export default defineConfig({
   testDir: '.', testMatch: '**/*.spec.ts', fullyParallel: false, forbidOnly: Boolean(process.env.CI), retries: process.env.CI ? 1 : 0, reporter: 'list',
   use: { baseURL: `http://127.0.0.1:${port}`, trace: 'retain-on-failure' },
-  projects: [{ name: 'firefox', use: { ...devices['Desktop Firefox'] } }],
+  // Chromium: the Linux CI runner's Firefox has no GL driver, and these journeys walk the 3D world.
+  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'], launchOptions: { args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] } } }],
   webServer: [
     { command: 'node apps/server/dist/index.js', cwd: '../..', url: `http://127.0.0.1:${port}/api/health`, reuseExistingServer: false, timeout: 120000, env: { NODE_ENV: 'production', PORT: String(port), ENABLE_DEMO_FIXTURES: 'true', ENABLE_VALIDATION_HARNESS: 'false' } },
     { command: 'node apps/server/dist/index.js', cwd: '../..', url: `http://127.0.0.1:${port + 1}/api/health`, reuseExistingServer: false, timeout: 120000, env: { NODE_ENV: 'development', PORT: String(port + 1), ENABLE_DEMO_FIXTURES: 'true', ENABLE_VALIDATION_HARNESS: 'true' } },

@@ -60,7 +60,8 @@ test('live voice streams mic audio, renders transcripts, applies turns and honou
   });
   const panel = await openPanel(page);
   const status = panel.getByTestId('live-status');
-  await expect(status).toHaveAttribute('data-status', 'live');
+  // The scripted server answers the first mic frame within milliseconds, so a slow runner may already see the reply playing.
+  await expect(status).toHaveAttribute('data-status', /^(live|npc-speaking)$/);
   expect(urls[0]).toMatch(/^ws:\/\/[^/]+\/api\/sessions\/ui-player-P1\/live\?npcId=xiaolin$/);
   expect(await counter(page, '__gum')).toBe(1);
   await expect(panel.getByRole('button', { name: 'Start recording' })).toHaveCount(0);

@@ -3,16 +3,16 @@ import { missionFor } from '../content/missions.js';
 
 const tracks: Track[] = ['reading', 'listening', 'conversation', 'repair'];
 const actions: Record<Track, string> = {
-  reading: 'Used a written Mandarin cue to choose the route',
-  listening: 'Followed spoken Mandarin directions without subtitles',
+  reading: 'Read Mandarin world text before acting',
+  listening: 'Followed spoken Mandarin without subtitles',
   conversation: 'Communicated a relevant request in Mandarin',
-  repair: 'Recovered independently after an uncertain route decision',
+  repair: 'Recovered independently after a misunderstanding',
 };
 const challenges: Record<Track, string> = {
-  reading: 'connect the destination sign to your next route decision',
-  listening: 'listen to a platform-change announcement before boarding',
+  reading: 'read the menu or sign before you ask',
+  listening: 'listen to the spoken reply before opening subtitles',
   conversation: 'confirm the requested item and its details in Mandarin',
-  repair: 'clarify a changed route before choosing a platform',
+  repair: 'add the missing detail when the NPC asks you to clarify',
 };
 
 /** First decisions own their cue, including an incorrect or assisted first decision. */
@@ -34,7 +34,6 @@ function attemptUnits(state: InternalState): EvidenceRecord[] {
 const eligible = (unit: EvidenceRecord) => unit.independent && unit.firstAttempt && !unit.validationMode && !unit.providerFailure && !unit.listeningAssisted;
 
 export function selectPracticeTier(state: InternalState, missionId: MissionId): Tier {
-  if (missionId === 'B1') return 1;
   const targets = missionFor(missionId).variants[0]!.targetTracks;
   const observed = targets.map((track) => state.skills[track]);
   const count = observed.reduce((sum, skill) => sum + skill.independentCount, 0);
@@ -60,18 +59,18 @@ export function updateSkillsAfterAttempt(state: InternalState): InternalState {
   const observed = tracks.filter((track) => next.skills[track].independentCount > 0);
   const weakest = [...observed].sort((a, b) => next.skills[a].mastery - next.skills[b].mastery)[0];
   const correction = units.find((unit) => eligible(unit) && unit.score < 1);
-  const practiceId = weakest === 'conversation' ? 'P1' : 'P2';
+  const practiceId = weakest === 'conversation' || weakest === 'reading' ? 'Q1' : next.missionId;
   const tier = selectPracticeTier(next, practiceId);
   const movement = tier > next.difficulty ? 'adds a harder authored challenge' : tier < next.difficulty ? 'uses simpler authored cues' : 'keeps the current cue complexity';
   const reason = weakest
     ? `After ${next.skills[weakest].independentCount} ${weakest} decisions, ${practiceId} practice ${movement} (tier ${tier}): ${challenges[weakest]}.`
-    : `No independent decisions were recorded; ${practiceId} practice keeps tier ${tier}. Try an audio challenge and act on the directions.`;
+    : `No independent decisions were recorded; ${practiceId} practice keeps tier ${tier}. Try speaking with an NPC and act on what they say.`;
   next.debrief = {
     tracks: structuredClone(next.skills),
     strengths: tracks.filter((track) => units.some((unit) => unit.track === track && eligible(unit) && unit.score === 1)).map((track) => actions[track]),
     improvement: correction ? `Next time, ${challenges[correction.track]}.` : units.some((unit) => !eligible(unit)) ? 'Try the same decision independently before opening an example or subtitles.' : 'Keep connecting Mandarin cues to a concrete world action.',
     nextPracticeMissionId: practiceId,
-    nextPracticeReason: `${reason}${next.skills.listening.independentCount === 0 ? ' Listening is untested: try audio.' : ''}`,
+    nextPracticeReason: `${reason}${next.skills.listening.independentCount === 0 ? ' Listening is untested: keep subtitles off.' : ''}`,
     evidenceSummary: {
       spokenTurns: units.filter((unit) => unit.track === 'conversation' && unit.conversationSource === 'spoken').length,
       typedTurns: units.filter((unit) => unit.track === 'conversation' && unit.conversationSource === 'typed').length,

@@ -1,54 +1,89 @@
 {
   "sessionId": "fixture-session",
+  "worldId": "fixture-world",
   "version": 0,
-  "missionId": "P1",
+  "missionId": "Q1",
   "attemptId": "fixture-attempt-001",
-  "nodeId": "p1.bootstrap",
+  "nodeId": "q1.order",
   "mode": "practice",
   "status": "active",
-  "zoneId": "plaza",
+  "zoneId": "historic",
   "position": {
-    "x": 0,
-    "z": 10
+    "x": 20,
+    "z": 20
   },
   "tier": 1,
+  "lastMovementAtMs": 1791653400000,
   "flags": {},
   "inventory": {
     "hint": 0,
-    "freeze": 0
+    "cny": 20,
+    "drinks": []
   },
+  "purchases": [],
   "xp": 0,
   "badges": [],
   "awardedRewardIds": [],
   "unlockedMissionIds": [
-    "P1"
+    "Q1"
   ],
+  "completedMissionIds": [],
   "inspectedTargetIds": [],
-  "cuePlaybacks": [],
   "npcState": {
-    "xiaolin": {
+    "vendor": {
       "patience": 5,
       "mood": "warm",
       "history": [],
-      "revealedFactIds": [],
-      "repeatCounts": {},
+      "anchorId": null,
+      "repeatCount": 0,
       "cooldownRemainingMs": 0
     },
-    "achen": {
+    "guide": {
       "patience": 4,
       "mood": "warm",
       "history": [],
-      "revealedFactIds": [],
-      "repeatCounts": {},
+      "anchorId": null,
+      "repeatCount": 0,
       "cooldownRemainingMs": 0
     },
-    "laozhou": {
-      "patience": 3,
-      "mood": "neutral",
+    "passerby": {
+      "patience": 4,
+      "mood": "warm",
       "history": [],
-      "revealedFactIds": [],
-      "repeatCounts": {},
+      "anchorId": null,
+      "repeatCount": 0,
       "cooldownRemainingMs": 0
+    }
+  },
+  "directions": null,
+  "photo": null,
+  "exploration": {
+    "activeMs": 0,
+    "lastActiveAtMs": 1791653400000,
+    "visitedChunkKeys": [
+      "0,0"
+    ],
+    "lastEncounter": {
+      "drink-vendor": {
+        "activeMs": 0,
+        "visitedChunks": 0
+      },
+      "direction-helper": {
+        "activeMs": 0,
+        "visitedChunks": 0
+      },
+      "hotel-landmark": {
+        "activeMs": 0,
+        "visitedChunks": 0
+      },
+      "river-viewpoint": {
+        "activeMs": 0,
+        "visitedChunks": 0
+      },
+      "photo-passerby": {
+        "activeMs": 0,
+        "visitedChunks": 0
+      }
     }
   },
   "evidence": [],
@@ -72,13 +107,18 @@
   },
   "difficulty": 1,
   "skillUpdatedAttemptIds": [],
-  "timer": null,
+  "pauseReasons": [],
   "audioOperations": [],
   "activeAudioOperationId": null,
   "pendingTurn": null,
   "validationMode": true,
   "inputPreference": "voice",
   "providerStatus": "fixture",
-  "factSnapshotId": "p1.bootstrap",
-  "secretFacts": {}
+  "factSnapshotId": "q1.drinks",
+  "secretFacts": {
+    "opener": "你想喝什么？",
+    "coffee": "卖完了",
+    "teaPriceCny": "10",
+    "waterPriceCny": "5"
+  }
 }

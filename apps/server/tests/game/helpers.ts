@@ -1,55 +1,134 @@
-import { expect } from 'vitest';
+import { expect, vi } from 'vitest';
 import request from 'supertest';
-import type { GameAction, PublicState } from '@vibequest/shared';
+import type { Anchor, Directions, GameAction, NpcId, Position, PublicState, WorldInfo, WorldView } from '@vibequest/shared';
 import { createApp } from '../../src/app.js';
 import { loadConfig } from '../../src/config.js';
-import { createServices } from '../../src/services.js';
+import { createServices, type ServerServices } from '../../src/services.js';
+import type { WorldService } from '../../src/city/world-service.js';
 
+// Moves are clocked by the server; tests advance a Date.now offset instead of sleeping.
+const realNow = Date.now.bind(Date);
+export const clock = { offset: 0 };
+vi.spyOn(Date, 'now').mockImplementation(() => realNow() + clock.offset);
+export const advance = (ms: number) => { clock.offset += Math.round(ms); };
+
+type FakeAnchor = Anchor & { position: Position; chunk: string };
+const anchor = (id: string, capability: Anchor['capability'], kind: Anchor['kind'], x: number, z: number, extra: Partial<Anchor> = {}): FakeAnchor =>
+  ({ id, placementId: `${id}.placement`, capability, kind, x: x + 20, z: z + 20, position: { x, z }, chunk: '0,0', ...extra });
+
+/** A flat test street around spawn: vendor + menu at spawn, a guide, the river viewpoint with a passer-by, and a lone passer-by far from water. */
+export const ANCHORS = {
+  vendor: anchor('an.vendor.spawn', 'drink-vendor', 'npc', 1, 0, { role: 'vendor', nameKey: 'xiaolin' }),
+  farVendor: anchor('an.vendor.far', 'drink-vendor', 'npc', 40, 0, { role: 'vendor', nameKey: 'laowang' }),
+  menu: anchor('an.sign.menu', 'readable-sign', 'sign', 0, 1, { cueId: 'q1.menu' }),
+  guide: anchor('an.helper.street', 'direction-helper', 'npc', 6, 0, { role: 'guide', nameKey: 'laowang' }),
+  hotel: anchor('hotel.grand', 'hotel-landmark', 'landmark', 80, 0, { nameKey: 'grand-hotel' }),
+  viewpoint: anchor('an.viewpoint.river', 'river-viewpoint', 'photo-spot', 14, 0, { cueId: 'q3.river-sign' }),
+  passerby: anchor('an.npc.riverside', 'photo-passerby', 'npc', 12, 0, { role: 'passerby', nameKey: 'xiaomei' }),
+  lonely: anchor('an.npc.inland', 'photo-passerby', 'npc', 30, 20, { role: 'passerby', nameKey: 'xiaoli' }),
+} as const;
+export const ROUTE: Directions = {
+  routeId: 'route.test', fromAnchorId: ANCHORS.guide.id, hotelAnchorId: 'hotel.grand',
+  textZh: '沿着南京路往东走两个路口，上海大酒店在左边。',
+  steps: [{ textZh: '沿着南京路往东走两个路口', english: 'Walk east along Nanjing Road for two blocks' }, { textZh: '上海大酒店在左边', english: 'The Shanghai Grand Hotel is on the left' }],
+};
+/** Committed land is |x|,|z| ≤ 100 minus a wall at x ∈ [-5, -4]; beyond is uncommitted. */
+export const WALL = { minX: -5, maxX: -4, minZ: -10, maxZ: 10 };
+
+export function fakeWorldView(worldId = 'w-test'): WorldView {
+  const all = Object.values(ANCHORS);
+  return {
+    worldId,
+    walkable: ({ x, z }) => Math.abs(x) <= 100 && Math.abs(z) <= 100 && !(x >= WALL.minX - 0.35 && x <= WALL.maxX + 0.35 && z >= WALL.minZ && z <= WALL.maxZ),
+    committed: ({ cx, cz }) => Math.abs(cx) <= 2 && Math.abs(cz) <= 2,
+    districtAt: ({ x }) => x >= 10 ? 'waterfront' : 'shopping',
+    anchor: (id) => all.find((entry) => entry.id === id),
+    anchorsNear: (position, radius) => all.filter((entry) => Math.hypot(entry.position.x - position.x, entry.position.z - position.z) <= radius),
+    directionsToHotel: (fromAnchorId) => fromAnchorId === ANCHORS.guide.id ? ROUTE : null,
+  };
+}
+export function fakeWorldService(): WorldService {
+  const info = (worldId = 'w-test'): WorldInfo => ({ worldId, seed: 'seed-test', generatorVersion: 1, catalogVersion: 'catalog-1', spawn: { x: 0, z: 0 }, hotelAnchorId: 'hotel.grand' });
+  return {
+    provider: 'fallback',
+    open: (worldId) => info(worldId),
+    view: (worldId) => fakeWorldView(worldId),
+    request: () => Promise.reject(new Error('Chunk generation is outside game tests.')),
+    restore: () => { throw new Error('Chunk restore is outside game tests.'); },
+  };
+}
+export function fakeServices(environment: Record<string, string> = { NODE_ENV: 'test', ENABLE_DEMO_FIXTURES: 'true', ENABLE_VALIDATION_HARNESS: 'true' }): ServerServices {
+  return { ...createServices(loadConfig(environment)), worlds: fakeWorldService() };
+}
 export function fixtureApp() {
-  const services = createServices(loadConfig({ NODE_ENV: 'test', ENABLE_DEMO_FIXTURES: 'true', ENABLE_VALIDATION_HARNESS: 'true' }));
+  const services = fakeServices();
   return { services, app: createApp({ services }) };
 }
-export async function campaign(providerMode: 'fixture' | 'live' = 'fixture') {
+
+export async function campaign(providerMode: 'fixture' | 'live' = 'fixture', validationMode = false) {
   const { app, services } = fixtureApp();
-  const created = await request(app).post('/api/sessions').send({ initialTier: 1, providerMode, validationMode: true }).expect(201);
+  const created = await request(app).post('/api/sessions').send({ initialTier: 1, providerMode, validationMode }).expect(201);
   let state: PublicState = created.body.state;
+  let position: Position = { x: 0, z: 0 };
   let count = 0;
   const act = async (action: GameAction, status = 200) => {
     const response = await request(app).post(`/api/sessions/${state.sessionId}/actions`).send({ actionId: `action-${++count}`, expectedVersion: state.version, action }).expect(status);
     if (response.body.state) state = response.body.state;
     return response;
   };
-  const talk = async (text: string, npcId: 'xiaolin' | 'achen' | 'laozhou' = 'xiaolin', status = 200) => {
-    const response = await request(app).post(`/api/sessions/${state.sessionId}/turns`).send({ turnId: `turn-${++count}`, expectedVersion: state.version, npcId, input: { text, source: 'typed' } }).expect(status);
+  /** Walks in one straight move after letting enough time pass at the authored speed. */
+  const walkTo = async (target: Position, status = 200) => {
+    advance(Math.hypot(target.x - position.x, target.z - position.z) / 4 * 1000 + 50);
+    const response = await act({ type: 'move', position: target }, status);
+    if (status === 200) position = target;
+    return response;
+  };
+  const talk = async (text: string, npcId: NpcId = 'vendor', anchorId: string = { vendor: ANCHORS.vendor.id, guide: ANCHORS.guide.id, passerby: ANCHORS.passerby.id }[npcId], status = 200) => {
+    const response = await request(app).post(`/api/sessions/${state.sessionId}/turns`).send({ turnId: `turn-${++count}`, expectedVersion: state.version, npcId, anchorId, input: { text, source: 'typed' } }).expect(status);
     if (response.body.state) state = response.body.state;
     return response;
   };
-  return { app, services, act, talk, get state() { return state; }, move: (zoneId: Extract<GameAction, { type: 'moveZone' }>['zoneId']) => act({ type: 'moveZone', zoneId }), choose: (choiceId: Extract<GameAction, { type: 'choose' }>['choiceId'], status = 200) => act({ type: 'choose', choiceId }, status), inspect: (targetId: Extract<GameAction, { type: 'inspect' }>['targetId']) => act({ type: 'inspect', targetId }), cue: (cueId: Extract<GameAction, { type: 'playCue' }>['cueId']) => act({ type: 'playCue', cueId, channel: 'validation-text' }) };
+  const session = async () => (await services.sessionStore.get(state.sessionId))!;
+  return {
+    app, services, act, talk, walkTo, session, get state() { return state; }, get position() { return position; },
+    pay: (anchorId: string = ANCHORS.vendor.id, status = 200) => act({ type: 'choose', choiceId: 'q1.pay', anchorId }, status),
+    startPhoto: (status = 200) => act({ type: 'choose', choiceId: 'q3.start-photo', anchorId: ANCHORS.viewpoint.id }, status),
+    capture: (outcome: 'captured' | 'failed', status = 200, imageDigest: string | undefined = 'a1b2c3d4e5f60718293a4b5c6d7e8f90') =>
+      act({ type: 'photoCapture', photoRequestId: state.photo!.id, outcome, ...(imageDigest ? { imageDigest } : {}) }, status),
+  };
 }
 export type Campaign = Awaited<ReturnType<typeof campaign>>;
-export async function p1(game: Campaign, kiosk = false) {
-  await game.move('cafe'); await game.inspect('p1.entrance-sign'); await game.choose('p1.enter-plaza-door');
-  await game.talk('我要咖啡。');
-  if (kiosk) { await game.talk('取消订单。'); await game.talk('我要水。'); await game.talk('水五元。'); }
-  else { await game.talk('那就茶吧。'); await game.talk('茶十元。'); }
-  if (kiosk) { await game.cue('p1.station-directions'); await game.move('kiosk'); await game.choose('p1.go-kiosk'); await game.choose('p1.pay-kiosk'); }
-  else { await game.choose('p1.pay-cafe'); await game.cue('p1.station-directions'); }
-  expect(game.state.status).toBe('active');
-  await game.move('concourse'); expect(game.state.status).toBe('cleared');
-}
-export async function p2(game: Campaign, wrong = false, clarify = false) {
-  await game.act({ type: 'startMission', missionId: 'P2' });
-  await game.inspect('p2.timetable'); await game.talk('去江滨的车在哪个站台？', 'achen'); await game.cue('p2.platform-change');
-  if (clarify) await game.talk('是三号站台吗？', 'achen');
-  if (wrong) { await game.move('platform-2'); await game.choose('p2.board-2'); expect(game.state.status).toBe('active'); await game.move('concourse'); }
-  await game.move('platform-3'); await game.choose('p2.board-3'); expect(game.state.status).toBe('cleared');
-}
-export async function b1Ticket(game: Campaign) {
-  await game.act({ type: 'startMission', missionId: 'B1' });
-  await game.inspect('b1.destination-board');
-  const turn = await game.talk('我要一张去海港的票。', 'laozhou');
-  expect(turn.body.feedback).toBeUndefined(); expect(turn.body.vibe).toBeUndefined();
-  await game.choose('b1.pay-ticket', 422);
-  await game.talk('海港，一张。', 'laozhou'); await game.choose('b1.pay-ticket'); await game.cue('b1.harbor-change');
-}
 
+/** Q1 at the spawn vendor: coffee is sold out, accept tea, confirm, pay. */
+export async function q1(game: Campaign) {
+  const coffee = await game.talk('我要咖啡。');
+  expect(coffee.body.npcReply).toBe('咖啡卖完了。我们有茶和水。');
+  await game.talk('那就茶吧。');
+  await game.talk('茶十元。');
+  await game.pay();
+  expect(game.state).toMatchObject({ missionId: 'Q1', status: 'cleared', inventory: { cny: 10, drinks: ['tea'] } });
+  expect(game.state.purchases).toHaveLength(1);
+}
+/** Q2 at the street guide: the reply is the verified route, never model text. */
+export async function q2(game: Campaign) {
+  await game.act({ type: 'startMission', missionId: 'Q2' });
+  await game.walkTo(ANCHORS.guide.position);
+  const turn = await game.talk('请问，去上海大酒店怎么走？', 'guide');
+  expect(turn.body.npcReply).toBe(ROUTE.textZh);
+  expect(game.state.directions).toMatchObject({ routeId: ROUTE.routeId, hotelAnchorId: 'hotel.grand' });
+  expect(game.state.status).toBe('cleared');
+}
+/** Q3 by the river: request → stand on the spot → NPC countdown → capture acknowledgment. */
+export async function q3(game: Campaign) {
+  await game.act({ type: 'startMission', missionId: 'Q3' });
+  await game.walkTo(ANCHORS.passerby.position);
+  await game.talk('可以帮我在这里拍张照吗？', 'passerby');
+  expect(game.state.photo).toMatchObject({ status: 'accepted', passerbyAnchorId: ANCHORS.passerby.id, viewpointAnchorId: ANCHORS.viewpoint.id });
+  await game.walkTo(game.state.photo!.spot);
+  await game.startPhoto();
+  expect(game.state.photo?.status).toBe('countdown');
+  advance(3_100);
+  await game.capture('captured');
+  expect(game.state).toMatchObject({ missionId: 'Q3', status: 'cleared' });
+  expect(game.state.badges).toContain('shanghai-explorer');
+}

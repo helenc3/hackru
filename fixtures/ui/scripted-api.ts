@@ -1,18 +1,33 @@
 import { expect, type Page, type Route } from '@playwright/test';
-import { ActionRequestSchema, CreateSessionRequestSchema, PublicStateSchema, TurnRequestSchema, TurnResponseSchema, createBaselineState, type GameAction, type MissionId, type PublicState } from '@vibequest/shared';
+import {
+  ActionRequestSchema, ChunkRequestSchema, ChunkRestoreRequestSchema, CreateSessionRequestSchema, PublicStateSchema, TurnRequestSchema, TurnResponseSchema,
+  generateFallbackChunk, seedFromWorldId, type GameAction, type MissionId, type PublicState,
+} from '@vibequest/shared';
 
 export type Step = { action?: Partial<GameAction>; text?: string; patch?: Partial<PublicState>; reply?: string; feedback?: boolean; event?: string; end?: boolean };
+const roles = { Q1: ['vendor', '小林'], Q2: ['guide', '阿陈'], Q3: ['passerby', '小美'] } as const;
+const spawn = { x: 20, z: 20 };
+/** Anchors sit at the player's position so dock buttons appear without walking. */
 export const fixtureState = (missionId: MissionId, validation = false): PublicState => PublicStateSchema.parse({
-  ...createBaselineState(missionId), sessionId: `ui-${validation ? 'validation' : 'player'}-${missionId}`, validationMode: validation,
-  zoneId: missionId === 'P1' ? 'cafe' : 'concourse', objectives: [
-    { id: `${missionId.toLowerCase()}.communication`, label: 'Read the sign and communicate in Mandarin.', complete: false },
-    { id: `${missionId.toLowerCase()}.arrival`, label: 'Act on the directions to reach your destination.', complete: false },
-  ], timer: null,
+  sessionId: `ui-${validation ? 'validation' : 'player'}-${missionId}`, worldId: 'ui-world', version: 0, missionId, mode: 'practice', status: 'active', zoneId: 'shopping', position: spawn, tier: 0,
+  objectives: [
+    { id: `${missionId.toLowerCase()}.communication`, label: 'Ask in Mandarin.', complete: false },
+    { id: `${missionId.toLowerCase()}.action`, label: 'Act on the answer in the world.', complete: false },
+  ],
+  interactables: [
+    { id: `ui.${roles[missionId][0]}`, kind: 'npc', role: roles[missionId][0], label: roles[missionId][1], position: spawn },
+    { id: 'ui.menu', kind: 'sign', label: '菜单', position: spawn, cueId: 'q1.menu' },
+  ],
+  visibleCues: [], npcMood: { vendor: 'warm', guide: 'warm', passerby: 'warm' }, inventory: { hint: 1, cny: 20, drinks: [] }, purchases: [],
+  xp: 0, badges: [], unlockedMissionIds: ['Q1', 'Q2', 'Q3'].slice(0, ['Q1', 'Q2', 'Q3'].indexOf(missionId) + 1), completedMissionIds: [],
+  directions: null, photo: null, timer: null, capabilities: { coach: true, hints: true, freeze: false },
+  validationMode: validation, inputPreference: 'voice', providerStatus: 'fixture',
 });
+const weights = { 'drink-vendor': 1, 'direction-helper': 1, 'hotel-landmark': 1, 'river-viewpoint': 1, 'photo-passerby': 1 };
 
-/** A response tape for UI tests. It does not implement or certify the game engine or AI. */
+/** A response tape for UI tests. It does not implement or certify the game engine, the city generator, or AI. */
 export async function installScriptedApi(page: Page, options: { mission?: MissionId; validation?: boolean; steps?: Step[]; fixtures?: boolean } = {}) {
-  let state = fixtureState(options.mission ?? 'P1', options.validation ?? false);
+  let state = fixtureState(options.mission ?? 'Q1', options.validation ?? false);
   const steps = [...options.steps ?? []];
   const requests: { path: string; body: unknown }[] = [];
   const failures: string[] = [];
@@ -22,14 +37,20 @@ export async function installScriptedApi(page: Page, options: { mission?: Missio
   await page.route('**/api/**', async (route) => {
     const request = route.request();
     const path = new URL(request.url()).pathname;
-    if (path === '/api/health') return json(route, { status: 'ok', buildId: 'ui-fixture', specVersion: '1.2', providers: { geminiConfigured: false, elevenlabsConfigured: false }, features: { fixtures: options.fixtures ?? true, validationHarness: options.validation ?? false }, segments: { engine: 'implemented', dialogue: 'fixture', speech: 'unimplemented' } });
+    if (path === '/api/health') return json(route, { status: 'ok', buildId: 'ui-fixture', specVersion: '2.0', providers: { geminiConfigured: false, elevenlabsConfigured: false }, features: { fixtures: options.fixtures ?? true, validationHarness: options.validation ?? false }, segments: { engine: 'implemented', dialogue: 'fixture', speech: 'unimplemented' } });
     const body: unknown = request.method() === 'POST' ? request.postDataJSON() : null;
+    // City streaming is not under test here: answer with the shared seeded fallback, outside the request log.
+    if (path.endsWith('/chunks')) {
+      const input = ChunkRequestSchema.parse(body);
+      try { return json(route, { chunks: input.coords.map((coord) => generateFallbackChunk(state.worldId, seedFromWorldId(state.worldId), coord, { missionId: state.missionId, weights })), pending: [] }); } catch { return json(route, { chunks: [], pending: input.coords }); }
+    }
+    if (path.endsWith('/chunks/restore')) { const input = ChunkRestoreRequestSchema.parse(body); return json(route, { accepted: [], rejected: [], chunks: input.chunks }); }
     requests.push({ path, body });
     if (failure) { const error = failure; failure = null; return json(route, { error: { code: error.code, message: error.message, retryable: error.retryable }, ...(error.status === 409 ? { state } : {}) }, error.status); }
     if (path === '/api/sessions') {
       const input = CreateSessionRequestSchema.parse(body);
       expect(input.validationMode).toBe(options.validation ?? false);
-      state = PublicStateSchema.parse({ ...state, inputPreference: input.inputPreference, tier: state.mode === 'boss' ? 1 : input.initialTier });
+      state = PublicStateSchema.parse({ ...state, inputPreference: input.inputPreference, tier: input.initialTier, ...(input.worldId ? { worldId: input.worldId } : {}) });
       return json(route, { state });
     }
     if (request.method() === 'GET') return json(route, { state });
@@ -41,10 +62,10 @@ export async function installScriptedApi(page: Page, options: { mission?: Missio
       const matches = next?.action && Object.entries(next.action).every(([key, value]) => JSON.stringify(input.action[key as keyof GameAction]) === JSON.stringify(value));
       let patch: Partial<PublicState>;
       if (matches) { steps.shift(); patch = next.patch ?? {}; }
-      else if (input.action.type === 'moveZone') patch = { zoneId: input.action.zoneId };
+      else if (input.action.type === 'move') patch = { position: input.action.position };
       else if (input.action.type === 'setInputPreference') patch = { inputPreference: input.action.preference };
       else if (['audioPhase', 'pausePractice', 'resumePractice'].includes(input.action.type)) patch = {};
-      else { failures.push(`Unexpected action ${JSON.stringify(input.action)}`); return json(route, { error: { code: 'ACTION_FORBIDDEN', message: 'The mission prerequisites are not satisfied.', retryable: false } }, 422); }
+      else { failures.push(`Unexpected action ${JSON.stringify(input.action)}`); return json(route, { error: { code: 'ACTION_FORBIDDEN', message: 'The quest prerequisites are not satisfied.', retryable: false } }, 422); }
       state = PublicStateSchema.parse({ ...state, ...patch, version: state.version + 1 });
       const response = { state, events: matches && next.event ? [{ id: `ui-event-${state.version}`, kind: 'objective', message: next.event }] : [] };
       sent.set(input.actionId, response);
@@ -57,7 +78,7 @@ export async function installScriptedApi(page: Page, options: { mission?: Missio
       const next = steps.shift();
       expect(next?.text).toBe(input.input.text);
       state = PublicStateSchema.parse({ ...state, ...next?.patch, version: state.version + 1 });
-      const response = TurnResponseSchema.parse({ turnId: input.turnId, state, events: [], npcReply: next?.reply ?? '好的。', ...(next?.end ? { conversationEnded: true } : {}), ...(next?.feedback && state.mode !== 'boss' ? { feedback: { understood: 'Your request was understood.', explanation: 'A short, clear Mandarin request works here.', improvedExample: '请给我一杯水，谢谢。' }, vibe: { intent: .9, clarity: .8, courtesy: .8 } } : {}) });
+      const response = TurnResponseSchema.parse({ turnId: input.turnId, state, events: [], npcReply: next?.reply ?? '好的。', ...(next?.end ? { conversationEnded: true } : {}), ...(next?.feedback ? { feedback: { understood: 'Your request was understood.', explanation: 'A short, clear Mandarin request works here.', improvedExample: '请给我一杯水，谢谢。' }, vibe: { intent: .9, clarity: .8, courtesy: .8 } } : {}) });
       sent.set(input.turnId, response);
       return json(route, response);
     }

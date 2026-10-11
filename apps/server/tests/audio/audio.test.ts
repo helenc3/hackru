@@ -2,11 +2,10 @@ import { describe, expect, it } from 'vitest';
 import request from 'supertest';
 import type { GameAction, PublicState, SpeechProvider } from '@vibequest/shared';
 import { createApp } from '../../src/app.js';
-import { loadConfig } from '../../src/config.js';
+import { ANCHORS, fakeServices } from '../game/helpers.js';
 import { createFixtureSpeechProvider } from '../../src/providers/speech.js';
 import { mp3DurationMs } from '../../src/providers/elevenlabs/live.js';
 import { silentMp3Frame } from '../../src/providers/elevenlabs/fixture.js';
-import { createServices } from '../../src/services.js';
 import { HttpError } from '../../src/errors.js';
 
 type Speech = SpeechProvider & { calls: { synthesize: number; transcribe: number } };
@@ -20,7 +19,7 @@ function countingSpeech(base: SpeechProvider = createFixtureSpeechProvider()): S
 }
 
 async function game(speech: SpeechProvider = countingSpeech()) {
-  const services = createServices(loadConfig({ NODE_ENV: 'test', ENABLE_DEMO_FIXTURES: 'true', ENABLE_VALIDATION_HARNESS: 'true' }));
+  const services = fakeServices();
   services.speechProvider = speech;
   const app = createApp({ services });
   let state: PublicState = (await request(app).post('/api/sessions').send({ initialTier: 1, providerMode: 'fixture', validationMode: true }).expect(201)).body.state;
@@ -31,7 +30,7 @@ async function game(speech: SpeechProvider = countingSpeech()) {
     return response;
   };
   const turn = async (input: { text: string; source: 'typed' | 'stt' | 'stt-edited'; transcriptionId?: string }, status = 200) => {
-    const response = await request(app).post(`/api/sessions/${state.sessionId}/turns`).send({ turnId: `t-${++n}`, expectedVersion: state.version, npcId: 'xiaolin', input }).expect(status);
+    const response = await request(app).post(`/api/sessions/${state.sessionId}/turns`).send({ turnId: `t-${++n}`, expectedVersion: state.version, npcId: 'vendor', anchorId: ANCHORS.vendor.id, input }).expect(status);
     if (response.body.state) state = response.body.state;
     return response;
   };
@@ -49,9 +48,8 @@ async function game(speech: SpeechProvider = countingSpeech()) {
     return response.body as { text: string; transcriptionId: string };
   };
   const session = async () => (await services.sessionStore.get(state.sessionId))!;
-  const atCafe = async () => {
-    await act({ type: 'moveZone', zoneId: 'cafe' }); await act({ type: 'inspect', targetId: 'p1.entrance-sign' }); await act({ type: 'choose', choiceId: 'p1.enter-plaza-door' });
-  };
+  // The spawn vendor is already within interaction reach.
+  const atCafe = async () => undefined;
   const speechGet = (speechId: string) => request(app).get(`/api/sessions/${state.sessionId}/speech/${speechId}`);
   const until200 = async (speechId: string) => {
     for (let i = 0; i < 50; i++) {
@@ -186,25 +184,9 @@ describe('Segment-005 speech jobs', () => {
   });
 });
 
-describe('Segment-005 PA playback', () => {
-  it('exposes only the active audio playback, and finishCue is the only delivery path', async () => {
+describe('retired PA playback', () => {
+  it('no longer exposes the station cue-playback route', async () => {
     const g = await game();
-    const cuePlayback = async () => (await request(g.app).get(`/api/sessions/${g.state.sessionId}/cue-playback`).expect(200)).body.playback;
-    await g.atCafe();
-    await g.turn({ text: '请给我一杯茶。', source: 'typed' });
-    await g.turn({ text: '茶十元。', source: 'typed' });
-    expect(await cuePlayback()).toBeNull();
-    await g.act({ type: 'playCue', cueId: 'p1.station-directions', channel: 'audio' });
-    const playback = await cuePlayback();
-    expect(playback).toMatchObject({ cueId: 'p1.station-directions', audioAssetId: 'p1.station-directions.tier-1', playbackId: expect.any(String) });
-    expect(playback.finishAfterMs).toBeGreaterThan(0);
-    expect(playback.finishAfterMs).toBeLessThanOrEqual(8_000);
-    const version = g.state.version;
-    await cuePlayback(); // reading it never starts or completes the cue
-    expect((await g.session()).state.cuePlaybacks.filter((entry) => entry.delivered)).toHaveLength(0);
-    expect(g.state.version).toBe(version);
-    await request(g.app).get('/api/sessions/unknown/cue-playback').expect(404);
-    await g.act({ type: 'retryMission' });
-    expect(await cuePlayback()).toBeNull();
+    await request(g.app).get(`/api/sessions/${g.state.sessionId}/cue-playback`).expect(404);
   });
 });

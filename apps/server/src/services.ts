@@ -3,6 +3,8 @@ import type { ServerConfig } from './config.js';
 import { createDialogueProvider } from './providers/dialogue.js';
 import { createSpeechProvider } from './providers/speech.js';
 import { createSessionStore, type SessionStore } from './session-store.js';
+import { createClaudeCityComposer } from './city/claude-city.js';
+import { createWorldService, type WorldService } from './city/world-service.js';
 
 /** Frozen injection seam: routers never instantiate or import a private provider. */
 export interface ServerServices {
@@ -10,6 +12,7 @@ export interface ServerServices {
   sessionStore: SessionStore;
   dialogueProvider: DialogueProvider;
   speechProvider: SpeechProvider;
+  worlds: WorldService;
 }
 
 export function createServices(config: ServerConfig): ServerServices {
@@ -18,5 +21,6 @@ export function createServices(config: ServerConfig): ServerServices {
     sessionStore: createSessionStore(),
     dialogueProvider: createDialogueProvider(config),
     speechProvider: createSpeechProvider(config),
+    worlds: createWorldService(config.enableClaudeCity && config.anthropicApiKey ? { composer: createClaudeCityComposer({ apiKey: config.anthropicApiKey, model: config.cityModel }) } : {}),
   };
 }

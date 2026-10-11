@@ -113,7 +113,7 @@ export function resolveTranscription(session: SessionRecord, input: TurnRequest[
 
 export function registerSpeechJob(session: SessionRecord, job: SpeechJob): boolean {
   if (job.sessionId !== session.id || job.attemptId !== session.state.attemptId) return false;
-  if (job.status !== 'pending' || job.audio || job.assetDurationMs !== undefined || !job.replyZh.trim() || job.replyZh.length > 80) {
+  if (job.status !== 'pending' || job.audio || job.assetDurationMs !== undefined || !job.replyZh.trim() || job.replyZh.length > 240) {
     throw new HttpError(422, 'INVALID_SPEECH_JOB', 'New speech jobs must contain a bounded committed reply and be pending.');
   }
   if (session.speechJobs.has(job.id) || [...session.speechJobs.values()].some((existing) => existing.turnId === job.turnId || existing.operationId === job.operationId)) {

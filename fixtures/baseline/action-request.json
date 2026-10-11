@@ -3,6 +3,6 @@
   "expectedVersion": 0,
   "action": {
     "type": "inspect",
-    "targetId": "p1.entrance-sign"
+    "targetId": "fixture-anchor.menu"
   }
 }

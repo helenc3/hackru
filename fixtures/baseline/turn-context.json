@@ -1,9 +1,11 @@
 {
-  "missionId": "P1",
+  "missionId": "Q1",
   "mode": "practice",
   "tier": 1,
-  "npcId": "xiaolin",
-  "persona": "Warm, encouraging café owner; Mandarin Chinese.",
+  "npcId": "vendor",
+  "anchorId": "fixture-anchor.vendor",
+  "nameZh": "小林",
+  "persona": "Warm, encouraging drink vendor; Mandarin Chinese.",
   "patience": 5,
   "allowedIntents": [
     "order_drink",
@@ -12,12 +14,13 @@
     "confirm_drink_price",
     "greeting",
     "request_repeat",
+    "farewell",
     "unknown"
   ],
   "facts": {
-    "coffee": "unavailable",
-    "teaPrice": "10 CNY",
-    "waterPrice": "5 CNY"
+    "coffee": "卖完了",
+    "teaPriceCny": "10",
+    "waterPriceCny": "5"
   },
   "history": []
 }

@@ -2,19 +2,19 @@
  * Manual live acceptance (paid providers; never run by CI).
  *   npm run dev   # with GEMINI_API_KEY, ELEVENLABS_API_KEY and ENABLE_VALIDATION_HARNESS=true in .env
  *   npx tsx --env-file=.env tests/e2e/live-acceptance.ts [http://127.0.0.1:3001]
- * Drives the server's real loop per turn: recording phase → ElevenLabs STT upload → transcript
- * confirmation → Gemini turn → ElevenLabs reply speech. Player clips are synthesized Mandarin
+ * Drives the server's real loop per turn with 小林 (Quest 1): recording phase → ElevenLabs STT upload →
+ * transcript confirmation → dialogue-provider turn → ElevenLabs reply speech. Player clips are synthesized Mandarin
  * (ElevenLabs TTS), so this measures provider latency but does not replace a microphone check.
  */
 import { randomUUID } from 'node:crypto';
 import { ElevenLabsClient } from '@elevenlabs/elevenlabs-js';
-import type { PublicState } from '@vibequest/shared';
+import { chunkOf, type PublicState } from '@vibequest/shared';
 
 const base = process.argv[2] ?? 'http://127.0.0.1:3001';
 const key = process.env.ELEVENLABS_API_KEY;
 if (!key) throw new Error('ELEVENLABS_API_KEY is required to synthesize player clips.');
 const eleven = new ElevenLabsClient({ apiKey: key });
-const lines = ['你好！', '我要咖啡。', '那就茶吧。', '茶多少钱？', '茶十元，对吗？', '谢谢。', '车站怎么走？', '请再说一遍。', '售票处在右边吗？', '好的，再见。'];
+const lines = ['你好！', '我要咖啡。', '那就茶吧。', '茶多少钱？', '茶十元，对吗？', '请再说一遍。', '谢谢。', '好的，再见。'];
 
 let state!: PublicState;
 let n = 0;
@@ -28,14 +28,17 @@ async function call(path: string, body?: object) {
 const act = (action: object) => call(`/sessions/${state.sessionId}/actions`, { actionId: `live-${++n}`, expectedVersion: state.version, action });
 
 await call('/sessions', { initialTier: 1, providerMode: 'live', validationMode: true, inputPreference: 'voice' });
-await act({ type: 'moveZone', zoneId: 'cafe' });
-await act({ type: 'inspect', targetId: 'p1.entrance-sign' });
-await act({ type: 'choose', choiceId: 'p1.enter-plaza-door' });
+// Commit the spawn chunk, then step beside 小林 (validation sessions skip the walking-speed rule).
+await call(`/sessions/${state.sessionId}/chunks`, { coords: [chunkOf(state.position)], urgent: true });
+await call(`/sessions/${state.sessionId}`);
+const vendor = state.interactables.find((entry) => entry.role === 'vendor' && entry.label === '小林');
+if (!vendor) throw new Error('小林 is not near spawn.');
+await act({ type: 'move', position: { x: vendor.position.x - 1.2, z: vendor.position.z } });
 
-const rows: { line: string; heard: string; reply: string; sttMs: number; geminiMs: number; ttsMs: number; totalMs: number }[] = [];
+const rows: { line: string; heard: string; reply: string; sttMs: number; dialogueMs: number; ttsMs: number; totalMs: number }[] = [];
 const failures: { line: string; error: string }[] = [];
 for (const line of lines) try {
-  const clip = new Uint8Array(await new Response(await eleven.textToSpeech.convert('EXAVITQu4vr4xnSDxMaL', { text: line, modelId: 'eleven_multilingual_v2', outputFormat: 'mp3_44100_128', languageCode: 'zh' })).arrayBuffer());
+  const clip = new Uint8Array(await new Response(await eleven.textToSpeech.convert('MI36FIkp9wRP7cpWKPTl', { text: line, modelId: 'eleven_multilingual_v2', outputFormat: 'mp3_44100_128', languageCode: 'zh' })).arrayBuffer());
   const operationId = randomUUID();
   await act({ type: 'audioPhase', operationId, phase: 'recording' });
   await act({ type: 'audioPhase', operationId, phase: 'transcribing' });
@@ -49,9 +52,9 @@ for (const line of lines) try {
   const sttMs = Date.now() - stop;
   await act({ type: 'audioPhase', operationId, phase: 'confirming' });
   await act({ type: 'audioPhase', operationId, phase: 'idle' }); // confirmation time is player time; excluded below
-  const geminiStart = Date.now();
-  const turn = await call(`/sessions/${state.sessionId}/turns`, { turnId: `live-${++n}`, expectedVersion: state.version, npcId: 'xiaolin', input: { text: stt.text, transcriptionId: stt.transcriptionId, source: 'stt' } }) as { npcReply: string; speechId: string };
-  const geminiMs = Date.now() - geminiStart;
+  const dialogueStart = Date.now();
+  const turn = await call(`/sessions/${state.sessionId}/turns`, { turnId: `live-${++n}`, expectedVersion: state.version, npcId: 'vendor', anchorId: vendor.id, input: { text: stt.text, transcriptionId: stt.transcriptionId, source: 'stt' } }) as { npcReply: string; speechId: string };
+  const dialogueMs = Date.now() - dialogueStart;
   const ttsStart = Date.now();
   for (;;) {
     const speech = await fetch(`${base}/api/sessions/${state.sessionId}/speech/${turn.speechId}`);
@@ -62,7 +65,7 @@ for (const line of lines) try {
   const ttsMs = Date.now() - ttsStart;
   await act({ type: 'audioPhase', operationId: turn.speechId, phase: 'playing' });
   await act({ type: 'audioPhase', operationId: turn.speechId, phase: 'idle' });
-  rows.push({ line, heard: stt.text, reply: turn.npcReply, sttMs, geminiMs, ttsMs, totalMs: sttMs + geminiMs + ttsMs });
+  rows.push({ line, heard: stt.text, reply: turn.npcReply, sttMs, dialogueMs, ttsMs, totalMs: sttMs + dialogueMs + ttsMs });
   console.log(rows.at(-1));
   await new Promise((resolve) => setTimeout(resolve, 6_500)); // stay under the 10 turns/minute cap
 } catch (error) {

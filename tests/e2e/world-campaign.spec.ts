@@ -1,101 +1,152 @@
-import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
-import type { GameAction, PublicState } from '@vibequest/shared';
+import { expect, test, type Page } from '@playwright/test';
+import { planChunk, seedFromWorldId, type ChunkManifest, type PublicState } from '@vibequest/shared';
+import { closeConversation, harness, hashes, interact, playerState, riversidePlan, say, spawnCoordsIn, startWorld, walkRoute, worldReady } from './helpers';
 
-const HARNESS = process.env.E2E_HARNESS_URL ?? 'http://127.0.0.1:4175';
-
-async function walk(page: Page, key: string, axis: 'x' | 'z', destination: number, direction: number) {
-  const world = page.getByTestId('world-renderer');
-  await world.focus();
-  const code = `Key${key.toUpperCase()}`;
-  // Release inside the animation loop so protocol latency cannot overshoot a target.
-  const stopped = world.evaluate((root, options) => new Promise<void>((resolve, reject) => {
-    const deadline = performance.now() + 15000;
-    const release = () => root.dispatchEvent(new KeyboardEvent('keyup', { code: options.code, bubbles: true }));
-    const watch = () => {
-      const position = Number(root.getAttribute(`data-position-${options.axis}`));
-      if (position * options.direction >= options.destination * options.direction) { release(); resolve(); }
-      else if (performance.now() >= deadline) { release(); reject(new Error(`Walking ${options.code} stopped at ${position}`)); }
-      else requestAnimationFrame(watch);
-    };
-    requestAnimationFrame(watch);
-  }), { code, axis, destination, direction });
-  await page.keyboard.down(key);
-  try { await stopped; } finally { await page.keyboard.up(key); }
+/** Planner-reserved guide in chunk (1,0): the Q2 helper on the row-0 avenue's north sidewalk. */
+function guidePlan(worldId: string) {
+  const near = planChunk(seedFromWorldId(worldId), { cx: 1, cz: 0 }).requiredAnchors.find((anchor) => anchor.capability === 'direction-helper')!.near!;
+  return { x: 40 + near.x, z: near.z };
 }
+const target = (state: PublicState, predicate: (entry: PublicState['interactables'][number]) => boolean) => {
+  const found = state.interactables.find(predicate);
+  expect(found, `interactables: ${state.interactables.map((entry) => entry.id).join(', ')}`).toBeTruthy();
+  return found!;
+};
+const nextQuest = async (page: Page, missionId: string) => {
+  await page.getByTestId('result-panel').getByRole('button', { name: 'Next quest' }).click();
+  await expect(page.getByText(`${missionId} · Tier`)).toBeVisible();
+  await page.waitForTimeout(500); // let the remounted world leave its first frame
+  await worldReady(page);
+};
 
-async function interact(page: Page, targetId: string) {
-  const button = page.locator(`[data-target-id="${targetId}"]`);
-  await expect(button).toBeEnabled();
-  await button.click();
-}
-
-async function say(page: Page, text: string) {
-  const panel = page.getByTestId('dialogue-panel');
-  const typed = panel.getByRole('button', { name: 'Use typed Mandarin', exact: true });
-  if (await typed.count()) await typed.click();
-  const before = await panel.getByTestId('npc-reply').count() ? await panel.getByTestId('npc-reply').innerText() : '';
-  await panel.getByRole('textbox').fill(text);
-  await panel.getByRole('button', { name: 'Send Mandarin' }).click();
-  await expect(panel.getByRole('textbox')).toHaveValue('');
-  await expect.poll(async () => await panel.getByTestId('npc-reply').count() ? panel.getByTestId('npc-reply').innerText() : '').not.toBe(before);
-}
-
-/** The developer harness path: same semantic actions through the validation API, no world. */
-async function harnessP1(request: APIRequestContext): Promise<PublicState> {
-  let state: PublicState = (await (await request.post(`${HARNESS}/api/sessions`, { data: { initialTier: 0, providerMode: 'fixture', validationMode: true, inputPreference: 'typed-accessibility' } })).json()).state;
-  let n = 0;
-  const post = async (path: string, data: object) => {
-    const response = await request.post(`${HARNESS}/api/sessions/${state.sessionId}/${path}`, { data: { ...data, expectedVersion: state.version } });
-    expect(response.status(), `${path} ${JSON.stringify(data)}`).toBe(200);
-    state = (await response.json()).state;
-  };
-  const act = (action: GameAction) => post('actions', { actionId: `h-${++n}`, action });
-  const talk = (text: string) => post('turns', { turnId: `h-${++n}`, npcId: 'xiaolin', input: { text, source: 'typed' } });
-  await act({ type: 'moveZone', zoneId: 'cafe' });
-  await act({ type: 'inspect', targetId: 'p1.entrance-sign' });
-  await act({ type: 'choose', choiceId: 'p1.enter-plaza-door' });
-  for (const line of ['我要咖啡。', '那就茶吧。', '茶十元。']) await talk(line);
-  await act({ type: 'choose', choiceId: 'p1.pay-cafe' });
-  await act({ type: 'playCue', cueId: 'p1.station-directions', channel: 'validation-text' });
-  await act({ type: 'moveZone', zoneId: 'concourse' });
-  return state;
-}
-
-const comparable = (state: PublicState) => ({ missionId: state.missionId, status: state.status, objectives: state.objectives, inventory: state.inventory, xp: state.xp, badges: state.badges, unlockedMissionIds: state.unlockedMissionIds });
-
-test('player world clears the café mission against the real server and matches the harness result', async ({ page, request }) => {
-  await page.goto('/');
-  await page.getByLabel('Conversation provider').selectOption('fixture');
-  await page.getByRole('button', { name: 'Start Practice', exact: true }).click();
-  await expect(page.getByTestId('world-renderer')).toHaveAttribute('data-position-z', /./);
-  await expect(page.getByText('Fixture demonstration · scripted responses')).toBeVisible();
+test('player world: buy a drink, get verified hotel directions, and a river photo — the world survives a reload', async ({ page, request }) => {
+  test.setTimeout(300_000);
+  const committed: ChunkManifest[] = [];
+  page.on('response', async (response) => {
+    if (/\/chunks(\/restore)?$/.test(new URL(response.url()).pathname) && response.ok()) committed.push(...(await response.json()).chunks);
+  });
+  await startWorld(page);
   await expect(page.locator('[data-testid="validation-harness"]')).toHaveCount(0);
+  const worldId = (await page.getByTestId('world-renderer').getAttribute('data-world-id'))!;
+  let state = await playerState(page, request);
+  expect(state).toMatchObject({ missionId: 'Q1', worldId, inventory: { cny: 20 } });
+  const spawn = state.position; // the corner sidewalk of the row-0 avenue; north of it is open road
 
-  // Read the sign, then act on it: the plaza door.
-  await walk(page, 'w', 'z', 6.1, -1);
-  await walk(page, 'a', 'x', -9.8, -1);
-  await interact(page, 'p1.entrance-sign');
-  await expect(page.getByRole('dialog', { name: 'Inspected sign' })).toContainText('请从广场进入');
-  await page.keyboard.press('Escape');
-  await interact(page, 'p1.enter-plaza-door');
+  // Q1 — 小林 stands 5 m east of spawn. Coffee is sold out; tea, price confirmation, explicit payment.
+  const vendor = target(state, (entry) => entry.role === 'vendor' && entry.label === '小林');
+  await walkRoute(page, [{ x: vendor.position.x - 1.2, z: state.position.z }]);
+  await interact(page, vendor.id);
+  await expect(page.getByTestId('dialogue-panel')).toContainText('你想喝什么');
+  expect(await say(page, '我要咖啡。')).toContain('咖啡卖完了');
+  expect(await say(page, '那就茶吧。')).toContain('茶十元');
+  await say(page, '对');
+  await page.getByTestId('pay-button').click();
+  await expect(page.getByTestId('result-panel')).toBeVisible();
+  state = await playerState(page, request);
+  expect(state).toMatchObject({ status: 'cleared', completedMissionIds: ['Q1'], inventory: { cny: 10, drinks: ['tea'] } });
+  expect(state.purchases).toHaveLength(1);
 
-  // Order through the in-world dialogue panel; the coffee substitution is authored.
-  await walk(page, 'w', 'z', 4.1, -1);
-  await interact(page, 'xiaolin');
-  for (const line of ['我要咖啡。', '那就茶吧。', '茶十元。']) await say(page, line);
-  await page.getByTestId('dialogue-panel').getByRole('button', { name: 'Close conversation' }).click();
-  await interact(page, 'p1.pay-cafe');
+  // Reload mid-journey: same world, spawn restored from IndexedDB without generation, progress intact.
+  const spawnBefore = hashes(committed.filter((chunk) => Math.abs(chunk.coord.cx) <= 1 && Math.abs(chunk.coord.cz) <= 1));
+  expect(Object.keys(spawnBefore)).toHaveLength(9);
+  const chunkRequests: (string | null)[] = [];
+  page.on('request', (outgoing) => { if (new URL(outgoing.url()).pathname.endsWith('/chunks')) chunkRequests.push(outgoing.postData()); });
+  committed.length = 0;
+  await page.reload();
+  await page.getByRole('button', { name: 'Continue Session' }).click();
+  await worldReady(page);
+  await expect(page.getByTestId('world-renderer')).toHaveAttribute('data-world-id', worldId);
+  expect(chunkRequests.flatMap(spawnCoordsIn)).toEqual([]);
+  expect(hashes(committed.filter((chunk) => Math.abs(chunk.coord.cx) <= 1 && Math.abs(chunk.coord.cz) <= 1))).toEqual(spawnBefore);
+  expect((await playerState(page, request)).completedMissionIds).toEqual(['Q1']);
 
-  // Spoken directions (Chinese subtitle channel keeps this deterministic), then walk there.
-  await page.getByRole('region', { name: 'World interactions' }).getByRole('button', { name: 'Chinese subtitles' }).click();
-  await page.getByRole('button', { name: 'Close sign' }).click();
-  await walk(page, 'w', 'z', 1.9, -1); // Concourse starts at z=2; clearing freezes movement.
-  await expect(page.getByTestId('result-panel')).toContainText('You found your way.');
+  // Q2 — the guide on the avenue east of spawn gives directions from the committed street graph.
+  await nextQuest(page, 'Q2');
+  const guide = guidePlan(worldId);
+  const avenueZ = riversidePlan(worldId).avenueZ ?? guide.z + 5.8;
+  await walkRoute(page, [spawn, { x: spawn.x, z: avenueZ }, { x: guide.x, z: avenueZ }, { x: guide.x, z: guide.z + 1.4 }]);
+  state = await playerState(page, request);
+  const helper = target(state, (entry) => entry.role === 'guide');
+  await interact(page, helper.id);
+  await say(page, '请问，去上海大酒店怎么走？'); // completes Q2, which closes the conversation
+  state = await playerState(page, request);
+  expect(state.directions?.textZh).toContain('上海大酒店');
+  await expect(page.getByTestId('directions-card')).toContainText('上海大酒店');
+  expect(state).toMatchObject({ status: 'cleared', completedMissionIds: ['Q1', 'Q2'] });
 
-  const sessionId = await page.evaluate(() => localStorage.getItem('vibequest.player-session.v1'));
-  const world: PublicState = (await (await request.get(`/api/sessions/${sessionId}`)).json()).state;
-  expect(world).toMatchObject({ validationMode: false, providerStatus: 'fixture', status: 'cleared' });
-  expect(comparable(world)).toEqual(comparable(await harnessP1(request)));
+  // Q3 — east along the avenue to the Huangpu promenade, ask a passer-by, stand on the spot, countdown, capture.
+  await nextQuest(page, 'Q3');
+  const river = riversidePlan(worldId);
+  const promenadeX = river.riverWestX - 3;
+  await walkRoute(page, [{ x: guide.x, z: avenueZ }, { x: promenadeX, z: avenueZ }, { x: promenadeX, z: river.passerby.z }]);
+  state = await playerState(page, request);
+  const passerby = target(state, (entry) => entry.role === 'passerby');
+  await walkRoute(page, [{ x: passerby.position.x - 1.2, z: passerby.position.z }]);
+  await interact(page, passerby.id);
+  await say(page, '可以帮我在这里拍张照吗？');
+  await closeConversation(page);
+  state = await playerState(page, request);
+  expect(state.photo).toMatchObject({ status: 'accepted' });
+  const spot = state.photo!.spot;
+  await walkRoute(page, [{ x: passerby.position.x - 1.2, z: spot.z }, { x: spot.x, z: spot.z }]);
+  const overlay = page.getByTestId('photo-overlay');
+  await overlay.getByRole('button', { name: 'Ready · start photo' }).click();
+  await expect(page.getByTestId('photo-result')).toBeVisible({ timeout: 20000 });
+  state = await playerState(page, request);
+  expect(state).toMatchObject({ status: 'cleared', completedMissionIds: ['Q1', 'Q2', 'Q3'], badges: ['shanghai-explorer'], photo: { status: 'captured' } });
+
+  // Revisit after unloading: the spawn meshes unloaded three chunks back; a reload restores the identical spawn terrain.
+  chunkRequests.length = 0; committed.length = 0;
+  await page.reload();
+  await page.getByRole('button', { name: 'Continue Session' }).click();
+  await worldReady(page);
+  await expect.poll(() => committed.filter((chunk) => Math.abs(chunk.coord.cx) <= 1 && Math.abs(chunk.coord.cz) <= 1).length).toBe(9);
+  expect(hashes(committed.filter((chunk) => Math.abs(chunk.coord.cx) <= 1 && Math.abs(chunk.coord.cz) <= 1))).toEqual(spawnBefore);
+  expect(chunkRequests.flatMap(spawnCoordsIn)).toEqual([]);
+  expect((await playerState(page, request)).completedMissionIds).toEqual(['Q1', 'Q2', 'Q3']);
+});
+
+test('developer harness: the same three quests through the validation API, rewards granted once', async ({ request }) => {
+  const h = await harness(request);
+  const worldId = h.state.worldId;
+  await h.goto(h.state.position);
+  const vendor = h.anchor((entry) => entry.role === 'vendor' && entry.label === '小林');
+  await h.goto({ x: vendor.position.x - 1.2, z: vendor.position.z });
+  for (const line of ['我要咖啡。', '那就茶吧。', '茶十元。']) await h.talk(vendor.id, 'vendor', line);
+  await h.act({ type: 'choose', choiceId: 'q1.pay', anchorId: vendor.id });
+  expect(h.state).toMatchObject({ status: 'cleared', inventory: { cny: 10 } });
+  await h.act({ type: 'choose', choiceId: 'q1.pay', anchorId: vendor.id }, 422); // the attempt has ended: no second reward
+  const q1Xp = h.state.xp;
+
+  await h.act({ type: 'startMission', missionId: 'Q2' });
+  const guide = guidePlan(worldId);
+  await h.goto({ x: guide.x, z: guide.z + 1.4 });
+  const helper = h.anchor((entry) => entry.role === 'guide');
+  await h.talk(helper.id, 'guide', '去火车站怎么走？');
+  expect(h.state.directions).toBeNull(); // unknown destination: no invented route
+  const turn = await h.talk(helper.id, 'guide', '请问，去上海大酒店怎么走？');
+  expect(turn.npcReply).toBe(h.state.directions?.textZh);
+  expect(h.state.status).toBe('cleared');
+
+  await h.act({ type: 'startMission', missionId: 'Q3' });
+  const river = riversidePlan(worldId);
+  await h.goto({ x: river.passerby.x, z: river.passerby.z });
+  const passerby = h.anchor((entry) => entry.role === 'passerby');
+  await h.goto({ x: passerby.position.x - 1.2, z: passerby.position.z });
+  await h.talk(passerby.id, 'passerby', '可以帮我在这里拍张照吗？');
+  const photo = h.state.photo!;
+  expect(photo.status).toBe('accepted');
+  await h.goto(photo.spot);
+  await h.act({ type: 'choose', choiceId: 'q3.start-photo', anchorId: photo.viewpointAnchorId });
+  await h.act({ type: 'photoCapture', photoRequestId: photo.id, outcome: 'captured', imageDigest: 'a1b2c3d4e5f60718293a4b5c6d7e8f90' }, 422); // countdown still running
+  await new Promise((resolve) => setTimeout(resolve, 3_100));
+  await h.act({ type: 'photoCapture', photoRequestId: photo.id, outcome: 'failed' });
+  expect(h.state.photo).toMatchObject({ status: 'accepted', attempts: 1 });
+  await h.act({ type: 'choose', choiceId: 'q3.start-photo', anchorId: photo.viewpointAnchorId });
+  await new Promise((resolve) => setTimeout(resolve, 3_100));
+  await h.act({ type: 'photoCapture', photoRequestId: photo.id, outcome: 'captured', imageDigest: 'a1b2c3d4e5f60718293a4b5c6d7e8f90' });
+  expect(h.state).toMatchObject({ status: 'cleared', completedMissionIds: ['Q1', 'Q2', 'Q3'], badges: ['shanghai-explorer'] });
+  expect(h.state.xp).toBeGreaterThan(q1Xp);
 });
 
 test('production refuses the harness and validation sessions', async ({ page, request }) => {
@@ -104,13 +155,16 @@ test('production refuses the harness and validation sessions', async ({ page, re
   await expect(page.getByText('The validation harness is unavailable.')).toBeVisible();
 });
 
-test('production serves UI, API and reviewed PA assets from one origin', async ({ request }) => {
+test('production serves UI, API and the city routes from one origin', async ({ request }) => {
   const health = await (await request.get('/api/health')).json();
-  expect(health).toMatchObject({ status: 'ok', specVersion: '1.2', features: { validationHarness: false, fixtures: true } });
+  expect(health).toMatchObject({ status: 'ok', features: { validationHarness: false, fixtures: true, cityProvider: 'fallback' } });
   expect((await request.get('/')).headers()['content-type']).toContain('text/html');
-  const pa = await request.get('/audio/p1.station-directions.tier-0.mp3');
-  expect(pa.status()).toBe(200);
-  expect(pa.headers()['content-type']).toContain('audio/mpeg');
   expect((await request.get('/api/nope')).status()).toBe(404);
   expect((await request.get('/audio/missing.mp3')).status()).toBe(404);
+  const session: PublicState = (await (await request.post('/api/sessions', { data: { initialTier: 0, providerMode: 'fixture' } })).json()).state;
+  const world = await (await request.get(`/api/worlds/${session.worldId}`)).json();
+  expect(world).toMatchObject({ worldId: session.worldId, hotelAnchorId: 'hotel.grand' });
+  const chunks = await (await request.post(`/api/sessions/${session.sessionId}/chunks`, { data: { coords: [{ cx: 0, cz: 0 }] } })).json();
+  expect(chunks.chunks[0]).toMatchObject({ worldId: session.worldId, coord: { cx: 0, cz: 0 } });
+  expect(chunks.chunks[0].placements.every((placement: { assetId: string }) => /^(bld|sf|st|ls|wf|an)\./.test(placement.assetId))).toBe(true);
 });

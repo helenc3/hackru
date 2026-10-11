@@ -63,22 +63,23 @@ async function actions(page: Page) { return JSON.parse(await page.getByTestId('a
 
 test('sign, NPC, focus and held-key interactions use shared callbacks once', async ({ page }) => {
   await open(page);
+  await expect(page.getByTestId('world-renderer')).toHaveAttribute('data-chunks', '9');
   await expect(page.locator('[data-target-id]')).toHaveCount(0);
-  await walk(page, 'w', 'z', 6.1, -1);
-  await walk(page, 'a', 'x', -9.8, -1);
+  await walk(page, 'w', 'z', 6.3, -1);
   await page.keyboard.press('e');
-  await expect(page.getByRole('dialog')).toContainText('请从广场进入。这扇门关闭了。');
+  await expect(page.getByRole('dialog')).toContainText('茶 十元');
   await page.waitForTimeout(150); // Position telemetry refreshes every 100 ms.
   const paused = await coordinate(page, 'z');
   await page.keyboard.press('w');
   await expect.poll(() => coordinate(page, 'z')).toBe(paused);
   await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog')).toHaveCount(0);
-  await walk(page, 'w', 'z', 4.1, -1);
+  await walk(page, 'a', 'x', 16.3, -1);
+  await walk(page, 'w', 'z', 4.6, -1);
   await page.keyboard.down('e');
   await page.keyboard.down('e');
   await page.keyboard.up('e');
-  await expect(page.getByRole('dialog', { name: 'NPC conversation' })).toBeVisible();
+  await expect(page.getByRole('dialog', { name: 'NPC conversation' })).toContainText('fixture.vendor');
   await page.waitForTimeout(150);
   const beforeTyping = await coordinate(page, 'z');
   await page.getByRole('textbox', { name: 'Dialogue input' }).fill('wasd 你好');
@@ -87,35 +88,41 @@ test('sign, NPC, focus and held-key interactions use shared callbacks once', asy
   await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog')).toHaveCount(0);
   const sent = await actions(page);
-  expect(sent.filter((a: { type: string }) => a.type === 'inspect')).toEqual([{ type: 'inspect', targetId: 'p1.entrance-sign' }]);
-  expect(sent.every((a: { type: string }) => ['inspect', 'moveZone'].includes(a.type))).toBe(true);
-  await expect(page.getByTestId('reward-state')).toHaveText('{"xp":0,"badges":[],"inventory":{"hint":0,"freeze":0}}');
+  expect(sent.filter((a: { type: string }) => a.type === 'inspect')).toEqual([{ type: 'inspect', targetId: 'fixture.menu' }]);
+  expect(sent.every((a: { type: string }) => ['inspect', 'move'].includes(a.type))).toBe(true);
+  expect(sent.filter((a: { type: string }) => a.type === 'move').every((a: { position: { x: number; z: number } }) => Number.isFinite(a.position.x) && Number.isFinite(a.position.z))).toBe(true);
+  await expect(page.getByTestId('reward-state')).toHaveText('{"xp":0,"badges":[],"inventory":{"hint":0,"cny":20,"drinks":[]}}');
 });
 
-test('PA and boarding IDs match the shared fixture and duplicate clicks are locked', async ({ page }) => {
+test('the payment choice carries its anchor and duplicate clicks are locked', async ({ page }) => {
   await open(page);
-  await page.getByLabel('Mission', { exact: true }).selectOption('P2');
-  await walk(page, 'w', 'z', -2, -1);
+  await walk(page, 'w', 'z', 4.6, -1);
+  await walk(page, 'a', 'x', 12.4, -1);
   await page.getByLabel('Delay callback', { exact: true }).check();
-  await page.getByTestId('world-renderer').focus();
-  await page.keyboard.down('e'); await page.keyboard.down('e'); await page.keyboard.up('e');
-  await expect.poll(async () => (await actions(page)).filter((a: { type: string }) => a.type === 'playCue')).toEqual([{ type: 'playCue', cueId: 'p2.platform-change', channel: 'audio' }]);
-  await page.getByLabel('Delay callback', { exact: true }).uncheck();
-  await walk(page, 'w', 'z', -11.8, -1);
-  await page.locator('[data-target-id="p2.board-2"]').evaluate((node: HTMLButtonElement) => { node.click(); node.click(); });
-  await expect.poll(async () => (await actions(page)).filter((a: { type: string }) => a.type === 'choose')).toEqual([{ type: 'choose', choiceId: 'p2.board-2' }]);
+  await page.locator('[data-target-id="fixture.pay"]').evaluate((node: HTMLButtonElement) => { node.click(); node.click(); });
+  await expect.poll(async () => (await actions(page)).filter((a: { type: string }) => a.type === 'choose')).toEqual([{ type: 'choose', choiceId: 'q1.pay', anchorId: 'fixture.pay' }]);
   await expect(page.getByTestId('reward-state')).toContainText('"xp":0');
 });
 
-test('failed callbacks offer retry; a lost WebGL context preserves the shell', async ({ page }) => {
+test('creek water blocks walking and the level bridge carries the player across', async ({ page }) => {
   await open(page);
-  await page.getByLabel('Mission', { exact: true }).selectOption('B1');
+  await walk(page, 'd', 'x', 23.5, 1);
+  await page.keyboard.down('d'); await page.waitForTimeout(600); await page.keyboard.up('d');
+  expect(await coordinate(page, 'x')).toBeLessThan(24);
+  await walk(page, 's', 'z', 20, 1);
+  await walk(page, 'd', 'x', 30, 1);
+  expect(await coordinate(page, 'x')).toBeGreaterThanOrEqual(30);
+});
+
+test('a failed callback records nothing; a lost WebGL context preserves the shell', async ({ page }) => {
+  await open(page);
+  await walk(page, 'w', 'z', 6.3, -1);
   await page.getByLabel('Fail callback', { exact: true }).check();
-  await page.getByTestId('world-renderer').focus();
   await page.keyboard.press('e');
-  await expect(page.getByRole('alert')).toContainText('Fixture connection failed');
+  await page.waitForTimeout(200);
+  expect((await actions(page)).filter((a: { type: string }) => a.type === 'inspect')).toEqual([]);
   await page.getByLabel('Fail callback', { exact: true }).uncheck();
-  await page.getByRole('button', { name: 'Dismiss' }).click();
+  await page.getByTestId('world-renderer').focus();
   await page.keyboard.press('e');
   await expect(page.getByRole('dialog')).toBeVisible();
   await page.keyboard.press('Escape');

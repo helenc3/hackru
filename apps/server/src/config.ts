@@ -1,4 +1,4 @@
-import { characterDescriptions } from '@vibequest/shared';
+import { characterDescriptions, type NpcId } from '@vibequest/shared';
 import { z } from 'zod';
 
 const booleanEnvironmentSchema = z
@@ -21,6 +21,10 @@ const environmentSchema = z.object({
   ELEVENLABS_STT_MODEL: z.string().trim().min(1).default('scribe_v2'),
   ENABLE_DEMO_FIXTURES: booleanEnvironmentSchema,
   ENABLE_VALIDATION_HARNESS: booleanEnvironmentSchema,
+  /** Claude city composition is opt-in; without it the seeded fallback generator builds every chunk. */
+  ENABLE_CLAUDE_CITY: booleanEnvironmentSchema,
+  /** Measured: claude-sonnet-5-5 composes a valid chunk in ~10.5 s; opus-5-5 exceeded 20 s at full density and haiku-5-5 returned invalid JSON. */
+  CITY_MODEL: z.string().trim().min(1).default('claude-sonnet-5-5'),
 });
 
 /** Server-only configuration. Never serialize this object to a client. */
@@ -37,11 +41,9 @@ export interface ServerConfig {
   elevenlabsTtsModel: string;
   elevenlabsPaModel: string;
   elevenlabsSttModel: string;
-  voiceIds: {
-    xiaolin: string | undefined;
-    achen: string | undefined;
-    laozhou: string | undefined;
-  };
+  voiceIds: Record<NpcId, string>;
+  enableClaudeCity: boolean;
+  cityModel: string;
   enableDemoFixtures: boolean;
   enableValidationHarness: boolean;
 }
@@ -71,11 +73,9 @@ export function loadConfig(environment: NodeJS.ProcessEnv = process.env): Server
     elevenlabsTtsModel: env.ELEVENLABS_TTS_MODEL,
     elevenlabsPaModel: env.ELEVENLABS_PA_MODEL,
     elevenlabsSttModel: env.ELEVENLABS_STT_MODEL,
-    voiceIds: {
-      xiaolin: characterDescriptions.find((npc) => npc.id === 'xiaolin')!.voice.id,
-      achen: characterDescriptions.find((npc) => npc.id === 'achen')!.voice.id,
-      laozhou: characterDescriptions.find((npc) => npc.id === 'laozhou')!.voice.id,
-    },
+    voiceIds: Object.fromEntries(characterDescriptions.map((npc) => [npc.id, npc.voice.id])) as Record<NpcId, string>,
+    enableClaudeCity: env.ENABLE_CLAUDE_CITY,
+    cityModel: env.CITY_MODEL,
     enableDemoFixtures: env.ENABLE_DEMO_FIXTURES,
     enableValidationHarness: env.ENABLE_VALIDATION_HARNESS,
   };

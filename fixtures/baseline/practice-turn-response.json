@@ -2,135 +2,67 @@
   "turnId": "fixture-turn-001",
   "state": {
     "sessionId": "fixture-session",
+    "worldId": "fixture-world",
     "version": 0,
-    "missionId": "P1",
+    "missionId": "Q1",
     "mode": "practice",
     "status": "active",
-    "zoneId": "plaza",
+    "zoneId": "historic",
+    "position": {
+      "x": 20,
+      "z": 20
+    },
     "tier": 1,
     "objectives": [
       {
-        "id": "p1.bootstrap",
-        "label": "Mission unimplemented — build Segment-001",
+        "id": "q1.order",
+        "label": "Find a drink vendor and ask for a drink.",
+        "complete": false
+      },
+      {
+        "id": "q1.substitute",
+        "label": "Coffee is sold out: choose tea or water.",
+        "complete": false
+      },
+      {
+        "id": "q1.receipt",
+        "label": "Confirm the drink and price, then pay.",
         "complete": false
       }
     ],
-    "interactables": [
-      {
-        "id": "xiaolin",
-        "kind": "npc",
-        "label": "小林",
-        "position": {
-          "x": -10,
-          "z": 4
-        }
-      },
-      {
-        "id": "achen",
-        "kind": "npc",
-        "label": "阿陈",
-        "position": {
-          "x": -3,
-          "z": 0
-        }
-      },
-      {
-        "id": "laozhou",
-        "kind": "npc",
-        "label": "老周",
-        "position": {
-          "x": 3,
-          "z": 0
-        }
-      },
-      {
-        "id": "p1.entrance-sign",
-        "kind": "sign",
-        "label": "入口告示",
-        "position": {
-          "x": -10,
-          "z": 6
-        }
-      },
-      {
-        "id": "p1.station-directions",
-        "kind": "pa",
-        "label": "去车站的路线",
-        "position": {
-          "x": -10,
-          "z": 4
-        }
-      },
-      {
-        "id": "p1.enter-plaza-door",
-        "kind": "choice",
-        "label": "广场入口",
-        "position": {
-          "x": -10,
-          "z": 6
-        }
-      },
-      {
-        "id": "p1.try-closed-door",
-        "kind": "choice",
-        "label": "关闭的侧门",
-        "position": {
-          "x": -14,
-          "z": 4
-        }
-      },
-      {
-        "id": "p1.pay-cafe",
-        "kind": "choice",
-        "label": "付款",
-        "position": {
-          "x": -10,
-          "z": 4
-        }
-      },
-      {
-        "id": "p1.go-kiosk",
-        "kind": "choice",
-        "label": "售货亭",
-        "position": {
-          "x": 8,
-          "z": 5
-        }
-      },
-      {
-        "id": "p1.pay-kiosk",
-        "kind": "choice",
-        "label": "付款",
-        "position": {
-          "x": 8,
-          "z": 5
-        }
-      }
-    ],
+    "interactables": [],
     "visibleCues": [],
     "npcMood": {
-      "xiaolin": "warm",
-      "achen": "warm",
-      "laozhou": "neutral"
+      "vendor": "warm",
+      "guide": "warm",
+      "passerby": "warm"
     },
     "inventory": {
       "hint": 0,
-      "freeze": 0
+      "cny": 20,
+      "drinks": []
     },
+    "purchases": [],
     "xp": 0,
     "badges": [],
+    "unlockedMissionIds": [
+      "Q1"
+    ],
+    "completedMissionIds": [],
+    "directions": null,
+    "photo": null,
     "timer": null,
     "capabilities": {
       "coach": true,
       "hints": true,
-      "freeze": true
+      "freeze": false
     },
     "validationMode": true,
     "inputPreference": "voice",
     "providerStatus": "fixture"
   },
   "events": [],
-  "npcReply": "好的，一杯茶十元。",
+  "npcReply": "一杯茶十元。请确认：茶十元，对吗？",
   "speechId": "fixture-speech-001",
   "feedback": {
     "understood": "You asked for tea.",

@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { loadConfig, validationHarnessEnabled, type ServerConfig } from './config.js';
 import { HttpError } from './errors.js';
 import { createAudioRouter } from './routes/audio.js';
+import { createCityRouter } from './routes/city.js';
 import { createGameRouter } from './routes/game.js';
 import { createServices, type ServerServices } from './services.js';
 
@@ -18,6 +19,8 @@ export function createApp(options: AppOptions = {}): Express {
   const services = options.services ? { ...options.services, config } : createServices(config);
   const app = express();
   app.disable('x-powered-by');
+  // Restored spawn manifests are the one large body; every other route keeps the 32 kB cap.
+  app.use('/api/sessions/:id/chunks/restore', express.json({ limit: '2mb' }));
   app.use(express.json({ limit: '32kb' }));
 
   app.get('/api/health', (_request, response) => {
@@ -32,6 +35,7 @@ export function createApp(options: AppOptions = {}): Express {
       features: {
         validationHarness: validationHarnessEnabled(config),
         fixtures: config.enableDemoFixtures,
+        cityProvider: services.worlds.provider,
       },
       segments: {
         engine: 'implemented',
@@ -42,6 +46,7 @@ export function createApp(options: AppOptions = {}): Express {
   });
   app.use('/api', createGameRouter(services));
   app.use('/api', createAudioRouter(services));
+  app.use('/api', createCityRouter(services));
   app.use('/api', (_request, _response, next) => {
     next(new HttpError(404, 'NOT_FOUND', 'Unknown API route.'));
   });

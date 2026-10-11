@@ -1,56 +1,58 @@
 import { expect, test } from '@playwright/test';
-import { createBaselineState, sceneManifest } from '@vibequest/shared';
-import { collides, distance, movePlayer, nearbyTargets, targetAction, zoneAt } from '../../src/world/navigation';
+import { WORLD_RULES, createWorldView, type PublicState } from '@vibequest/shared';
+import { collides, distance, movePlayer, nearbyTargets, targetAction, walkingPath, zoneAt } from '../../src/world/navigation';
+import { fixtureCity } from '../../../../fixtures/world/city';
 
-test('movement preserves frozen speed, camera direction and circle clearance', () => {
-  const spawn = sceneManifest.spawn;
-  const straight = movePlayer(spawn, 0, 1, 0, .1);
-  const diagonal = movePlayer(spawn, 1, 1, 0, .1);
-  expect(distance(spawn, straight)).toBeCloseTo(.4);
-  expect(distance(spawn, diagonal)).toBeCloseTo(.4);
-  expect(movePlayer(spawn, 0, 1, Math.PI / 2, .1).x).toBeCloseTo(-.4);
-  expect(movePlayer(spawn, 0, 1, 0, 10).z).toBeCloseTo(9.6);
-  let position = { x: -13.8, z: 5 };
-  for (let i = 0; i < 10; i++) position = movePlayer(position, -1, 1, 0, .05);
-  expect(collides(position)).toBe(false);
-  expect(position.x).toBeGreaterThanOrEqual(-14.15 - .001);
-  expect(position.z).toBeLessThan(4); // slides along the west wall
-  for (let i = 0; i < 300; i++) position = movePlayer(position, 1, -1, 0, .1);
-  expect(position.x).toBeLessThanOrEqual(19.65);
-  expect(position.z).toBeLessThanOrEqual(19.65);
-  expect(collides(position)).toBe(false);
+// The real WorldView over fixture manifests: the same collision code the server validates with.
+const manifests = new Map(fixtureCity().map((manifest) => [`${manifest.coord.cx},${manifest.coord.cz}`, manifest]));
+const view = createWorldView('fixture-world', 'fixture', manifests);
+const spawn = { x: 20, z: 10 };
+
+test('movement keeps the shared speed, camera direction and committed-ground collision', () => {
+  expect(distance(spawn, movePlayer(view, spawn, 0, 1, 0, .1))).toBeCloseTo(.4);
+  expect(distance(spawn, movePlayer(view, spawn, 1, 1, 0, .1))).toBeCloseTo(.4);
+  expect(movePlayer(view, spawn, 0, 1, Math.PI / 2, .1).x).toBeCloseTo(19.6);
+  expect(movePlayer(view, spawn, 0, 1, 0, 10).z).toBeCloseTo(9.6); // one frame is capped at 0.1 s
+  expect(zoneAt(view, spawn)).toBe('park');
 });
 
-test('all frozen zones and interactables are reachable by collision-safe steps', () => {
-  const start = sceneManifest.spawn;
-  const queue = [start];
-  const seen = new Set([`${start.x},${start.z}`]);
-  for (let index = 0; index < queue.length; index++) {
-    const p = queue[index];
-    for (const [dx, dz] of [[0, 1], [0, -1], [1, 0], [-1, 0]]) {
-      let next = p;
-      for (let i = 0; i < 5; i++) next = movePlayer(next, dx, -dz, 0, .05);
-      const grid = { x: Math.round(next.x), z: Math.round(next.z) };
-      if (distance(next, grid) > .01 || collides(grid)) continue;
-      const key = `${grid.x},${grid.z}`;
-      if (!seen.has(key)) { seen.add(key); queue.push(grid); }
-    }
-  }
-  for (const zone of sceneManifest.zones) expect(queue.some((p) => zoneAt(p) === zone.id), zone.id).toBe(true);
-  for (const target of sceneManifest.interactables) expect(queue.some((p) => distance(p, target.position) <= 2), target.id).toBe(true);
+test('water blocks, a level bridge crosses, and uncommitted chunks stop the player', () => {
+  let position = spawn;
+  for (let i = 0; i < 100; i++) position = movePlayer(view, position, 1, 0, 0, .05);
+  expect(position.x).toBeLessThan(24 - WORLD_RULES.playerRadius + .01); // creek edge
+  expect(collides(view, position)).toBe(false);
+  position = { x: 20, z: 20 };
+  for (let i = 0; i < 100; i++) position = movePlayer(view, position, 1, 0, 0, .05);
+  expect(position.x).toBeGreaterThan(29); // over the bridge deck
+  position = { x: 78, z: 10 };
+  for (let i = 0; i < 50; i++) position = movePlayer(view, position, 1, 0, 0, .05);
+  expect(position.x).toBeLessThan(80); // chunk (2,0) is not committed
 });
 
-test('nearby targets use exact shared action IDs and bounded range', () => {
-  for (const missionId of ['P1', 'P2', 'B1'] as const) {
-    const state = createBaselineState(missionId);
-    for (const target of state.interactables) {
-      expect(nearbyTargets(state, target.position).some((item) => item.id === target.id)).toBe(true);
-      expect(nearbyTargets(state, { x: target.position.x, z: target.position.z + 2.001 }).some((item) => item.id === target.id)).toBe(false);
-      const action = targetAction(target);
-      if (target.kind === 'choice') expect(action).toEqual({ type: 'choose', choiceId: target.id });
-      if (target.kind === 'sign') expect(action).toEqual({ type: 'inspect', targetId: target.id });
-      if (target.kind === 'pa') expect(action).toEqual({ type: 'playCue', cueId: target.id, channel: 'audio' });
-      if (target.kind === 'npc') expect(action).toBeNull();
-    }
-  }
+test('click-to-walk routes around water over the bridge using walkable steps', () => {
+  const path = walkingPath(view, spawn, { x: 32, z: 10 });
+  expect(path.length).toBeGreaterThan(1);
+  expect(path.at(-1)).toEqual({ x: 32, z: 10 });
+  expect(path.every((point) => !collides(view, point))).toBe(true);
+  expect(path.some((point) => point.z >= 18 && point.z <= 22 && point.x > 24 && point.x < 28)).toBe(true);
+  expect(walkingPath(view, spawn, { x: 26, z: 5 })).toEqual([]); // in the creek
+});
+
+test('nearby targets use anchor IDs with bounded range and the shared action shapes', () => {
+  const at = (x: number, z: number) => ({ x, z });
+  const state: Pick<PublicState, 'interactables'> = { interactables: [
+    { id: 'a.menu', kind: 'sign', label: '菜单', position: at(20, 6), cueId: 'q1.menu' },
+    { id: 'a.vendor', kind: 'npc', role: 'vendor', label: '小林', position: at(21, 6) },
+    { id: 'a.pay', kind: 'choice', label: '付款', position: at(22, 6), choiceId: 'q1.pay' },
+    { id: 'a.spot', kind: 'photo-spot', label: '拍照点', position: at(10, 10) },
+    { id: 'a.hotel', kind: 'landmark', label: '上海大酒店', position: at(20, 6) },
+  ] };
+  expect(nearbyTargets(state, at(20, 6)).map((target) => target.id)).toEqual(['a.menu', 'a.vendor', 'a.pay']);
+  expect(nearbyTargets(state, at(20, 8.001)).map((target) => target.id)).not.toContain('a.menu');
+  const [menu, vendor, pay, spot, hotel] = state.interactables;
+  expect(targetAction(menu!)).toEqual({ type: 'inspect', targetId: 'a.menu' });
+  expect(targetAction(vendor!)).toBeNull();
+  expect(targetAction(pay!)).toEqual({ type: 'choose', choiceId: 'q1.pay', anchorId: 'a.pay' });
+  expect(targetAction(spot!, { id: 'p1', passerbyAnchorId: 'a.p', viewpointAnchorId: 'a.view', spot: at(10, 10), status: 'accepted', attempts: 0 })).toEqual({ type: 'choose', choiceId: 'q3.start-photo', anchorId: 'a.view' });
+  expect(targetAction(hotel!)).toBeNull();
 });

@@ -13,10 +13,11 @@ export function meetsProgressionGate(e: TurnEvaluation): boolean {
 }
 
 const CLARIFY: Record<NpcId, string> = {
-  xiaolin: '不好意思，我没听懂。您想喝点什么？',
-  achen: '不好意思，请再说一遍？您要去哪儿？',
-  laozhou: '请再说清楚一点。您要买去哪儿的票？',
+  vendor: '不好意思，我没听懂。您想喝点什么？',
+  guide: '不好意思，请再说一遍？您要去哪儿？',
+  passerby: '不好意思，我没听懂。您需要帮忙吗？',
 };
+const EXAMPLE: Record<NpcId, string> = { vendor: '请给我一杯茶。', guide: '请问，去上海大酒店怎么走？', passerby: '可以帮我在这里拍张照吗？' };
 
 /** Safe no-transition evaluation: asks for clarification and grants nothing. */
 export function clarificationEvaluation(context: TurnContext, _playerText?: string): TurnEvaluation {
@@ -25,10 +26,10 @@ export function clarificationEvaluation(context: TurnContext, _playerText?: stri
     intentGrade: { score: 0, confidence: 0 }, clarity: 0, courtesy: 0.5,
     targetLanguageUse: 'uncertain', interaction: 'relevant',
     replyZh: CLARIFY[context.npcId],
-    coach: context.mode === 'boss' ? null : {
+    coach: {
       understood: 'I could not tell what you meant.',
       explanation: 'Try one short Mandarin sentence that says what you want.',
-      improvedExample: context.npcId === 'xiaolin' ? '请给我一杯茶。' : '我要去海港。',
+      improvedExample: EXAMPLE[context.npcId],
     },
   };
 }

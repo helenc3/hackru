@@ -127,14 +127,14 @@ export function Recorder({ state, onAction, onTranscript }: RecorderProps) {
 
   const recording = status === 'recording';
   const busy = status === 'starting' || status === 'transcribing';
-  const blocked = activity === 'announcing' || state.status !== 'active';
+  const blocked = state.status !== 'active';
   const problem = status === 'error' || status === 'denied' || status === 'unsupported';
   return (
     <div className="voice-control" data-testid="recorder">
       <span className="mic-symbol" aria-hidden="true">{recording ? '●' : '◉'}</span>
       <div>
         <strong>{recording ? 'Listening…' : status === 'transcribing' ? 'Got it…' : 'Hold to talk'}</strong>
-        <p>{recording ? 'Release or tap Stop when you finish.' : activity === 'announcing' ? 'Wait for the announcement to finish.' : activity === 'playing' ? 'Tap to interrupt and speak.' : 'Speak Mandarin. Hold the button, or tap to start and stop.'}</p>
+        <p>{recording ? 'Release or tap Stop when you finish.' : activity === 'playing' ? 'Tap to interrupt and speak.' : 'Speak Mandarin. Hold the button, or tap to start and stop.'}</p>
       </div>
       <button type="button" onPointerDown={down} onPointerUp={up} onPointerCancel={up} disabled={!recording && (busy || blocked || status === 'unsupported')}
         onKeyDown={(event) => { if (event.repeat || (event.key !== ' ' && event.key !== 'Enter')) return; event.preventDefault(); if (recording) stop(); else if (!busy) void start(); }}>

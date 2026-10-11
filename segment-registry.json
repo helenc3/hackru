@@ -1,5 +1,5 @@
 {
-  "specVersion": "1.2",
+  "specVersion": "2.0",
   "integrationBranch": "main",
   "segments": [
     {
@@ -118,6 +118,17 @@
       ],
       "packet": "segments/Segment-009.md",
       "optional": true,
+      "status": "planned"
+    },
+    {
+      "id": "Segment-010",
+      "title": "Shanghai city streaming and exploration quests",
+      "suggestedOwner": "A",
+      "dependencies": [
+        "Segment-007"
+      ],
+      "packet": "segments/Segment-010.md",
+      "optional": false,
       "status": "planned"
     }
   ]

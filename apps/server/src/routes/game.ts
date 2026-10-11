@@ -1,7 +1,7 @@
 import {
-  ActionRequestSchema, CreateSessionRequestSchema, TurnRequestSchema, TurnResponseSchema, createGame, applyAction, applyEvaluation, projectPublicState,
+  ActionRequestSchema, CreateSessionRequestSchema, TurnRequestSchema, TurnResponseSchema, createGame, applyAction, applyEvaluation, isClosingLine, projectPublicState,
   synchronizeGame, dialogueContext, groundedReply, createFixtureDialogueProvider, EngineRuleError, validateEvaluationForContext,
-  type PublicState, type TurnRequest, type TurnContext, type TurnResponse, type ActionResponse,
+  type PublicState, type TurnRequest, type TurnContext, type TurnResponse, type ActionResponse, type WorldView,
 } from '@vibequest/shared';
 import { randomUUID } from 'node:crypto';
 import { Router, type Response } from 'express';
@@ -25,6 +25,9 @@ function existing(session: SessionRecord, id: string, payload: string): { respon
   }
   return undefined;
 }
+/** Every engine call sees the committed chunks of the session's world. */
+const viewOf = (services: ServerServices, session: SessionRecord): WorldView => services.worlds.view(session.state.worldId);
+
 function version(session: SessionRecord, expected: number): void {
   if (session.state.version !== expected) throw new HttpError(409, 'STALE_VERSION', 'Synchronize state and retry with its current version.', true);
 }
@@ -40,7 +43,7 @@ function speechPlayback(session: SessionRecord, operationId: string, nowMs: numb
   if (existingOperation) return; // Engine checks completed/current phase without extending its deadline.
   const job = [...session.speechJobs.values()].find((entry) => entry.operationId === operationId);
   if (!job || job.status !== 'ready' || job.attemptId !== state.attemptId || !job.assetDurationMs) throw new HttpError(422, 'SPEECH_NOT_READY', 'Playback requires a ready current-attempt speech job.');
-  if (state.activeAudioOperationId || state.cuePlaybacks.some((entry) => !entry.delivered && !entry.interrupted)) throw new HttpError(422, 'AUDIO_BUSY', 'Another audio operation is active.');
+  if (state.activeAudioOperationId) throw new HttpError(422, 'AUDIO_BUSY', 'Another audio operation is active.');
   if (state.audioOperations.length >= 100) throw new HttpError(429, 'AUDIO_LIMIT', 'Too many audio operations.');
   state.audioOperations.push({ id: operationId, attemptId: state.attemptId, kind: 'playback', phase: 'playing', speechId: job.id, registeredAtMs: nowMs, phaseStartedAtMs: nowMs, phaseDeadlineMs: nowMs + job.assetDurationMs + 2_000, assetDurationMs: job.assetDurationMs, finished: false });
   state.activeAudioOperationId = operationId;
@@ -53,7 +56,7 @@ export function createGameRouter(services: ServerServices): Router {
     const known = error instanceof EngineRuleError ? new HttpError(422, error.code, error.message) : error instanceof HttpError ? error : new HttpError(500, 'INTERNAL_ERROR', 'The server could not process this request.');
     let state: PublicState | undefined;
     if (id) {
-      try { state = await store.withSession(id, async (session) => { sync(session, Date.now()); return projectPublicState(session.state, Date.now()); }); } catch { /* Unknown/expired session has no recovery state. */ }
+      try { state = await store.withSession(id, async (session) => { sync(session, Date.now()); return projectPublicState(session.state, Date.now(), viewOf(services, session)); }); } catch { /* Unknown/expired session has no recovery state. */ }
     }
     response.status(known.status).json({ error: { code: known.code, message: known.message, retryable: known.retryable }, ...(state ? { state } : {}) });
   };
@@ -64,14 +67,15 @@ export function createGameRouter(services: ServerServices): Router {
       if (parsed.data.validationMode && !validationHarnessEnabled(services.config)) throw new HttpError(422, 'VALIDATION_DISABLED', 'The validation harness is unavailable.');
       if (parsed.data.providerMode === 'fixture' && !services.config.enableDemoFixtures) throw new HttpError(422, 'FIXTURES_DISABLED', 'Fixture sessions are disabled.');
       const nowMs = Date.now();
-      const session = await store.create(createGame({ sessionId: randomUUID(), attemptId: randomUUID(), missionId: 'P1', initialTier: parsed.data.initialTier, validationMode: parsed.data.validationMode, inputPreference: parsed.data.inputPreference, providerStatus: parsed.data.providerMode === 'fixture' ? 'fixture' : 'live' }, nowMs));
-      response.status(201).json({ state: projectPublicState(session.state, nowMs) });
+      const world = services.worlds.open(parsed.data.worldId);
+      const session = await store.create(createGame({ sessionId: randomUUID(), worldId: world.worldId, attemptId: randomUUID(), missionId: 'Q1', initialTier: parsed.data.initialTier, validationMode: parsed.data.validationMode, inputPreference: parsed.data.inputPreference, providerStatus: parsed.data.providerMode === 'fixture' ? 'fixture' : 'live', spawn: world.spawn }, nowMs));
+      response.status(201).json({ state: projectPublicState(session.state, nowMs, services.worlds.view(world.worldId)) });
     } catch (error) { await sendError(response, error); }
   });
   router.get('/sessions/:id', async (request, response) => {
     try {
       const { id } = sessionParamsSchema.parse(request.params);
-      const state = await store.withSession(id, async (session) => { const nowMs = Date.now(); sync(session, nowMs); return projectPublicState(session.state, nowMs); });
+      const state = await store.withSession(id, async (session) => { const nowMs = Date.now(); sync(session, nowMs); return projectPublicState(session.state, nowMs, viewOf(services, session)); });
       response.json({ state });
     } catch (error) { await sendError(response, error instanceof z.ZodError ? new HttpError(400, 'INVALID_REQUEST', 'Invalid session identifier.') : error); }
   });
@@ -94,11 +98,12 @@ export function createGameRouter(services: ServerServices): Router {
         const candidate = { ...session, state: structuredClone(session.state) };
         if (body.action.type === 'audioPhase' && body.action.phase === 'playing') speechPlayback(candidate, body.action.operationId, nowMs);
         if (body.action.type === 'audioPhase' && body.action.phase === 'recording' && [...session.speechJobs.values()].some((job) => job.operationId === (body.action as { operationId: string }).operationId)) throw new HttpError(422, 'INVALID_AUDIO_OPERATION', 'Speech operations cannot be used for recording.');
-        const engine = applyAction(candidate.state, body.action, nowMs);
+        const world = viewOf(services, session);
+        const engine = applyAction(candidate.state, body.action, nowMs, world);
         if (engine.state.attemptId !== session.state.attemptId) invalidateAttemptArtifacts(session);
         session.state = engine.state;
         session.state.version++;
-        const outcome: ActionResponse = { state: projectPublicState(session.state, nowMs), events: engine.events };
+        const outcome: ActionResponse = { state: projectPublicState(session.state, nowMs, world), events: engine.events };
         session.completedRequests.set(body.actionId, { payload, response: outcome });
         return outcome;
       });
@@ -124,27 +129,26 @@ export interface TurnOptions {
 /** One evaluated dialogue turn: reservation, provider evaluation, engine commit. Shared by HTTP and live voice. */
 export async function runTurn(services: ServerServices, id: string, body: TurnRequest, options: TurnOptions = {}): Promise<TurnResponse> {
   const store = services.sessionStore;
-  const payload = semanticPayload('turn', { npcId: body.npcId, input: body.input });
+  const payload = semanticPayload('turn', { npcId: body.npcId, anchorId: body.anchorId, input: body.input });
   const reserved = await store.withSession(id, async (session) => {
     const cached = existing(session, body.turnId, payload);
     if (cached) return { cached };
     if (options.checkVersion !== false) version(session, body.expectedVersion);
     if (session.state.pendingTurn) throw new HttpError(409, 'TURN_PENDING', 'Wait for the pending turn or retry the mission.', true);
     const nowMs = Date.now(); sync(session, nowMs);
-    const context = dialogueContext(session.state, body.npcId);
+    const context = dialogueContext(session.state, body.npcId, body.anchorId, viewOf(services, session));
     if (session.state.activeAudioOperationId) throw new HttpError(422, 'AUDIO_BUSY', 'Finish the current audio operation before submitting.');
-    if (session.state.cuePlaybacks.some((entry) => !entry.delivered && !entry.interrupted)) throw new HttpError(422, 'AUDIO_BUSY', 'Wait for cue playback to finish.');
     const provenance = resolveTranscription(session, body.input, nowMs);
     session.modelCalls = session.modelCalls.filter((time) => time > nowMs - 60_000);
-    if (session.totalModelCalls >= 30 || session.modelCalls.length >= 10) throw new HttpError(429, 'TURN_LIMIT', 'Session or per-minute turn budget reached.');
+    if (session.totalModelCalls >= 60 || session.modelCalls.length >= 10) throw new HttpError(429, 'TURN_LIMIT', 'Session or per-minute turn budget reached.');
     session.totalModelCalls++; session.modelCalls.push(nowMs);
     let resolve!: PendingRequest['resolve']; let reject!: PendingRequest['reject'];
     const result = new Promise<unknown>((yes, no) => { resolve = yes; reject = no; });
     void result.catch(() => undefined); // Abandonment may precede attachment of the waiter.
     const pending: PendingRequest = { sessionId: id, payload, attemptId: session.state.attemptId, result, resolve, reject };
     session.pendingRequests.set(body.turnId, pending);
-    session.state.pendingTurn = { turnId: body.turnId, sessionId: id, attemptId: pending.attemptId, npcId: body.npcId, text: body.input.text, source: provenance.source, ...(body.input.transcriptionId ? { transcriptionId: body.input.transcriptionId, originalSttText: provenance.originalSttText } : {}), assisted: Boolean(session.state.flags['session.assisted']), createdAtMs: nowMs };
-    if (!session.state.timer!.pauseReasons.includes('provider')) session.state.timer!.pauseReasons.push('provider');
+    session.state.pendingTurn = { turnId: body.turnId, sessionId: id, attemptId: pending.attemptId, npcId: body.npcId, anchorId: body.anchorId, text: body.input.text, source: provenance.source, ...(body.input.transcriptionId ? { transcriptionId: body.input.transcriptionId, originalSttText: provenance.originalSttText } : {}), assisted: Boolean(session.state.flags['session.assisted']), createdAtMs: nowMs };
+    if (!session.state.pauseReasons.includes('provider')) session.state.pauseReasons.push('provider');
     session.state.version++;
     return { pending, context, fixture: session.state.providerStatus === 'fixture' };
   });
@@ -159,7 +163,7 @@ async function evaluate(services: ServerServices, body: TurnRequest, pending: Pe
   let timeout: ReturnType<typeof setTimeout> | undefined;
   const startedMs = Date.now();
   // §11 turn log: no keys, player audio or provider bodies.
-  const log = (outcome: string, detail: string) => console.info(JSON.stringify({ turnId: body.turnId, elapsedMs: Date.now() - startedMs, provider: fixture ? 'fixture' : `gemini:${services.config.geminiModel}`, live: Boolean(options.spokenReply), outcome, detail }));
+  const log = (outcome: string, detail: string) => console.info(JSON.stringify({ turnId: body.turnId, elapsedMs: Date.now() - startedMs, provider: fixture ? 'fixture' : services.config.anthropicApiKey ? `claude:${services.config.anthropicModel}` : `gemini:${services.config.geminiModel}`, live: Boolean(options.spokenReply), outcome, detail }));
   try {
     const provider = fixture ? fixtureDialogue : services.dialogueProvider;
     const raw = await Promise.race([provider.evaluate(context, body.input.text), new Promise<never>((_resolve, reject) => { timeout = setTimeout(() => reject(new Error('Provider timeout')), 8_000); })]);
@@ -168,20 +172,23 @@ async function evaluate(services: ServerServices, body: TurnRequest, pending: Pe
     await store.withSession(pending.sessionId, async (session) => {
       if (session.state.attemptId !== pending.attemptId || session.pendingRequests.get(body.turnId) !== pending || session.state.pendingTurn?.turnId !== body.turnId) return;
       const nowMs = Date.now();
-      const engine = applyEvaluation(session.state, body.npcId, evaluation, nowMs);
+      const world = viewOf(services, session);
+      const engine = applyEvaluation(session.state, body.npcId, body.anchorId, evaluation, nowMs, world);
       session.state = engine.state;
       session.state.pendingTurn = null;
-      session.state.timer!.pauseReasons = session.state.timer!.pauseReasons.filter((reason) => reason !== 'provider');
+      session.state.pauseReasons = session.state.pauseReasons.filter((reason) => reason !== 'provider');
       session.state.version++;
-      const replyZh = groundedReply(session.state, body.npcId, evaluation);
+      const replyZh = groundedReply(session.state, body.npcId, evaluation, world);
+      // Verified directions are authoritative: the live model's own words never replace the route text.
+      const verifiedRoute = engine.events.some((event) => event.kind === 'directions');
       let speech: { npcReply: string; speechId?: string };
-      if (options.spokenReply) speech = { npcReply: spoken && spoken.length <= 80 ? spoken : replyZh }; // audio already streamed live
+      if (options.spokenReply) speech = { npcReply: spoken && !verifiedRoute && spoken.length <= 240 ? spoken : replyZh }; // audio already streamed live
       else {
         const speechId = randomUUID();
         registerSpeechJob(session, { id: speechId, sessionId: session.id, attemptId: pending.attemptId, turnId: body.turnId, replyZh, voiceKey: body.npcId, operationId: speechId, status: 'pending' });
         speech = { npcReply: replyZh, speechId };
       }
-      const outcome: TurnResponse = TurnResponseSchema.parse({ turnId: body.turnId, state: projectPublicState(session.state, nowMs), events: engine.events, ...speech, ...(engine.conversationEnded ? { conversationEnded: true } : {}), ...(session.state.mode === 'practice' ? { ...(evaluation.coach ? { feedback: evaluation.coach } : {}), vibe: { intent: evaluation.intentGrade.score, clarity: evaluation.clarity, courtesy: evaluation.courtesy } } : {}) });
+      const outcome: TurnResponse = TurnResponseSchema.parse({ turnId: body.turnId, state: projectPublicState(session.state, nowMs, world), events: engine.events, ...speech, ...(engine.conversationEnded || (evaluation.intent !== 'request_repeat' && isClosingLine(spoken)) ? { conversationEnded: true } : {}), ...(evaluation.coach ? { feedback: evaluation.coach } : {}), vibe: { intent: evaluation.intentGrade.score, clarity: evaluation.clarity, courtesy: evaluation.courtesy } });
       session.pendingRequests.delete(body.turnId);
       session.completedRequests.set(body.turnId, { payload: pending.payload, response: outcome });
       pending.resolve(outcome);
@@ -193,7 +200,7 @@ async function evaluate(services: ServerServices, body: TurnRequest, pending: Pe
       if (session.state.attemptId !== pending.attemptId || session.pendingRequests.get(body.turnId) !== pending) return;
       sync(session, Date.now());
       session.state.pendingTurn = null;
-      session.state.timer!.pauseReasons = session.state.timer!.pauseReasons.filter((reason) => reason !== 'provider');
+      session.state.pauseReasons = session.state.pauseReasons.filter((reason) => reason !== 'provider');
       session.state.version++;
       session.pendingRequests.delete(body.turnId);
       pending.reject(new HttpError(503, 'PROVIDER_UNAVAILABLE', 'The provider response was unavailable or invalid. Retry with the current version.', true));

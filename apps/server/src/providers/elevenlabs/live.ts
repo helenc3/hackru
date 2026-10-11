@@ -16,7 +16,8 @@ export const DEFAULT_VOICE_IDS = Object.fromEntries(characterDescriptions.map((n
 export const DEFAULT_PA_VOICE_ID = audioVoices.pa.id;
 
 export const MAX_CLIP_BYTES = 3 * 1024 * 1024;
-const MAX_REPLY_CHARS = 80;
+// Verified Q2 routes run up to 240 characters (DirectionsSchema.textZh).
+const MAX_REPLY_CHARS = 240;
 
 export interface ElevenLabsSpeechOptions {
   apiKey: string;
@@ -42,7 +43,7 @@ export function createElevenLabsSpeechProvider(options: ElevenLabsSpeechOptions)
   return {
     async synthesize(text, voiceKey) {
       const line = text.trim();
-      if (!line || line.length > MAX_REPLY_CHARS) throw new HttpError(422, 'INVALID_SPEECH_TEXT', 'NPC speech must be 1-80 characters.');
+      if (!line || line.length > MAX_REPLY_CHARS) throw new HttpError(422, 'INVALID_SPEECH_TEXT', 'NPC speech must be 1-240 characters.');
       const voiceId = voiceFor(options.voiceIds, voiceKey);
       try {
         const stream = await client.textToSpeech.convert(

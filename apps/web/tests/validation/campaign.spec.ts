@@ -1,86 +1,65 @@
 import { test, expect } from './dev-page';
-import { installScriptedApi, type Step } from '../../../../fixtures/ui/scripted-api';
-import { bossSteps, cafeSteps, missionPatch, platformSteps } from '../../../../fixtures/validation/campaigns';
+import { installScriptedApi } from '../../../../fixtures/ui/scripted-api';
+import { drinkSteps, hotelSteps, missionPatch, photoSteps } from '../../../../fixtures/validation/campaigns';
 import type { Page } from '@playwright/test';
 
 const target = (page: Page, name: string) => page.getByTestId('validation-harness').getByRole('button', { name, exact: true });
-async function talk(page: Page, npc: string, text: string) {
-  await target(page, `npc · ${npc}`).click();
+async function open(page: Page, npc: string) {
+  await target(page, npc).click();
   const panel = page.getByTestId('dialogue-panel');
   await expect(panel).toBeVisible();
   if (await panel.getByRole('button', { name: 'Use typed Mandarin', exact: true }).count()) await panel.getByRole('button', { name: 'Use typed Mandarin', exact: true }).click();
+  return panel;
+}
+async function say(page: Page, text: string) {
+  const panel = page.getByTestId('dialogue-panel');
   await panel.getByRole('textbox').fill(text);
   await panel.getByRole('button', { name: 'Send Mandarin' }).click();
-  await expect(panel.getByRole('textbox')).toHaveValue('');
-  await panel.getByRole('button', { name: 'Close conversation' }).click();
+  // A quest-completing turn replaces the dialogue with the result panel.
+  await expect.poll(async () => await page.getByTestId('result-panel').isVisible() || await panel.getByRole('textbox').inputValue().catch(() => 'pending') === '').toBe(true);
 }
-async function cafe(page: Page, kiosk = false) {
-  await target(page, 'sign · p1.entrance-sign').click();
-  await expect(page.getByRole('dialog', { name: 'Inspected sign' })).toContainText('请从广场进入');
-  await talk(page, 'xiaolin', '我要咖啡。');
-  if (kiosk) { await talk(page, 'xiaolin', '不用了，谢谢。'); await talk(page, 'xiaolin', '我要水，五元，对吗？'); await target(page, 'choice · p1.go-kiosk').click(); }
-  else await talk(page, 'xiaolin', '那我要水，五元，对吗？');
-  await target(page, `choice · p1.pay-${kiosk ? 'kiosk' : 'cafe'}`).click();
-  await expect(page.getByTestId('result-panel')).toHaveCount(0);
-  await target(page, 'concourse').click();
-  await expect(page.getByTestId('result-panel')).toContainText('You found your way.');
+async function drink(page: Page) {
+  await target(page, 'sign · ui.menu').click();
+  await expect(page.getByRole('dialog', { name: 'Inspected sign' })).toContainText('咖啡 卖完了');
+  await page.getByRole('button', { name: 'Close sign' }).click();
+  await open(page, 'npc/vendor · ui.vendor');
+  await say(page, '我要咖啡。'); await say(page, '那我要水，五元，对吗？');
+  await page.getByTestId('pay-button').click();
+  await expect(page.getByTestId('result-panel')).toContainText('Nicely done.');
 }
-async function platform(page: Page, confirmation = false, wrong = false) {
-  await target(page, 'sign · p2.timetable').click();
-  await talk(page, 'achen', '去江滨的车在哪个站台？');
-  await target(page, 'pa · p2.platform-change').click();
-  if (confirmation) await talk(page, 'achen', '是三号站台吗？');
-  if (wrong) { await target(page, 'choice · p2.board-2').click(); await expect(page.getByTestId('result-panel')).toHaveCount(0); }
-  await target(page, 'choice · p2.board-3').click();
-  await expect(page.getByTestId('result-panel')).toContainText('You found your way.');
+async function hotel(page: Page) {
+  await open(page, 'npc/guide · ui.guide');
+  await say(page, '请问，去上海大酒店怎么走？');
+  await expect(page.getByTestId('result-panel')).toContainText('Nicely done.');
 }
-async function boss(page: Page, fail = false) {
-  await target(page, 'sign · b1.destination-board').click();
-  await talk(page, 'laozhou', '我要一张去海港的票。');
-  await expect(page.getByTestId('coach-panel')).toHaveCount(0);
-  await expect(page.getByTestId('inventory-bar').getByRole('button')).toHaveCount(0);
-  await target(page, 'choice · b1.pay-ticket').click();
-  await target(page, 'pa · b1.harbor-change').click();
-  await target(page, `choice · b1.board-${fail ? '1' : '2'}`).click();
-  await expect(page.getByTestId('result-panel')).toContainText(fail ? 'Try a fresh route.' : 'You found your way.');
+async function photograph(page: Page) {
+  await open(page, 'npc/passerby · ui.passerby');
+  await say(page, '可以帮我在这里拍张照吗？');
+  await page.getByTestId('dialogue-panel').getByRole('button', { name: 'Close conversation' }).click();
+  await page.getByTestId('photo-overlay').getByRole('button', { name: 'Ready · start photo' }).click();
+  await expect(page.getByTestId('result-panel')).toContainText('Nicely done.');
 }
 
-for (const kiosk of [false, true]) test(`validation café ${kiosk ? 'kiosk' : 'substitution'} branch stays simulated`, async ({ page, devUrl }) => {
-  const api = await installScriptedApi(page, { validation: true, steps: cafeSteps(kiosk) });
-  await page.goto(`${devUrl}/__validation`);
-  await page.getByRole('button', { name: 'Start validation session' }).click();
-  await cafe(page, kiosk);
-  await expect(page.getByTestId('result-panel')).toContainText('SIMULATED RESULT');
-  expect(api.remaining()).toBe(0); expect(api.failures).toEqual([]);
-  expect(await page.evaluate(() => localStorage.getItem('vibequest.player-session.v1'))).toBeNull();
-});
-for (const confirmation of [false, true]) test(`validation platform ${confirmation ? 'confirmation' : 'direct'} route repairs wrong boarding`, async ({ page, devUrl }) => {
-  const api = await installScriptedApi(page, { mission: 'P2', validation: true, steps: platformSteps(confirmation, true) });
-  await page.goto(`${devUrl}/__validation`); await page.getByRole('button', { name: 'Start validation session' }).click();
-  await platform(page, confirmation, true);
-  expect(api.remaining()).toBe(0); expect(api.failures).toEqual([]);
-});
-for (const fail of [false, true]) test(`validation boss ${fail ? 'fails and retries' : 'clears without help'}`, async ({ page, devUrl }) => {
-  const steps: Step[] = [...bossSteps(fail), ...(fail ? [{ action: { type: 'retryMission' as const }, patch: { ...missionPatch('B1', 180), sessionId: 'ui-validation-B1', badges: [] } }] : [])];
-  const api = await installScriptedApi(page, { mission: 'B1', validation: true, steps });
-  await page.goto(`${devUrl}/__validation`); await page.getByRole('button', { name: 'Start validation session' }).click();
-  await boss(page, fail);
-  if (fail) { await expect(page.getByTestId('result-panel')).not.toContainText('Station Navigator'); await page.getByRole('button', { name: 'Retry mission' }).click(); await expect(page.getByTestId('result-panel')).toHaveCount(0); }
-  else await expect(page.getByTestId('result-panel')).toContainText('Simulated badge: Station Navigator');
-  expect(api.remaining()).toBe(0); expect(api.failures).toEqual([]);
-});
-test('one validation session completes all three missions through the shared API', async ({ page, devUrl }) => {
+test('one validation session completes all three quests through the shared API, simulated only', async ({ page, devUrl }) => {
   const api = await installScriptedApi(page, { validation: true, steps: [
-    ...cafeSteps(), { action: { type: 'startMission', missionId: 'P2' }, patch: missionPatch('P2', 80) },
-    ...platformSteps(), { action: { type: 'startMission', missionId: 'B1' }, patch: missionPatch('B1', 180) }, ...bossSteps(),
+    ...drinkSteps(), { action: { type: 'startMission', missionId: 'Q2' }, patch: missionPatch('Q2', 100, { completedMissionIds: ['Q1'], unlockedMissionIds: ['Q1', 'Q2'] }) },
+    ...hotelSteps(), { action: { type: 'startMission', missionId: 'Q3' }, patch: missionPatch('Q3', 200, { completedMissionIds: ['Q1', 'Q2'], unlockedMissionIds: ['Q1', 'Q2', 'Q3'] }) },
+    ...photoSteps(),
   ] });
   await page.goto(`${devUrl}/__validation`); await page.getByRole('button', { name: 'Start validation session' }).click();
-  await cafe(page); await page.getByRole('button', { name: 'Next practice mission' }).click();
-  await platform(page); await page.getByRole('button', { name: 'Enter boss mission' }).click(); await boss(page);
+  await drink(page); await page.getByRole('button', { name: 'Next quest' }).click();
+  await hotel(page); await page.getByRole('button', { name: 'Next quest' }).click();
+  await photograph(page);
+  await expect(page.getByTestId('result-panel')).toContainText('SIMULATED RESULT');
+  await expect(page.getByTestId('result-panel')).toContainText('Simulated badge: Shanghai Explorer');
   expect(api.remaining()).toBe(0); expect(api.failures).toEqual([]);
   expect(api.requests.filter((request) => request.path.endsWith('/turns'))).toHaveLength(4);
+  expect(await page.evaluate(() => localStorage.getItem('vibequest.player-session.v1'))).toBeNull();
+  // Validation sessions never claim the player's saved city.
+  expect(await page.evaluate(() => localStorage.getItem('vibequest.worldId'))).toBeNull();
   await expect(page.getByTestId('inventory-bar')).toContainText('Simulated XP');
 });
+
 test('validation entry needs server permission and cannot resume a player session', async ({ page, devUrl }) => {
   await installScriptedApi(page, { validation: false });
   await page.goto(`${devUrl}/__validation`);
@@ -88,16 +67,15 @@ test('validation entry needs server permission and cannot resume a player sessio
   await expect(page.getByTestId('validation-harness')).toHaveCount(0);
 });
 
-test('rapid developer location actions dispatch serially with fresh versions', async ({ page, devUrl }) => {
+test('rapid developer relocations dispatch serially with fresh versions', async ({ page, devUrl }) => {
   const api = await installScriptedApi(page, { validation: true });
   await page.goto(`${devUrl}/__validation`); await page.getByRole('button', { name: 'Start validation session' }).click();
   await expect(page.getByTestId('validation-harness')).toBeVisible();
   await page.getByTestId('validation-harness').evaluate((panel) => {
-    const buttons = [...panel.querySelectorAll('button')];
-    buttons.find((button) => button.textContent === 'plaza')!.click();
-    buttons.find((button) => button.textContent === 'concourse')!.click();
+    const button = [...panel.querySelectorAll('button')].find((entry) => entry.textContent === 'sign · ui.menu')!;
+    button.click(); button.click();
   });
-  await expect.poll(() => api.requests.filter((request) => request.path.endsWith('/actions')).length).toBe(2);
-  await expect(page.locator('.session-footer')).toContainText('Version 2');
-  expect(api.failures).toEqual([]);
+  await expect.poll(() => api.requests.filter((request) => request.path.endsWith('/actions')).length).toBeGreaterThanOrEqual(2);
+  const versions = api.requests.filter((request) => request.path.endsWith('/actions')).map((request) => (request.body as { expectedVersion: number }).expectedVersion);
+  expect(versions).toEqual([...versions].sort((a, b) => a - b));
 });

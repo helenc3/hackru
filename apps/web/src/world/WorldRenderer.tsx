@@ -58,7 +58,6 @@ export function WorldRenderer({ state, onAction, onTalk }: RendererProps) {
   const [hasWebGl, setHasWebGl] = useState(webGlIsAvailable);
   const [position, setPosition] = useState(() => initialPosition(state));
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState('');
   const root = useRef<HTMLElement>(null);
   const labels = useRef<(HTMLSpanElement | null)[]>([]);
   const current = useRef({ state, onAction, onTalk });
@@ -71,7 +70,7 @@ export function WorldRenderer({ state, onAction, onTalk }: RendererProps) {
     const r = runtime.current;
     r.generation++; r.position = initialPosition(current.current.state); r.lastSent = null; r.pending = null;
     r.keys.clear(); r.path = []; r.busy = false; r.syncing = false; syncPromise.current = Promise.resolve();
-    setPosition({ ...r.position }); setBusy(false); setError('');
+    setPosition({ ...r.position }); setBusy(false);
   }, [sessionKey]);
   useEffect(() => {
     const clear = () => { runtime.current.keys.clear(); runtime.current.path = []; runtime.current.active = false; drag.current = null; };
@@ -102,8 +101,9 @@ export function WorldRenderer({ state, onAction, onTalk }: RendererProps) {
           r.pending = null;
           await flushPosition({ ...r.position });
         }
-      } catch (cause) {
-        if (generation === r.generation) { r.pending = null; setError(cause instanceof Error ? cause.message : 'Position could not sync. Try again.'); }
+      } catch {
+        // The session coordinator displays request failures in the recovery popup.
+        if (generation === r.generation) r.pending = null;
       } finally { if (generation === r.generation) r.syncing = false; }
     })();
   }
@@ -114,7 +114,7 @@ export function WorldRenderer({ state, onAction, onTalk }: RendererProps) {
     const target = nearbyTargets(current.current.state, r.position).find((item) => item.id === id);
     if (!target) return;
     const generation = r.generation;
-    r.busy = true; r.path = []; r.keys.clear(); r.pending = null; setBusy(true); setError('');
+    r.busy = true; r.path = []; r.keys.clear(); r.pending = null; setBusy(true);
     try {
       await syncPromise.current;
       if (generation !== r.generation) return;
@@ -126,8 +126,8 @@ export function WorldRenderer({ state, onAction, onTalk }: RendererProps) {
         if (action) await current.current.onAction(action);
         if (generation !== r.generation) return;
       }
-    } catch (cause) {
-      if (generation === r.generation) setError(cause instanceof Error ? cause.message : 'Interaction failed. Try again.');
+    } catch {
+      // The session coordinator displays request failures in the recovery popup.
     } finally { if (generation === r.generation) { r.busy = false; setBusy(false); } }
   }
 
@@ -190,7 +190,6 @@ export function WorldRenderer({ state, onAction, onTalk }: RendererProps) {
       <div className="world-caption"><span className="live-dot" />The district<span>Third-person navigation</span></div>
       <div className="district-nearby" aria-label="Nearby interactions">{nearby.map((target, i) => <button key={target.id} disabled={busy || state.status !== 'active'} onClick={() => void interact(target.id)} data-target-id={target.id}><span lang="zh-Hans">{target.label}</span>{i === 0 ? ' · E' : ''}</button>)}</div>
       <div className="world-note">Click to walk · Drag clockwise / counterclockwise to orbit · Alt/Option + click or drag to angle camera · E to interact</div>
-      {error && <div className="district-error" role="alert">{error}<button onClick={() => { setError(''); root.current?.focus(); }}>Dismiss</button></div>}
     </>}
   </section>;
 }

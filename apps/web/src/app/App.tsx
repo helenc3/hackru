@@ -28,7 +28,6 @@ export function App() {
   const [paused, setPaused] = useState(false);
   const [sign, setSign] = useState<string | null>(null);
   const signClose = useRef<HTMLButtonElement>(null);
-  const [notice, setNotice] = useState('');
   // The server resets position on a new attempt; remounting the world resets the client avatar to match.
   const [attempt, setAttempt] = useState(0);
   const closeSignPanel = useCallback(() => {
@@ -46,18 +45,15 @@ export function App() {
   }, [sign, closeSignPanel]);
 
 
-  useEffect(() => { setNpc(null); setSign(null); setPaused(false); setNotice(''); }, [session.state?.sessionId, session.state?.missionId, session.state?.status]);
+  useEffect(() => { setNpc(null); setSign(null); setPaused(false); }, [session.state?.sessionId, session.state?.missionId, session.state?.status]);
   const closeConversation = useCallback(() => setNpc(null), []);
 
   const onAction = useCallback(async (action: GameAction) => {
-    try {
-      await session.onAction(action);
-      if (action.type === 'retryMission' || action.type === 'startMission') { setNpc(null); setSign(null); setAttempt((count) => count + 1); }
-      if (action.type === 'inspect') setSign(action.targetId);
-      if (action.type === 'pausePractice') setPaused(true);
-      if (action.type === 'resumePractice' || action.type === 'retryMission' || action.type === 'startMission') setPaused(false);
-      setNotice('');
-    } catch (error: unknown) { setNotice(error instanceof Error ? error.message : 'The action could not be completed.'); throw error; }
+    await session.onAction(action);
+    if (action.type === 'retryMission' || action.type === 'startMission') { setNpc(null); setSign(null); setAttempt((count) => count + 1); }
+    if (action.type === 'inspect') setSign(action.targetId);
+    if (action.type === 'pausePractice') setPaused(true);
+    if (action.type === 'resumePractice' || action.type === 'retryMission' || action.type === 'startMission') setPaused(false);
   }, [session.onAction]);
 
   const onTalk = useCallback((id: string) => {
@@ -109,7 +105,6 @@ export function App() {
       </div>
       {selectedCue?.text && <section className="sign-overlay" role="dialog" aria-label="Inspected sign"><button ref={signClose} className="button secondary" onClick={closeSignPanel} aria-label="Close sign">Close</button><h3 lang="zh-Hans">{selectedCue.label}</h3><p lang="zh-Hans">{selectedCue.text}</p></section>}
       <RecoveryPanel problem={session.problem} pending={session.pending} state={state} onRetry={session.retry} onRefresh={session.refresh} onNew={session.abandon} onDismiss={session.dismiss} />
-      {notice && <div className="action-notice" role="status">{notice}</div>}
       {session.events.length > 0 && <section className="event-feed" aria-label="Mission updates" aria-live="polite">{session.events.slice(-3).map((event) => <p key={event.id}>{event.message}</p>)}</section>}
       {paused && !npc && state.status === 'active' && <CoachPanel state={state} turn={session.turn} />}
       {npc && state.status === 'active' && <DialoguePanel key={`${state.sessionId}:${state.missionId}:${npc}`} state={state} npcId={npc} pending={session.pending} turn={session.turnNpc === npc ? session.turn : null} choices={npcChoices} onAction={onAction} onSubmit={session.submit} onLiveTurn={session.applyTurn} onClose={closeConversation} />}

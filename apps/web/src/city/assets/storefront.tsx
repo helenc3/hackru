@@ -13,6 +13,8 @@ const CJK_FONT = '"PingFang SC", "Hiragino Sans GB", "Noto Sans CJK SC", "Micros
 const boards: Record<string, string> = { red: '#c8323c', gold: '#d9a52b', black: '#2a1838', green: '#2f7d5a', cream: candy.cream };
 const neon: Record<string, string> = { pink: '#ff5fd2', cyan: '#5ff4ff', amber: '#ffb347', lime: '#b6ff5f' };
 const frames: Record<string, string> = { black: INK, brass: '#c9a24a', white: '#f4f1ea' };
+// Keep doors proud of the wall and its built-in facade panels (up to 6 cm deep).
+const DOOR_FACADE_OFFSET = 0.1;
 
 /**
  * Reviewed Chinese text drawn with the system CJK font into a CanvasTexture. drei's Text would
@@ -53,7 +55,7 @@ const WoodDoor: AssetComponent = ({ params }) => {
   const shikumen = variant === 'shikumen', h = shikumen ? 2.4 : 2.2;
   const leaf = shikumen ? INK : candy.bark;
   const leaves = variant === 'single' ? [0] : [-w / 4, w / 4];
-  return <group>
+  return <group position={[0, 0, DOOR_FACADE_OFFSET]}>
     {leaves.map((x) => <Box key={x} at={[x, h / 2, 0.02]} size={[w / leaves.length - 0.04, h, 0.08]} color={leaf} />)}
     {leaves.map((x) => <mesh key={`k${x}`} position={[x + (leaves.length === 1 ? w / 3 : -Math.sign(x) * w / 8), h * 0.48, 0.09]}><sphereGeometry args={[0.05, 8, 6]} /><Toon color={candy.mustard} outline={false} /></mesh>)}
     {shikumen
@@ -65,7 +67,7 @@ const WoodDoor: AssetComponent = ({ params }) => {
 
 const GlassDoor: AssetComponent = ({ params }) => {
   const w = n(params, 'width'), frame = frames[s(params, 'frame')] ?? INK;
-  return <group>
+  return <group position={[0, 0, DOOR_FACADE_OFFSET]}>
     <Glass at={[0, 1.15, 0]} size={[w, 2.3, 0.04]} />
     <Box at={[-w / 2, 1.2, 0]} size={[0.06, 2.4, 0.08]} color={frame} /><Box at={[w / 2, 1.2, 0]} size={[0.06, 2.4, 0.08]} color={frame} />
     <Box at={[0, 2.37, 0]} size={[w + 0.06, 0.06, 0.08]} color={frame} /><Box at={[0, 0.03, 0]} size={[w + 0.06, 0.06, 0.08]} color={frame} />
@@ -124,7 +126,8 @@ const FlatCanopy: AssetComponent = ({ params }) => {
   const rod = Math.hypot(d, 0.9), tilt = Math.atan2(d, 0.9);
   return <group>
     <Box at={[0, 0, d / 2]} size={[w, 0.12, d]} color={color} />
-    {[-w / 2 + 0.2, w / 2 - 0.2].map((x) => <mesh key={x} position={[x, 0.45, d / 2]} rotation={[tilt, 0, 0]}><cylinderGeometry args={[0.02, 0.02, rod, 6]} /><Toon color={INK} outline={false} /></mesh>)}
+    {/* Tie rods run from the wall at y=.9, z=0 to the canopy edge at y=0, z=d. */}
+    {[-w / 2 + 0.2, w / 2 - 0.2].map((x) => <mesh key={x} position={[x, 0.45, d / 2]} rotation={[-tilt, 0, 0]}><cylinderGeometry args={[0.02, 0.02, rod, 6]} /><Toon color={INK} outline={false} /></mesh>)}
   </group>;
 };
 

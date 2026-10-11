@@ -418,6 +418,15 @@ export function generateFallbackChunk(worldId: string, seed: string, coord: Chun
         const useMetro: boolean = !metro && frontageExtras.length > 0 && rng() < 0.08;
         const entry = useMetro ? frontageExtras[0]! : pick(kit)!;
         const params = randomParams(entry);
+        // Fit variable footprints to the remaining lot before rejecting the candidate.
+        // Random full-size widths/depths otherwise leave narrow outer-city lots empty.
+        for (const [key, available] of [['width', end - cursor], ['depth', depth]] as const) {
+          const spec = entry.params[key];
+          if (!spec || (spec.type !== 'number' && spec.type !== 'int')) continue;
+          const step = spec.type === 'int' ? 1 : spec.step;
+          const maximum = step ? round(spec.min + Math.floor((available - spec.min) / step) * step) : round(Math.floor(available * 100) / 100);
+          if (maximum >= spec.min) params[key] = Math.min(params[key] as number, maximum);
+        }
         const valid = resolved(entry, params);
         if (!valid) continue;
         const { w, d } = entry.footprint(valid);

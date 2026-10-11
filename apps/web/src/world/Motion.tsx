@@ -47,7 +47,8 @@ export function Motion({ runtime, root, labels, marks, city, state, tick, sync, 
     const multiplier = state.providerStatus === 'fixture' ? profile.movementMultiplier : 1;
     city.focus(r.position);
     // Movement waits until the chunk under the player is committed (server validates the same manifests).
-    const blocked = !city.ready(r.position) || !r.active || r.busy || state.status !== 'active' || document.activeElement !== root.current || document.hidden;
+    const blocked = conversationOpen || !city.ready(r.position) || !r.active || r.busy || state.status !== 'active' || document.activeElement !== root.current || document.hidden;
+    if (conversationOpen) { r.keys.clear(); r.goal = undefined; }
     r.groundPoint = (x, y) => {
       const bounds = gl.domElement.getBoundingClientRect();
       ray.current.setFromCamera(new Vector2((x - bounds.left) / bounds.width * 2 - 1, 1 - (y - bounds.top) / bounds.height * 2), camera);

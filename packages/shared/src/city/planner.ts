@@ -97,7 +97,8 @@ function crossesVerticalEdge(seed: string, cx: number, cz: number, layout: World
 // ---------------------------------------------------------------- districts
 
 const LAND_KINDS = (['shopping', 'park'] as const);
-const CELL = 6;
+// Keep parks as neighborhood breaks rather than several hundred metres of open land.
+const CELL = 2;
 function cellKind(seed: string, gx: number, gz: number): DistrictKind {
   const r = createRng(seed, 'cell', gx, gz);
   r(); r();

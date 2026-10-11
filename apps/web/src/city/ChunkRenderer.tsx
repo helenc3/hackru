@@ -54,7 +54,21 @@ function Attached({ item, byParent, lod, still }: { item: Resolved; byParent: Ma
     {(byParent.get(item.placement.id) ?? []).map((child) => {
       const socket = sockets.find((entry) => entry.id === child.placement.attachTo!.socketId);
       if (!socket) return null;
-      return <group key={child.placement.id} position={[socket.x, socket.y, socket.z]} rotation={[0, socket.facing * DEG, 0]}>
+      // Older saved cities allowed these modules on ground-level storefront/window sockets.
+      // Keep their frontage and facing, but use the matching elevated socket's mounting height.
+      const mountingKind = child.entry?.id.startsWith('sf.awning.') ? 'awning'
+        : child.entry?.id.startsWith('sf.sign.') ? 'sign' : undefined;
+      const legacyMount = mountingKind && !child.entry?.attachesTo?.includes(socket.kind);
+      // Door/storefront sockets start at the pavement; hanging lanterns need a top mount.
+      const lanternEntranceMount = child.entry?.id === 'sf.lantern.pair'
+        && (socket.kind === 'door' || socket.kind === 'storefront');
+      const mountingHeight = lanternEntranceMount
+        ? Math.max(socket.y, sockets.find((candidate) => candidate.kind === 'awning' && candidate.facing === socket.facing)?.y ?? 2.7)
+        : legacyMount
+        ? sockets.find((candidate) => candidate.kind === mountingKind && candidate.facing === socket.facing)?.y
+          ?? (mountingKind === 'awning' ? 2.7 : 3.3)
+        : socket.y;
+      return <group key={child.placement.id} position={[socket.x, mountingHeight, socket.z]} rotation={[0, socket.facing * DEG, 0]}>
         <Attached item={child} byParent={byParent} lod={lod} still={still} />
       </group>;
     })}
@@ -260,11 +274,11 @@ export const ChunkRenderer = memo(function ChunkRenderer({ manifest, centre, far
   }, [resolved, origin, centre, far]);
   const ground = districtGround[manifest.district];
   const placementGroup = ({ item }: { item: Resolved }) => ({ position: [item.placement.x, 0, item.placement.z] as [number, number, number], rotation: [0, item.placement.rotation * DEG, 0] as [number, number, number],
-    userData: { clearView: item.entry?.category === 'building' ? 'fade' : 'solid', placementId: item.placement.id } });
+    userData: { clearView: 'solid', placementId: item.placement.id } });
   // NPC assemblies stay live together, including their stands; never bake an animated child into scenery.
   const hasNpc = (item: Resolved) => item.entry?.id.startsWith('an.npc.') ||
     (layout.byParent.get(item.placement.id) ?? []).some((child) => child.entry?.id.startsWith('an.npc.'));
-  // Near buildings batch per placement so ClearView can fade them one at a time; near anchors stay live.
+  // Near buildings keep per-placement batches; their walls remain solid. Near anchors stay live.
   // Everything else joins the chunk batch (trees still fade: their sway group is its own batch).
   const own = (root: { item: Resolved; lod: number }) => hasNpc(root.item) || (root.lod === 0 && (root.item.entry?.category === 'building' || root.item.entry?.category === 'anchor'));
   const near = layout.roots.filter(own);

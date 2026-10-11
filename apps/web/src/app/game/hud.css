@@ -50,6 +50,5 @@
 }
 
 .quest-panel[data-collapsed=true] {
-  width: auto;
   max-width: 270px;
 }

@@ -1,5 +1,6 @@
 import { Component, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Canvas, useThree } from '@react-three/fiber';
+import { createPortal } from 'react-dom';
 import { VISIBLE_RADIUS_CHUNKS, chunkOf, chunkOrigin, seedFromWorldId, text, worldLayout, type ChunkManifest, type Position, type RendererProps } from '@vibequest/shared';
 import { distance, nearbyTargets, nextLeg, targetAction, walkingPath } from './navigation';
 import { registerWalkHandler } from './walk-request';
@@ -80,7 +81,7 @@ function anchorLabels(city: CityHandle, position: Position): Landmark[] {
  * `preview` renders a local seeded city behind the welcome screen; it is inert and must not look like
  * the live world to tests or assistive tech. `manifests` gives a static city (fixtures/tests).
  */
-export function WorldRenderer({ state, onAction, onTalk, preview = false, manifests, conversationOpen = false }: RendererProps & { preview?: boolean; manifests?: readonly ChunkManifest[]; conversationOpen?: boolean }) {
+export function WorldRenderer({ state, onAction, onTalk, preview = false, manifests, conversationOpen = false, guidanceContainer }: RendererProps & { preview?: boolean; manifests?: readonly ChunkManifest[]; conversationOpen?: boolean; guidanceContainer?: HTMLElement | null }) {
   const city = useCity(preview ? null : state, { manifests });
   const [hasWebGl, setHasWebGl] = useState(webGlIsAvailable);
   const [position, setPosition] = useState(() => initialPosition(state));
@@ -106,10 +107,15 @@ export function WorldRenderer({ state, onAction, onTalk, preview = false, manife
   const river = useMemo(() => worldLayout(seed).river, [seed]);
   const still = useReducedMotion();
   useEffect(() => preview ? undefined : registerWalkHandler((target) => {
+    if (conversationOpen) return;
     const r = runtime.current;
     root.current?.focus();
     r.keys.clear(); r.path = []; r.goal = { ...target }; r.replanAt = 0;
-  }), [preview]);
+  }), [preview, conversationOpen]);
+  useEffect(() => {
+    if (!conversationOpen) return;
+    runtime.current.keys.clear(); runtime.current.path = []; runtime.current.goal = undefined;
+  }, [conversationOpen]);
   useEffect(() => {
     const clear = () => { runtime.current.keys.clear(); runtime.current.path = []; runtime.current.active = false; drag.current = null; };
     window.addEventListener('blur', clear);
@@ -179,7 +185,7 @@ export function WorldRenderer({ state, onAction, onTalk, preview = false, manife
     onBlur={() => { runtime.current.keys.clear(); runtime.current.path = []; runtime.current.active = false; }}
     onKeyDown={(event) => {
       if (event.target !== root.current || event.nativeEvent.isComposing) return;
-      if (movementKeys.includes(event.code)) { event.preventDefault(); runtime.current.keys.add(event.code); runtime.current.path = []; }
+      if (movementKeys.includes(event.code)) { event.preventDefault(); if (!conversationOpen) { runtime.current.keys.add(event.code); runtime.current.path = []; } }
       if (event.code === 'KeyE' && !event.repeat) { event.preventDefault(); const target = nearbyTargets(current.current.state, runtime.current.position)[0]; if (target) void interact(target.id); }
     }}
     onKeyUp={(event) => { runtime.current.keys.delete(event.code); }}
@@ -204,7 +210,7 @@ export function WorldRenderer({ state, onAction, onTalk, preview = false, manife
     onPointerUp={(event) => {
       const gesture = drag.current;
       if (!gesture || gesture.pointerId !== event.pointerId) return;
-      if (!gesture.moved && !runtime.current.busy && current.current.state.status === 'active') {
+      if (!conversationOpen && !gesture.moved && !runtime.current.busy && current.current.state.status === 'active') {
         const point = runtime.current.groundPoint?.(event.clientX, event.clientY);
         if (point) { runtime.current.keys.clear(); runtime.current.goal = undefined; runtime.current.path = walkingPath(city.view, runtime.current.position, point); }
       }
@@ -223,7 +229,7 @@ export function WorldRenderer({ state, onAction, onTalk, preview = false, manife
       <div className="world-caption"><span className="live-dot" />Shanghai<span>Third-person navigation</span></div>
       {loading && <div className="world-note" role="status" data-testid="city-loading">Building the neighbourhood…</div>}
       {city.error && !preview && <div className="world-note" role="status" data-testid="city-error">{city.error}</div>}
-      {!preview && state.status === 'active' && state.questTarget && <QuestCompass target={state.questTarget} position={position} yaw={runtime.current.yaw} onWalk={() => requestWalk(state.questTarget!.position)} />}
+      {!preview && state.status === 'active' && state.questTarget && guidanceContainer && createPortal(<QuestCompass target={state.questTarget} position={position} yaw={runtime.current.yaw} onWalk={() => requestWalk(state.questTarget!.position)} />, guidanceContainer)}
       <div className="district-nearby" aria-label="Nearby interactions">{nearby.filter((target) => target.kind !== 'npc').map((target) => <button key={target.id} disabled={busy || state.status !== 'active'} onClick={() => void interact(target.id)} data-target-id={target.id}><span lang="zh-Hans">{target.label}</span>{target.id === nearby[0]?.id ? ' · E' : ''}</button>)}</div>
     </>}
   </section>;

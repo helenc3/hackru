@@ -6,4 +6,6 @@ Commercial shop shells use four-to-eight floors; noodle shops use three-to-six. 
 
 Building lots use aligned frontage/interior rows. Trees and street furniture occupy fixed sidewalk stations; parks use fixed feature rows. Claude receives the same density and placement guidance, while deterministic validation retains authority over geometry and quests.
 
+Exploration density tuning: district cells now span two chunks (80 m), keeping park clusters smaller beyond the shopping-only spawn area. The fallback composer fits variable building widths and depths to the remaining lot before placement, so random oversized footprints do not unnecessarily empty narrow lots. Previously committed chunks retain their layouts; these changes apply to newly generated chunks.
+
 Intersection signals are authored road decoration derived from manifest road intersections in ChunkRenderer. They do not add a placement, collider, route rule, interaction or frozen manifest field. A shared 66-second clock gives perpendicular approaches opposite phases (30 green, 3 amber, 33 red); Chinese labels and countdowns update each second. No interface changes are required.

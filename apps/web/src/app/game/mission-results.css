@@ -8,7 +8,33 @@
 .result-close { position: absolute; top: 12px; right: 12px; padding: 6px 10px; font-size: 12px; line-height: 1; }
 .result-objectives, .mission-progress { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 8px; font-size: 13px; }
 .result-objectives li, .mission-progress li { display: flex; align-items: center; gap: 8px; }
-.result-objectives input, .mission-progress input { pointer-events: none; width: 16px; height: 16px; accent-color: var(--mint); margin: 0; }
+.result-objectives input[type="checkbox"], .mission-progress input[type="checkbox"] {
+  appearance: none;
+  pointer-events: none;
+  display: grid;
+  place-content: center;
+  flex: 0 0 18px;
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  border: 2px solid var(--ink);
+  border-radius: 5px;
+  background: var(--cream);
+  box-shadow: 2px 2px 0 var(--ink);
+}
+.result-objectives input[type="checkbox"]:checked, .mission-progress input[type="checkbox"]:checked { background: var(--mint); }
+.result-objectives input[type="checkbox"]:checked::after, .mission-progress input[type="checkbox"]:checked::after {
+  content: '';
+  width: 5px;
+  height: 9px;
+  border: solid var(--ink);
+  border-width: 0 2px 2px 0;
+  transform: translateY(-1px) rotate(45deg);
+}
+@media (forced-colors: active) {
+  .result-objectives input[type="checkbox"], .mission-progress input[type="checkbox"] { appearance: auto; box-shadow: none; }
+  .result-objectives input[type="checkbox"]:checked::after, .mission-progress input[type="checkbox"]:checked::after { content: none; }
+}
 .mission-progress { margin: 12px 0 10px; font-size: 12px; }
 .mission-progress li span { flex: 1; }
 .vocab-review { margin-top: 18px; padding: 14px 16px; background: var(--cream); border: var(--outline); border-radius: var(--radius-md); font-size: 13px; }

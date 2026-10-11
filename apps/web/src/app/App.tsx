@@ -31,6 +31,7 @@ export function App() {
   const validation = Boolean(ValidationHarness && validationRequested && health?.features.validationHarness);
   const session = useSession(validationRequested);
   const [npc, setNpc] = useState<NpcTarget | null>(null);
+  const [guidanceContainer, setGuidanceContainer] = useState<HTMLDivElement | null>(null);
   const [settingsRotation, setSettingsRotation] = useState(0);
   // The server resets position on a new attempt; remounting the world resets the client avatar to match.
   const [attempt, setAttempt] = useState(0);
@@ -113,8 +114,8 @@ export function App() {
       </details>
       </div></header>
     <main className="game-main">
-      <div className="game-world" id="world"><WorldRenderer key={attempt} conversationOpen={Boolean(npc)} state={state} onAction={onAction} onTalk={onTalk} /></div>
-      <QuestPanel state={state} results={results} onReview={openReview} conversationOpen={Boolean(npc)} />
+      <div className="game-world" id="world"><WorldRenderer key={attempt} conversationOpen={Boolean(npc)} state={state} onAction={onAction} onTalk={onTalk} guidanceContainer={guidanceContainer} /></div>
+      <QuestPanel state={state} results={results} onReview={openReview} conversationOpen={Boolean(npc)} guidanceRef={setGuidanceContainer} />
       <RecoveryPanel problem={session.problem} pending={session.pending} state={state} onRetry={session.retry} onRefresh={session.refresh} onNew={leave} onDismiss={session.dismiss} />
       {session.events.length > 0 && <section className="event-feed" aria-label="Quest updates" aria-live="polite">{session.events.slice(-3).map((event) => <p key={event.id}>{event.message}</p>)}</section>}
       {npc && state.status === 'active' && <DialoguePanel key={`${state.sessionId}:${state.missionId}:${npc.anchorId}`} state={state} npc={npc} pending={session.pending} turn={session.turnNpc === npc.anchorId ? session.turn : null} onAction={onAction} onSubmit={session.submit} onLiveTurn={session.applyTurn} onClose={closeConversation} />}

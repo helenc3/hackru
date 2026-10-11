@@ -77,6 +77,16 @@ test('world interactions, focus, detached canvas and duplicate payment', async (
   await expect(page.getByRole('dialog', { name: 'NPC conversation' })).toContainText('fixture.vendor');
   await page.waitForTimeout(150);
   const beforeTyping = await coordinate(page, 'z');
+  const world = page.getByTestId('world-renderer');
+  await world.focus();
+  await page.keyboard.down('w');
+  await page.waitForTimeout(350);
+  await page.keyboard.up('w');
+  expect(await coordinate(page, 'z')).toBe(beforeTyping);
+  await world.locator('canvas').click({ position: { x: 120, y: 120 } });
+  await page.waitForTimeout(350);
+  expect(await coordinate(page, 'z')).toBe(beforeTyping);
+  await page.getByRole('textbox', { name: 'Dialogue input' }).focus();
   await page.getByRole('textbox', { name: 'Dialogue input' }).fill('wasd 你好');
   await page.keyboard.press('ArrowUp');
   await expect.poll(() => coordinate(page, 'z')).toBe(beforeTyping);

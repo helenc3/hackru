@@ -21,8 +21,7 @@ export function QuestCompass({ target, position, yaw, onWalk }: { target: QuestT
   const heading = CARDINALS[Math.round(((Math.atan2(dx, -dz) * 180 / Math.PI + 360) % 360) / 45) % 8];
   return <div className="quest-compass" data-testid="quest-compass" data-distance={metres} role="status" aria-label={`Quest target: ${target.english}, ${metres} metres ${heading}`}>
     {metres > 2 && <svg className="quest-compass-arrow" aria-hidden="true" viewBox="0 0 24 24" style={{ transform: `rotate(${arrow.rotation}deg)` }}><path d="M12 2 3 12h6v10h6V12h6Z" fill="currentColor" /></svg>}
-    {/* Distance first: if space runs out, the English gloss is what truncates. */}
-    <span className="quest-compass-text"><b lang="zh-Hans">{target.label}</b> · {metres <= 2 ? 'here' : `${metres} m ${heading}`} · {target.english}</span>
+    <span className="quest-compass-text">{metres <= 2 ? 'here' : `${metres} m ${heading}`}</span>
     {metres > 2 && <button type="button" className="button secondary" data-testid="walk-there" onClick={onWalk}>Walk there</button>}
   </div>;
 }

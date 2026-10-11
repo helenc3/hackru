@@ -34,7 +34,7 @@ function Fixture() {
     <p>Fixture callbacks only. No quest progression or provider calls.</p>
     <label><input type="checkbox" aria-label="Delay callback" checked={delay} onChange={(event) => setDelay(event.target.checked)} />Delay callback</label>
     <label><input type="checkbox" aria-label="Fail callback" checked={fail} onChange={(event) => setFail(event.target.checked)} />Fail callback</label>
-    <WorldRenderer state={state} manifests={manifests} onAction={async (action) => {
+    <WorldRenderer state={state} conversationOpen={Boolean(npc)} manifests={manifests} onAction={async (action) => {
       if (delay) await new Promise((resolve) => setTimeout(resolve, 400));
       if (fail) throw new Error('Fixture connection failed');
       setActions((previous) => [...previous, action]);

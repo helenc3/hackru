@@ -134,7 +134,10 @@ const Bench: AssetComponent = ({ params }) => {
   const l = n(params, 'length');
   if (params.variant === 'stone') return <Box at={[0, .225, 0]} size={[l, .45, .5]} color="#b9b3c4" />;
   return <>
-    {[-1, 1].map((s) => <Box key={s} at={[s * (l / 2 - .15), .22, 0]} size={[.08, .44, .5]} color={INK} />)}
+    {[-1, 1].map((s) => <group key={s}>
+      <Box at={[s * (l / 2 - .15), .22, 0]} size={[.08, .44, .5]} color={INK} />
+      <Box at={[s * (l / 2 - .15), .62, -.27]} size={[.08, .44, .08]} color={INK} />
+    </group>)}
     {[-.15, 0, .15].map((z) => <Box key={z} at={[0, .45, z]} size={[l, .05, .12]} color={candy.bark} outline={false} />)}
     <Box at={[0, .72, -.24]} size={[l, .3, .05]} color={candy.bark} />
   </>;

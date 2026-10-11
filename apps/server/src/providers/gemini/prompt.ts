@@ -51,7 +51,10 @@ export function buildPrompt(context: TurnContext, playerText: string): { systemI
     '- evidenceQuote must be an exact substring copied from the player message ("" for unknown).',
     '- targetLanguageUse: "yes" Mandarin, "mixed" meaningful Mandarin plus other language, "no" English/other only, "uncertain" otherwise. English-only input is "no" even if understood.',
     '- interaction: "relevant", "repeat" (asks to repeat), "irrelevant" (spam/off-topic), "insult".',
+    '- A short agreement (好的, 对, 可以, 行, 好, 是的, 就这个) right after the NPC stated a drink and its price is intent "confirm_drink_price"; take drink and priceCny from that NPC line and the facts.',
+    '- A drink plus a price (茶十元, 茶十块, 一杯水五块钱, 茶10元) is "confirm_drink_price" with priceCny as an integer; 块 and 元 both mean CNY.',
     '- Scores 0-1. Spelling/grammar mistakes alone do not lower intent score. Never grade pronunciation or tones.',
+    '- In practice mode, when targetLanguageUse is "no" or "mixed", still classify the intended meaning, and coach MUST explain in English what to say and give improvedExample as the full Simplified Chinese sentence for that meaning.',
     '- Never announce completed objectives, rewards, XP, or game results.',
   ].join('\n');
   const contents = [

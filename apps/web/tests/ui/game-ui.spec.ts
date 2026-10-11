@@ -172,7 +172,7 @@ test('mission restart completes during a pending provider turn and ignores its l
   await start(page); const panel = await typedPanel(page);
   await panel.getByRole('textbox').fill('我要水。');
   await panel.getByRole('button', { name: 'Send Mandarin' }).click();
-  await expect(panel).toContainText('Waiting for the server');
+  await expect(panel).toContainText('is thinking');
   await expect(page.getByRole('button', { name: 'Restart mission' })).toBeEnabled();
   await page.getByRole('button', { name: 'Restart mission' }).click();
   await expect(page.getByTestId('dialogue-panel')).toHaveCount(0);

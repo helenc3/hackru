@@ -2,7 +2,7 @@ import {
   AUDIO_PHASE_MAX_MS, CreateGameOptionsSchema, GameActionSchema, InternalStateSchema, PublicStateSchema, TurnEvaluationSchema,
   type CreateGameOptions, type EngineResult, type EvidenceRecord, type GameAction, type Guard, type InternalState, type NpcId, type PublicState, type TurnContext, type TurnEvaluation,
 } from '../contracts.js';
-import { authoredFacts, cues, groundedReplies, npcs, sceneManifest } from '../content/index.js';
+import { authoredFacts, clarifyReplies, cues, groundedReplies, speakMandarinReplies, npcs, sceneManifest } from '../content/index.js';
 import { missionFor } from '../content/missions.js';
 import { advanceClock } from './clock.js';
 import { selectPracticeTier, updateSkillsAfterAttempt } from './skills.js';
@@ -157,8 +157,11 @@ export function applyAction(state: InternalState, raw: GameAction, nowMs: number
       requireRule(next.validationMode || Boolean(action.position), 'World movement requires a position.');
       requireRule(position.x >= zone.bounds.minX && position.x <= zone.bounds.maxX && position.z >= zone.bounds.minZ && position.z <= zone.bounds.maxZ, 'Position is outside the requested zone.');
       // Timer synchronization also runs on reads and unrelated actions. Movement
-      // needs its own baseline, advanced only when a position is accepted.
-      requireRule(next.validationMode || Math.hypot(position.x - state.position.x, position.z - state.position.z) <= sceneManifest.movementSpeed * Math.max(0, nowMs - (state.lastMovementAtMs ?? state.timer!.lastUpdatedAtMs)) / 1000 + 0.25, 'Movement exceeds the authored speed.');
+      // needs its own baseline, advanced only when a position is accepted. Elapsed time is
+      // measured between arrivals, so request latency jitter steals from the next interval:
+      // the slack covers ~250 ms of it (one unit at the authored speed) while still rejecting
+      // teleports. ponytail: slack is per request; use a token bucket if cheating ever matters.
+      requireRule(next.validationMode || Math.hypot(position.x - state.position.x, position.z - state.position.z) <= sceneManifest.movementSpeed * Math.max(0, nowMs - (state.lastMovementAtMs ?? state.timer!.lastUpdatedAtMs)) / 1000 + 1, 'Movement exceeds the authored speed.');
       requireRule(!sceneManifest.colliders.some(({ bounds }) => position.x >= bounds.minX - sceneManifest.playerRadius && position.x <= bounds.maxX + sceneManifest.playerRadius && position.z >= bounds.minZ - sceneManifest.playerRadius && position.z <= bounds.maxZ + sceneManifest.playerRadius), 'Position intersects a wall.');
       next.zoneId = action.zoneId; next.position = position; next.lastMovementAtMs = nowMs;
       if (next.missionId === 'P1' && action.zoneId === 'concourse' && next.flags['p1.receipt'] && delivered(next, 'p1.station-directions')) {
@@ -263,9 +266,29 @@ export function dialogueContext(state: InternalState, npcId: NpcId): TurnContext
   requireRule(runtime.patience > 0 || (state.mode === 'boss' && runtime.cooldownRemainingMs === 0), 'The NPC needs a short break.');
   return { missionId: state.missionId, mode: state.mode, tier: state.tier, npcId, persona: npc.persona, patience: runtime.patience, allowedIntents: [...npc.allowedIntents], facts: { ...state.secretFacts }, history: runtime.history };
 }
+/** English/other-only, hostile, or unclear mixed input: never acted on, never advances, costs patience. */
+export function offTarget(evaluation: TurnEvaluation): boolean {
+  return evaluation.targetLanguageUse === 'no' || evaluation.interaction === 'irrelevant' || evaluation.interaction === 'insult'
+    || (evaluation.targetLanguageUse !== 'yes' && evaluation.intentGrade.score < 0.5);
+}
+/** Deterministic slot completion: a confirmation after the NPC stated the drink and price only needs what the facts already fix. */
+function completeDrinkConfirmation(state: InternalState, evaluation: TurnEvaluation): TurnEvaluation {
+  if (state.missionId !== 'P1' || evaluation.intent !== 'confirm_drink_price') return evaluation;
+  // A bare agreement (no slots) or a bare price takes the drink the player already chose; a drink
+  // named without a price stays unconfirmed, so a wrong or unparsed price never confirms by omission.
+  if (evaluation.slots.some((entry) => entry.key === 'drink')) return evaluation;
+  const chosen = state.flags['p1.drink'];
+  if (chosen !== 'tea' && chosen !== 'water') return evaluation;
+  const slots: TurnEvaluation['slots'] = [{ key: 'drink', value: chosen }, ...evaluation.slots];
+  if (!slots.some((entry) => entry.key === 'priceCny')) slots.push({ key: 'priceCny', value: chosen === 'tea' ? 10 : 5 });
+  return { ...evaluation, slots };
+}
 export function groundedReply(state: InternalState, npcId: NpcId, evaluation: TurnEvaluation): string {
   const slot = (key: string) => evaluation.slots.find((entry) => entry.key === key)?.value;
   if (evaluation.interaction === 'insult') return '请礼貌一点。';
+  const byNode = (table: Record<string, string>) => table[`${state.nodeId}.${String(state.flags['p1.drink'] ?? '')}`] ?? table[state.nodeId] ?? table.default!;
+  if (offTarget(evaluation)) return state.mode === 'boss' ? groundedReplies.clarification : byNode(speakMandarinReplies);
+  if (evaluation.intent === 'unknown') return state.mode === 'boss' ? groundedReplies.clarification : byNode(clarifyReplies);
   if (evaluation.intent === 'request_repeat') return [...state.npcState[npcId].history].reverse().find((entry) => entry.role === 'npc')?.text ?? groundedReplies.clarification;
   if (state.missionId === 'P1') {
     if (evaluation.intent === 'cancel_order') return '好的。请重新选择茶或水并确认价格，再去售货亭。';
@@ -287,21 +310,22 @@ export function groundedReply(state: InternalState, npcId: NpcId, evaluation: Tu
   return state.mode === 'boss' ? groundedReplies.clarification : evaluation.replyZh;
 }
 export function applyEvaluation(state: InternalState, npcId: NpcId, raw: TurnEvaluation, nowMs: number): EngineResult {
-  const evaluation = TurnEvaluationSchema.parse(raw);
   const result = synchronizeGame(state, nowMs);
   const next = result.state;
+  const evaluation = completeDrinkConfirmation(next, TurnEvaluationSchema.parse(raw));
   dialogueContext(next, npcId);
   requireRule(next.pendingTurn?.npcId === npcId && next.pendingTurn.attemptId === next.attemptId, 'Evaluation requires a current server-reserved turn.');
   const npc = next.npcState[npcId];
   if (npc.patience === 0) npc.patience = 1;
   const successful = evaluation.interaction === 'relevant' && evaluation.targetLanguageUse === 'yes' && evaluation.intentGrade.score >= 0.7 && evaluation.intentGrade.confidence >= 0.75;
   if (evaluation.intent === 'confirm_drink_price') next.flags['p1.price-confirmed'] = false;
+  let transitioned = false;
   if (successful) {
     const before = next.nodeId;
     const options = currentNode(next).intentTransitions.filter((entry) => entry.trigger.intent === evaluation.intent);
     const relevantDecision = options.length > 0;
     const missingDetail = relevantDecision && options.some((entry) => entry.trigger.slots.some((required) => !evaluation.slots.some((slot) => slot.key === required.key)));
-    const transitioned = transition(next, evaluation, result.events);
+    transitioned = transition(next, evaluation, result.events);
     if (transitioned) {
       npc.patience = Math.min(5, npc.patience + 1);
       evidence(next, 'conversation', 1, undefined, next.pendingTurn!.assisted, before);
@@ -316,11 +340,26 @@ export function applyEvaluation(state: InternalState, npcId: NpcId, raw: TurnEva
       if (!missingDetail && next.missionId === 'B1' && evaluation.intent === 'buy_ticket') evidence(next, 'reading', 0, 'b1.destination-board', next.pendingTurn!.assisted);
     }
   }
+  // A miss in practice surfaces the node's vocabulary once, recorded like a used hint (assisted) without spending one.
+  if (!transitioned && next.mode === 'practice' && !['greeting', 'request_repeat'].includes(evaluation.intent) && Number(next.flags[`${next.nodeId}-hint-level`] ?? 0) < 2) {
+    const hint = missionFor(next.missionId).hints.find((entry) => entry.nodeId === next.nodeId && entry.level === 2);
+    if (hint) {
+      next.flags[`${next.nodeId}-hint-level`] = 2; next.flags['session.assisted'] = true;
+      result.events.push({ id: `${next.attemptId}.vocab-${next.nodeId}`, kind: 'objective', message: `Hint: ${hint.text}` });
+    }
+  }
   if (evaluation.intent === 'request_repeat') {
     const cueId = next.missionId === 'P1' ? 'p1.station-directions' : next.missionId === 'P2' ? 'p2.platform-change' : 'b1.harbor-change';
     const count = npc.repeatCounts[cueId] ?? 0; npc.repeatCounts[cueId] = count + 1;
     if (count > 0) npc.patience = Math.max(1, npc.patience - 1);
-  } else if (evaluation.interaction === 'irrelevant' || evaluation.interaction === 'insult') npc.patience = Math.max(0, npc.patience - 1);
+  } else if (offTarget(evaluation)) {
+    npc.patience = Math.max(0, npc.patience - 1);
+    if (next.mode === 'practice') {
+      next.xp = Math.max(0, next.xp - 5);
+      const name = npcs.find((entry) => entry.id === npcId)!.nameZh;
+      result.events.push({ id: `${next.attemptId}.language-${next.pendingTurn!.turnId}`, kind: 'objective', message: evaluation.interaction === 'insult' ? `${name} is upset: -5 XP. Stay polite.` : evaluation.targetLanguageUse === 'no' ? `${name} didn't understand English: -5 XP. Try it in Mandarin.` : `${name} didn't follow that: -5 XP. Try a short Mandarin sentence.` });
+    }
+  }
   if (npc.patience === 0) npc.cooldownRemainingMs = 10_000;
   npc.mood = mood(npc.patience);
   const reply = groundedReply(next, npcId, evaluation);

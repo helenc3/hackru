@@ -127,8 +127,8 @@ test('reply audio waits for the job, plays once, and replay never renews its lif
   await panel.getByRole('button', { name: 'Send Mandarin' }).click();
   const controls = page.getByTestId('audio-controller');
   await expect(controls).toContainText('Playing reply');
-  // One local audio lane: no recording while the reply plays.
-  await expect(panel.getByRole('button', { name: 'Start recording' })).toBeDisabled();
+  // NPC speech is interruptible: the mic stays live while the reply plays (see barge-in test).
+  await expect(panel.getByRole('button', { name: 'Start recording' })).toBeEnabled();
   await page.evaluate(() => { (window as unknown as Record<string, boolean>).__holdPlayback = false; });
   await expect(controls).toContainText('Audio ready');
   expect(polls).toBe(2);
@@ -136,6 +136,27 @@ test('reply audio waits for the job, plays once, and replay never renews its lif
   await expect.poll(() => counter(page, '__plays')).toBe(2);
   await expect(controls.getByRole('button', { name: 'Replay' })).toBeEnabled();
   expect(phases(api).map((action) => `${action.operationId}:${action.phase}`)).toEqual(['speech-1:playing', 'speech-1:idle']);
+});
+
+test('pressing the mic interrupts the reply and records only after the speech operation ends', async ({ page }) => {
+  await fakeMedia(page);
+  const api = await installScriptedApi(page);
+  await speechTurns(page, api);
+  await page.route('**/api/sessions/*/speech/*', (route) => route.fulfill({ status: 200, contentType: 'audio/mpeg', headers: { 'X-Asset-Duration-Ms': '900' }, body: Buffer.from('ID3fake') }));
+  await transcribeAs(page, '谢谢');
+  const panel = await openPanel(page);
+  await panel.getByRole('button', { name: 'Use typed Mandarin' }).click();
+  await page.evaluate(() => { (window as unknown as Record<string, boolean>).__holdPlayback = true; });
+  await panel.getByRole('textbox').fill('请给我一杯茶。');
+  await panel.getByRole('button', { name: 'Send Mandarin' }).click();
+  const controls = page.getByTestId('audio-controller');
+  await expect(controls).toContainText('Playing reply');
+  await panel.getByRole('button', { name: 'Start recording' }).click();
+  await expect(panel.getByTestId('recorder')).toContainText('Listening…');
+  await expect(controls).toContainText('Audio stopped');
+  await panel.getByRole('button', { name: 'Stop recording' }).click();
+  await expect.poll(() => phases(api).map((action) => `${action.operationId === 'speech-1' ? 'speech' : 'mic'}:${action.phase}`)).toEqual(['speech:playing', 'speech:idle', 'mic:recording', 'mic:transcribing', 'mic:confirming']);
+  expect(api.failures).toEqual([]);
 });
 
 test('restarting during a pending reply drops the old audio', async ({ page }) => {

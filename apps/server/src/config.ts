@@ -11,6 +11,7 @@ const environmentSchema = z.object({
   PORT: z.coerce.number().int().min(1).max(65535).optional(),
   GEMINI_API_KEY: z.string().trim().min(1).optional(),
   GEMINI_MODEL: z.string().trim().min(1).default('gemini-3.8-flash'),
+  GEMINI_LIVE_MODEL: z.string().trim().min(1).default('gemini-3.8-live'),
   ELEVENLABS_API_KEY: z.string().trim().min(1).optional(),
   ELEVENLABS_TTS_MODEL: z.string().trim().min(1).default('eleven_flash_v2_5'),
   ELEVENLABS_PA_MODEL: z.string().trim().min(1).default('eleven_multilingual_v2'),
@@ -29,6 +30,7 @@ export interface ServerConfig {
   port: number;
   geminiApiKey: string | undefined;
   geminiModel: string;
+  geminiLiveModel: string;
   elevenlabsApiKey: string | undefined;
   elevenlabsTtsModel: string;
   elevenlabsPaModel: string;
@@ -60,6 +62,7 @@ export function loadConfig(environment: NodeJS.ProcessEnv = process.env): Server
     port: env.PORT ?? (env.NODE_ENV === 'production' ? 4173 : 3001),
     geminiApiKey: env.GEMINI_API_KEY,
     geminiModel: env.GEMINI_MODEL,
+    geminiLiveModel: env.GEMINI_LIVE_MODEL,
     elevenlabsApiKey: env.ELEVENLABS_API_KEY,
     elevenlabsTtsModel: env.ELEVENLABS_TTS_MODEL,
     elevenlabsPaModel: env.ELEVENLABS_PA_MODEL,

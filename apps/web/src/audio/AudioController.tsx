@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { AudioControllerProps } from '@vibequest/shared';
-import { fetchCuePlayback, fetchSpeech, setAudioActivity, useAudioActivity } from './audio-bus';
+import { fetchCuePlayback, fetchSpeech, setAudioActivity, setInterrupt, useAudioActivity } from './audio-bus';
 
 /** PA tracks carry the earliest time the server accepts finishCue for them. */
 type Track = { kind: 'speech'; id: string; url: string } | { kind: 'pa'; id: string; url: string; finishAt: number };
@@ -32,15 +32,14 @@ export function AudioController({ state, onAction, speechId }: AudioControllerPr
    * Ends the current track; only the first play of a speech operation reports its phases.
    * PA reports finishCue only after audio actually ended: stopped or failed PA stays replayable.
    */
-  function settle(track: Track, ended: boolean, report: boolean) {
-    if (playing.current !== track) return;
+  function settle(track: Track, ended: boolean, report: boolean): Promise<void> {
+    if (playing.current !== track) return Promise.resolve();
     playing.current = null;
     if (track.kind === 'speech') {
       setAudioActivity('idle');
-      if (report) void onAction({ type: 'audioPhase', operationId: track.id, phase: 'idle' }).catch(() => undefined);
-      return;
+      return report ? onAction({ type: 'audioPhase', operationId: track.id, phase: 'idle' }).then(() => undefined, () => undefined) : Promise.resolve();
     }
-    if (!ended || finishedCues.current.has(track.id)) { setAudioActivity('idle'); return; }
+    if (!ended || finishedCues.current.has(track.id)) { setAudioActivity('idle'); return Promise.resolve(); }
     finishedCues.current.add(track.id);
     const token = scope.current;
     // Keep the lane busy until the server records delivery so a recording cannot collide with it.
@@ -50,10 +49,11 @@ export function AudioController({ state, onAction, speechId }: AudioControllerPr
         .catch(() => { finishedCues.current.delete(track.id); setStatus('The announcement could not be confirmed. Replay it.'); })
         .finally(() => { if (token === scope.current && !playing.current) setAudioActivity('idle'); });
     }, Math.max(0, track.finishAt - Date.now()));
+    return Promise.resolve();
   }
 
   async function play(track: Track, replay = false) {
-    stop(false);
+    void stop();
     const token = scope.current;
     const report = !replay && !announced.current.has(track.id);
     if (report && track.kind === 'speech') {
@@ -65,7 +65,7 @@ export function AudioController({ state, onAction, speechId }: AudioControllerPr
     if (report) announced.current.add(track.id);
     const player = audio();
     playing.current = track; last.current = track;
-    setAudioActivity('playing'); setFailed(null); setBlockedTrack(null);
+    setAudioActivity(track.kind === 'speech' ? 'playing' : 'announcing'); setFailed(null); setBlockedTrack(null);
     player.muted = muted;
     player.src = track.url;
     player.onended = () => { setStatus('Audio ready'); settle(track, true, report); };
@@ -78,12 +78,16 @@ export function AudioController({ state, onAction, speechId }: AudioControllerPr
     }
   }
 
-  function stop(userInitiated = true) {
+  /** Resolves once the server knows the speech operation ended, so a recording can follow it. */
+  function stop(): Promise<void> {
     const track = playing.current;
     element.current?.pause();
-    if (track) settle(track, false, true);
-    if (userInitiated) setStatus('Audio stopped');
+    if (!track) return Promise.resolve();
+    setStatus('Audio stopped');
+    return settle(track, false, true);
   }
+  // The recorder barges in through the bus; re-register each render so stop() sees current props.
+  useEffect(() => { setInterrupt(stop); return () => setInterrupt(null); });
 
   // New NPC reply: wait for the server's speech job, then play it once.
   useEffect(() => {
@@ -121,7 +125,7 @@ export function AudioController({ state, onAction, speechId }: AudioControllerPr
   }, [attempt]);
   useEffect(() => { if (element.current) element.current.muted = muted; }, [muted]);
 
-  const busy = activity === 'playing' && Boolean(playing.current);
+  const busy = (activity === 'playing' || activity === 'announcing') && Boolean(playing.current);
   return (
     <div className="audio-status" data-testid="audio-controller" role="group" aria-label="Audio controls">
       <span aria-hidden="true">♫</span>

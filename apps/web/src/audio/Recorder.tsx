@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type PointerEvent } from 'react';
 import type { RecorderProps } from '@vibequest/shared';
-import { AudioApiError, setAudioActivity, setConfirmation, uploadClip, useAudioActivity } from './audio-bus';
+import { AudioApiError, interruptPlayback, setAudioActivity, setConfirmation, uploadClip, useAudioActivity } from './audio-bus';
 
 const MAX_MS = 15_000;
 const MAX_BYTES = 3 * 1024 * 1024;
+const HOLD_MS = 350; // shorter presses are taps (toggle); longer ones are hold-to-talk
 const MIME_TYPES = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'audio/ogg', 'audio/mp4'];
 
 type Status = 'idle' | 'starting' | 'recording' | 'transcribing' | 'error' | 'denied' | 'unsupported';
@@ -20,6 +21,8 @@ export function Recorder({ state, onAction, onTranscript }: RecorderProps) {
   const [message, setMessage] = useState('');
   const capture = useRef<Capture | null>(null);
   const upload = useRef<AbortController | null>(null);
+  const press = useRef<{ at: number; started: boolean } | null>(null);
+  const pendingStop = useRef(false); // released a hold before getUserMedia resolved
   const activity = useAudioActivity();
   const attempt = `${state.sessionId}:${state.missionId}:${state.status}`;
   const phase = (operationId: string, next: 'recording' | 'transcribing' | 'confirming' | 'idle') => onAction({ type: 'audioPhase', operationId, phase: next });
@@ -41,7 +44,7 @@ export function Recorder({ state, onAction, onTranscript }: RecorderProps) {
   async function start() {
     const mimeType = supportedMime();
     if (!mimeType) { setStatus('unsupported'); setMessage('This browser cannot record audio here. Type your Mandarin instead.'); return; }
-    setStatus('starting'); setMessage('');
+    setStatus('starting'); setMessage(''); pendingStop.current = false;
     let stream: MediaStream;
     try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); } catch (error) {
       const denied = error instanceof DOMException && (error.name === 'NotAllowedError' || error.name === 'SecurityError');
@@ -50,6 +53,7 @@ export function Recorder({ state, onAction, onTranscript }: RecorderProps) {
       return;
     }
     const operationId = crypto.randomUUID();
+    await interruptPlayback(); // barge-in: the server must see the speech operation end first
     try { await phase(operationId, 'recording'); } catch {
       for (const track of stream.getTracks()) track.stop();
       setStatus('error'); setMessage('Recording is unavailable while other audio is active. Try again in a moment.');
@@ -67,6 +71,20 @@ export function Recorder({ state, onAction, onTranscript }: RecorderProps) {
     recorder.start(1000);
     setAudioActivity('recording');
     setStatus('recording');
+    if (pendingStop.current) stop();
+  }
+
+  function down(event: PointerEvent<HTMLButtonElement>) {
+    try { event.currentTarget.setPointerCapture(event.pointerId); } catch { /* release still reaches the button in practice */ }
+    const started = !capture.current;
+    press.current = { at: Date.now(), started };
+    if (started) void start();
+  }
+  function up() {
+    const current = press.current; press.current = null;
+    if (!current) return;
+    if (!current.started) return stop(); // tap while recording
+    if (Date.now() - current.at >= HOLD_MS) { pendingStop.current = true; stop(); }
   }
 
   function stop() {
@@ -109,18 +127,20 @@ export function Recorder({ state, onAction, onTranscript }: RecorderProps) {
 
   const recording = status === 'recording';
   const busy = status === 'starting' || status === 'transcribing';
-  const blocked = activity === 'playing' || state.status !== 'active';
+  const blocked = activity === 'announcing' || state.status !== 'active';
   const problem = status === 'error' || status === 'denied' || status === 'unsupported';
   return (
     <div className="voice-control" data-testid="recorder">
       <span className="mic-symbol" aria-hidden="true">{recording ? '●' : '◉'}</span>
       <div>
-        <strong>{recording ? 'Listening… speak Mandarin' : status === 'transcribing' ? 'Transcribing…' : 'Speak Mandarin'}</strong>
-        <p>{recording ? 'Up to 15 seconds. Stop when you finish.' : blocked && activity === 'playing' ? 'Wait for the reply audio to finish.' : 'Record, check the transcript, then Send.'}</p>
+        <strong>{recording ? 'Listening…' : status === 'transcribing' ? 'Got it…' : 'Hold to talk'}</strong>
+        <p>{recording ? 'Release or tap Stop when you finish.' : activity === 'announcing' ? 'Wait for the announcement to finish.' : activity === 'playing' ? 'Tap to interrupt and speak.' : 'Speak Mandarin. Hold the button, or tap to start and stop.'}</p>
       </div>
-      {recording
-        ? <><button type="button" onClick={stop}>Stop recording</button><button type="button" onClick={cancel}>Cancel</button></>
-        : <button type="button" onClick={() => void start()} disabled={busy || blocked || status === 'unsupported'}>{problem && status !== 'unsupported' ? 'Re-record' : 'Start recording'}</button>}
+      <button type="button" onPointerDown={down} onPointerUp={up} onPointerCancel={up} disabled={!recording && (busy || blocked || status === 'unsupported')}
+        onKeyDown={(event) => { if (event.repeat || (event.key !== ' ' && event.key !== 'Enter')) return; event.preventDefault(); if (recording) stop(); else if (!busy) void start(); }}>
+        {recording ? 'Stop recording' : problem && status !== 'unsupported' ? 'Re-record' : 'Start recording'}
+      </button>
+      {recording && <button type="button" onClick={cancel}>Cancel</button>}
       {message && <p role="alert" className="recorder-message">{message}</p>}
       {problem && state.inputPreference === 'voice' && <button type="button" onClick={() => void onAction({ type: 'setInputPreference', preference: 'typed-accessibility' }).catch(() => undefined)}>Type instead</button>}
     </div>

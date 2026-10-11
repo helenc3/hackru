@@ -215,9 +215,12 @@ export const ChunkRenderer = memo(function ChunkRenderer({ manifest, centre, far
   const ground = districtGround[manifest.district];
   const placementGroup = ({ item }: { item: Resolved }) => ({ position: [item.placement.x, 0, item.placement.z] as [number, number, number], rotation: [0, item.placement.rotation * DEG, 0] as [number, number, number],
     userData: { clearView: item.entry?.category === 'building' ? 'fade' : 'solid', placementId: item.placement.id } });
-  // Near buildings batch per placement so ClearView can fade them one at a time; near anchors (NPCs) stay live.
+  // NPC assemblies stay live together, including their stands; never bake an animated child into scenery.
+  const hasNpc = (item: Resolved) => item.entry?.id.startsWith('an.npc.') ||
+    (layout.byParent.get(item.placement.id) ?? []).some((child) => child.entry?.id.startsWith('an.npc.'));
+  // Near buildings batch per placement so ClearView can fade them one at a time; near anchors stay live.
   // Everything else joins the chunk batch (trees still fade: their sway group is its own batch).
-  const own = (root: { item: Resolved; lod: number }) => root.lod === 0 && (root.item.entry?.category === 'building' || root.item.entry?.category === 'anchor');
+  const own = (root: { item: Resolved; lod: number }) => hasNpc(root.item) || (root.lod === 0 && (root.item.entry?.category === 'building' || root.item.entry?.category === 'anchor'));
   const near = layout.roots.filter(own);
   return <>
     <group position={[origin.x, 0, origin.z]}>

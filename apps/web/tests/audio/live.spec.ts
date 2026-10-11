@@ -28,12 +28,13 @@ const counter = (page: Page, name: string) => page.evaluate((key) => Number((win
 const liveState = () => PublicStateSchema.parse({ ...fixtureState('Q1'), providerStatus: 'live' });
 
 async function openPanel(page: Page) {
-  await installScriptedApi(page);
-  // Registered last, so it wins: the session starts with live providers.
-  await page.route('**/api/sessions', (route) => route.fulfill({ json: { state: liveState() } }));
+  const api = await installScriptedApi(page);
+  // Keep movement and audio bookkeeping responses in the same live session.
+  api.patch({ providerStatus: 'live' });
   await page.goto('/');
   await page.getByRole('button', { name: 'Start exploring', exact: true }).click();
-  await page.getByRole('button', { name: '老王 · Talk', exact: true }).click();
+  await page.getByTestId('world-renderer').focus();
+  await page.keyboard.press('e');
   return page.getByTestId('dialogue-panel');
 }
 
@@ -54,7 +55,7 @@ test('live voice streams mic audio, renders transcripts, applies turns and honou
       ws.send(JSON.stringify({ type: 'npcTranscript', text: '一杯茶十元。', final: true }));
       ws.send(JSON.stringify({ type: 'audio', data: Buffer.alloc(4800).toString('base64') }));
       ws.send(JSON.stringify({ type: 'audio', data: Buffer.alloc(4800).toString('base64') }));
-      const state = PublicStateSchema.parse({ ...liveState(), version: 1, objectives: liveState().objectives.map((objective, index) => ({ ...objective, complete: index === 0 })) });
+      const state = PublicStateSchema.parse({ ...liveState(), version: 1, xp: 7 });
       ws.send(JSON.stringify({ type: 'turn', turn: TurnResponseSchema.parse({ turnId: 'live-turn-1', state, events: [{ id: 'live-event-1', kind: 'objective', message: 'Order placed.' }], npcReply: '一杯茶十元。', feedback: { understood: 'You asked for tea.', explanation: 'Say the price back to confirm.', improvedExample: '茶十元。' }, vibe: { intent: .9, clarity: .8, courtesy: .8 } }) }));
     });
   });
@@ -68,7 +69,7 @@ test('live voice streams mic audio, renders transcripts, applies turns and honou
   await expect(panel.getByTestId('npc-reply')).toHaveText('一杯茶十元。');
   await expect(panel.locator('.bubble.player')).toHaveText('我要一杯茶。');
   expect(binaryFrames[0]).toBeGreaterThanOrEqual(1280); // ≥ one 40 ms PCM16 frame at 16 kHz
-  await expect(page.getByTestId('quest-panel').locator('li[data-complete="true"]')).toHaveCount(1);
+  await expect(page.getByRole('region', { name: 'Inventory' })).toContainText(/XP\s*7/);
   await expect(page.getByLabel('Quest updates')).toContainText('Order placed.');
   await expect(panel.getByTestId('live-coach')).toContainText('Say the price back to confirm.');
   await expect(panel.getByTestId('live-coach').locator('.mandarin-chip')).toHaveText('茶十元。');
@@ -86,6 +87,7 @@ test('live voice streams mic audio, renders transcripts, applies turns and honou
 
 test('interrupted flushes queued NPC audio', async ({ page }) => {
   await fakeAudio(page);
+  let interrupt: (() => void) | undefined;
   await page.routeWebSocket(/\/live/, (ws) => {
     ws.send(JSON.stringify({ type: 'ready', npcId: 'vendor', sampleRate: 24000 }));
     let first = true;
@@ -94,12 +96,14 @@ test('interrupted flushes queued NPC audio', async ({ page }) => {
       first = false;
       ws.send(JSON.stringify({ type: 'audio', data: Buffer.alloc(48000).toString('base64') }));
       ws.send(JSON.stringify({ type: 'audio', data: Buffer.alloc(48000).toString('base64') }));
-      setTimeout(() => ws.send(JSON.stringify({ type: 'interrupted' })), 150);
+      interrupt = () => ws.send(JSON.stringify({ type: 'interrupted' }));
     });
   });
   const panel = await openPanel(page);
   const status = panel.getByTestId('live-status');
   await expect(status).toHaveAttribute('data-status', 'npc-speaking');
+  await expect.poll(() => counter(page, '__scheduled')).toBe(2);
+  interrupt!();
   await expect(status).toHaveAttribute('data-status', 'live');
   expect(await counter(page, '__stopped')).toBe(2);
 });
@@ -123,12 +127,12 @@ test('a farewell turn followed by the server closing ends the conversation', asy
       sent = true;
       ws.send(JSON.stringify({ type: 'playerTranscript', text: '再见。', final: true }));
       ws.send(JSON.stringify({ type: 'npcTranscript', text: '好的，再见！', final: true }));
-      ws.send(JSON.stringify({ type: 'turn', turn: TurnResponseSchema.parse({ turnId: 'live-bye', state: PublicStateSchema.parse({ ...liveState(), version: 1 }), events: [], npcReply: '好的，再见！', conversationEnded: true }) }));
+      ws.send(JSON.stringify({ type: 'turn', turn: TurnResponseSchema.parse({ turnId: 'live-bye', state: PublicStateSchema.parse({ ...liveState(), version: 1 }), events: [{ id: 'farewell-event', kind: 'objective', message: 'Conversation ended.' }], npcReply: '好的，再见！', conversationEnded: true }) }));
       setTimeout(() => ws.send(JSON.stringify({ type: 'closed', reason: 'farewell' })), 300);
     });
   });
-  const panel = await openPanel(page);
-  await expect(panel.getByTestId('npc-reply')).toContainText('好的，再见！');
+  await openPanel(page);
+  await expect(page.getByLabel('Quest updates')).toContainText('Conversation ended.');
   await expect(page.getByTestId('dialogue-panel')).toHaveCount(0);
   expect(await counter(page, '__trackStops')).toBe(1);
 });

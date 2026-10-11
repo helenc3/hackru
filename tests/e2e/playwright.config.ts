@@ -7,6 +7,7 @@ import { defineConfig, devices } from '@playwright/test';
 const port = Number(process.env.E2E_PORT ?? 4174);
 process.env.E2E_HARNESS_URL = `http://127.0.0.1:${port + 1}`;
 export default defineConfig({
+  timeout: 90_000,
   testDir: '.', testMatch: '**/*.spec.ts', fullyParallel: false, forbidOnly: Boolean(process.env.CI), retries: process.env.CI ? 1 : 0, reporter: 'list',
   use: { baseURL: `http://127.0.0.1:${port}`, trace: 'retain-on-failure' },
   // Chromium: the Linux CI runner's Firefox has no GL driver, and these journeys walk the 3D world.

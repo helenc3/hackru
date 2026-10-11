@@ -1,3 +1,4 @@
+import { GENERATOR_VERSION } from '../../src/city/contracts.js';
 import type { CatalogEntry, ChunkManifest, ChunkPlan, ParamValues } from '../../src/city/contracts.js';
 
 // Tiny stand-in catalog for validator/world-view/directions unit tests (vi.mock'd into catalog/index.js).
@@ -48,7 +49,7 @@ export function plan(over: Partial<ChunkPlan> = {}): ChunkPlan {
 }
 export function manifest(p: ChunkPlan, over: Partial<ChunkManifest> = {}): Omit<ChunkManifest, 'contentHash'> {
   return {
-    worldId: 'w-test', coord: p.coord, district: p.district, catalogVersion: 'test-catalog', generatorVersion: 1, seed: 's',
+    worldId: 'w-test', coord: p.coord, district: p.district, catalogVersion: 'test-catalog', generatorVersion: GENERATOR_VERSION, seed: 's',
     source: 'fixture', questContext: { missionId: 'Q1', weights: { 'drink-vendor': 1, 'direction-helper': 1, 'hotel-landmark': 1, 'river-viewpoint': 1, 'photo-passerby': 1 } }, connectors: p.connectors, roads: p.roads, water: p.water, bridges: [],
     placements: [], anchors: [], missingCapabilities: [], ...over,
   };

@@ -9,7 +9,7 @@ export const CHUNK_SIZE = 40;
 export const SPAWN_RADIUS_CHUNKS = 1;
 export const VISIBLE_RADIUS_CHUNKS = 1;
 export const PREFETCH_RADIUS_CHUNKS = 2;
-export const GENERATOR_VERSION = 1;
+export const GENERATOR_VERSION = 2;
 export const CITY_LIMITS = { maxPlacements: 160, maxAnchors: 12, maxRoads: 24, maxWater: 8, maxBridges: 4, maxTriangles: 120_000, maxDrawCalls: 400 } as const;
 /** deadlineMs started at 8 s; a measured live claude-opus-5-5 chunk took ~12 s (27k input / 1k output tokens), so prefetch waits 20 s. Urgent requests still commit a seeded fallback immediately. */
 export const GENERATION_RULES = { concurrency: 2, deadlineMs: 20_000, retries: 1, batchSize: 6, sessionCallCap: 60, sessionTokenCap: 400_000 } as const;
@@ -21,7 +21,7 @@ export const EXPLORATION_BUDGET_CHUNKS = 4;
 export const DistrictKindSchema = ZoneIdSchema;
 export type DistrictKind = ZoneId;
 /** Gameplay defaults, not Shanghai zoning statistics. Water corridors are reserved separately. */
-export const DISTRICT_TARGETS: Record<DistrictKind, number> = { shopping: 0.35, historic: 0.25, residential: 0.15, waterfront: 0.10, park: 0.08, office: 0.05, industrial: 0.02 };
+export const DISTRICT_TARGETS: Record<DistrictKind, number> = { shopping: 0.72, historic: 0, residential: 0, waterfront: 0.16, park: 0.12, office: 0, industrial: 0 };
 
 const int = z.number().int();
 const local = z.number().finite().min(0).max(CHUNK_SIZE);

@@ -24,17 +24,17 @@ const entry = (spec: Spec): CatalogEntry => ({
 
 export const buildingsCommercialEntries: readonly CatalogEntry[] = [
   entry({
-    id: 'bld.shop.twostory', component: 'ShopTwoStory', description: 'Narrow 2–3 storey street shop: open ground-floor shopfront, flat upper façade with windows and a small balcony.',
-    districts: ['shopping', 'historic'],
-    params: { width: num(4, 8, 6, 'Frontage width (m)'), floors: floors(2, 3, 2), variant: variant(['stucco', 'brick', 'tile']) },
+    id: 'bld.shop.twostory', component: 'ShopTwoStory', description: 'Narrow mixed-use street shop: open ground-floor shopfront, flat upper façade with windows and a small balcony.',
+    districts: ['shopping', 'historic', 'waterfront'],
+    params: { width: num(4, 8, 6, 'Frontage width (m)'), floors: floors(4, 8, 6), variant: variant(['stucco', 'brick', 'tile']) },
     footprint: (p) => ({ w: n(p, 'width'), d: 8, h: storeyHeight(n(p, 'floors')) }),
     sockets: (p) => [front('storefront', 'storefront', 0, 0, 8), front('door', 'door', n(p, 'width') / 2 - 1, 0, 8), front('awning', 'awning', 0, 2.7, 8), front('sign', 'sign', 0, 3.6, 8), front('balcony', 'balcony', 0, GROUND + 0.1, 8)],
     clearance: { front: 2, side: 0 }, capabilities: [], lod: { levels: 2, cullDistance: 120 }, cost: { triangles: 600, drawCalls: 10, instanced: false },
   }),
   entry({
     id: 'bld.shop.corner', component: 'ShopCorner', description: 'Corner shop block with a chamfered corner entrance and shopfronts on two streets (front and +x side).',
-    districts: ['shopping', 'historic'],
-    params: { width: num(8, 12, 10, 'Front width (m)'), depth: num(8, 12, 10, 'Side depth (m)'), floors: floors(2, 4, 3), variant: variant(['stucco', 'brick', 'tile']) },
+    districts: ['shopping', 'historic', 'waterfront'],
+    params: { width: num(8, 12, 10, 'Front width (m)'), depth: num(8, 12, 10, 'Side depth (m)'), floors: floors(4, 8, 6), variant: variant(['stucco', 'brick', 'tile']) },
     footprint: (p) => ({ w: n(p, 'width'), d: n(p, 'depth'), h: storeyHeight(n(p, 'floors')) }),
     sockets: (p) => {
       const w = n(p, 'width'), d = n(p, 'depth');
@@ -45,8 +45,8 @@ export const buildingsCommercialEntries: readonly CatalogEntry[] = [
   }),
   entry({
     id: 'bld.shop.arcade', component: 'ShopArcade', description: 'Qilou-style arcade shop: upper floors over a covered walkway; the 2.5 m arcade strip at the front is walkable.',
-    districts: ['shopping', 'historic'],
-    params: { width: num(6, 16, 10, 'Frontage width (m)'), floors: floors(2, 4, 3), variant: variant(['stucco', 'tile', 'brick']) },
+    districts: ['shopping', 'historic', 'waterfront'],
+    params: { width: num(6, 16, 10, 'Frontage width (m)'), floors: floors(4, 8, 6), variant: variant(['stucco', 'tile', 'brick']) },
     footprint: (p) => ({ w: n(p, 'width'), d: 10, h: storeyHeight(n(p, 'floors')) }),
     // Solid shop body behind; columns at the front corners; walkable arcade between them.
     collision: (p) => {
@@ -66,16 +66,16 @@ export const buildingsCommercialEntries: readonly CatalogEntry[] = [
   }),
   entry({
     id: 'bld.restaurant.dimsum', component: 'RestaurantDimsum', description: 'Two-storey dim-sum restaurant with upturned tiled eaves, lattice upper windows and a lantern-hung entrance.',
-    districts: ['shopping', 'historic'],
+    districts: ['shopping', 'historic', 'waterfront'],
     params: { width: num(7, 10, 8, 'Frontage width (m)'), variant: variant(['red', 'jade'], 'Lacquer colour') },
     footprint: (p) => ({ w: n(p, 'width'), d: 9, h: storeyHeight(2) + 1.2 }),
     sockets: (p) => [front('door', 'door', 0, 0, 9), front('sign', 'sign', 0, 3.4, 9), front('lamp-left', 'lamp', -n(p, 'width') / 2 + 1, 2.6, 9), front('lamp-right', 'lamp', n(p, 'width') / 2 - 1, 2.6, 9), front('window', 'window', -n(p, 'width') / 4, 4.4, 9)],
     clearance: { front: 2.5, side: 0 }, capabilities: [], lod: { levels: 2, cullDistance: 120 }, cost: { triangles: 900, drawCalls: 12, instanced: false },
   }),
   entry({
-    id: 'bld.restaurant.noodle', component: 'RestaurantNoodle', description: 'Narrow noodle shop: 1–2 storeys, open counter window to the street with a roll-up shutter box.',
-    districts: ['shopping', 'historic', 'residential'],
-    params: { width: num(4, 6, 5, 'Frontage width (m)'), floors: floors(1, 2, 1), variant: variant(['tile', 'stucco']) },
+    id: 'bld.restaurant.noodle', component: 'RestaurantNoodle', description: 'Narrow noodle shop: 3–6 storeys, open counter window to the street with a roll-up shutter box.',
+    districts: ['shopping', 'historic', 'residential', 'waterfront'],
+    params: { width: num(4, 6, 5, 'Frontage width (m)'), floors: floors(3, 6, 4), variant: variant(['tile', 'stucco']) },
     footprint: (p) => ({ w: n(p, 'width'), d: 7, h: storeyHeight(n(p, 'floors')) }),
     sockets: (p) => [front('counter', 'counter', -0.6, 0, 7), front('door', 'door', n(p, 'width') / 2 - 0.8, 0, 7), front('awning', 'awning', 0, 2.6, 7), front('sign', 'sign', 0, 2.95, 7)],
     clearance: { front: 2, side: 0 }, capabilities: [], lod: { levels: 2, cullDistance: 100 }, cost: { triangles: 450, drawCalls: 8, instanced: false },

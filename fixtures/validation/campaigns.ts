@@ -17,7 +17,6 @@ export const photo = { id: 'photo-ui', passerbyAnchorId: 'ui.passerby', viewpoin
 
 export function drinkSteps(): Step[] {
   return [
-    { action: { type: 'inspect', targetId: 'ui.menu' }, patch: { visibleCues: [{ id: 'q1.menu', label: '菜单', text: '茶 十元\n水 五元\n咖啡 卖完了' }] } },
     { text: '我要咖啡。', reply: '咖啡卖完了。我们有茶和水。', feedback: true },
     { text: '我要水。', reply: '好的，一杯水，五元。', feedback: true, patch: { npcActions: [{ anchorId: 'ui.vendor', action: { kind: 'pay', anchorId: 'ui.vendor', drink: 'water', priceCny: 5 } }] } },
     { action: { type: 'choose', choiceId: 'q1.pay', anchorId: 'ui.vendor' }, patch: done('Q1', 100, { inventory: { hint: 1, cny: 15, drinks: ['water'] }, npcActions: [] }), event: 'Bought water for ¥5.' },

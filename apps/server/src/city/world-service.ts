@@ -29,7 +29,7 @@ const NEIGHBOURS: [Edge, number, number][] = [['north', 0, -1], ['east', 1, 0], 
 export function createWorldService(options: WorldServiceOptions = {}): WorldService {
   const rules: Record<keyof typeof GENERATION_RULES, number> = { ...GENERATION_RULES, ...options.rules };
   const log = options.log ?? ((entry) => console.info(JSON.stringify({ city: 'chunk', ...entry })));
-  // ponytail: in-memory store, nothing evicted; clients re-restore spawn from IndexedDB after a restart.
+  // Authoritative process-local terrain store, matching session lifetime. Clients stream cached commits on demand.
   const worlds = new Map<string, World>();
   const jobs = new Map<string, Job>();
   const usage = new Map<string, { calls: number; tokens: number }>();
@@ -132,6 +132,7 @@ export function createWorldService(options: WorldServiceOptions = {}): WorldServ
         const layout = worldLayout(seed);
         found = { info: { worldId, seed, generatorVersion: GENERATOR_VERSION, catalogVersion: CATALOG_VERSION, spawn: layout.spawn, hotelAnchorId: layout.hotel.anchorId }, manifests: new Map() };
         worlds.set(worldId, found);
+        log({ city: 'world', event: 'created', worldId, seed });
       }
       return found.info;
     },

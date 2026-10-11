@@ -31,6 +31,12 @@ async function orderedTea(state: InternalState) {
   return (await say(state, '我要茶')).state;
 }
 
+it('keeps scenery signs out of the projected interactions', () => {
+  const state = projectPublicState(game(), NOW, fakeWorld);
+  expect(state.interactables.some((target) => target.id === 'a.menu')).toBe(false);
+  expect(state.interactables.some((target) => target.id === 'a.vendor')).toBe(true);
+});
+
 describe('Q1 buy a drink', () => {
   it('is one goal: coffee is sold out in dialogue, the priced drink enables Pay, the first purchase completes it', async () => {
     let state = game();
@@ -68,19 +74,22 @@ describe('Q1 buy a drink', () => {
     confirmed.position = { x: 10, z: 1 };
     expect(() => act(confirmed, { type: 'choose', choiceId: 'q1.pay', anchorId: 'a.vendor' })).toThrow('Move closer');
   });
-  it('rejects insufficient funds without changing state, and repeat purchases never re-grant the reward', async () => {
-    let state = act(await orderedTea(game()), { type: 'choose', choiceId: 'q1.pay', anchorId: 'a.vendor' });
-    state = act(state, { type: 'retryMission' });
-    state = (await say(state, '我要水')).state;
-    state = act(state, { type: 'choose', choiceId: 'q1.pay', anchorId: 'a.vendor' });
-    expect(state).toMatchObject({ status: 'cleared', xp: 100, inventory: { cny: 5, drinks: ['tea', 'water'] } });
-    expect(state.purchases).toHaveLength(2);
-    const broke = await orderedTea(act(state, { type: 'retryMission' }));
+  it('rejects insufficient funds without changing state', async () => {
+    const broke = await orderedTea(game());
+    broke.inventory.cny = 5;
     expect(() => act(broke, { type: 'choose', choiceId: 'q1.pay', anchorId: 'a.vendor' })).toThrow('Not enough money');
     expect(broke.inventory.cny).toBe(5);
     const bye = await say(broke, '谢谢，再见');
     expect(bye.state.status).toBe('active');
     expect(bye.state.inventory.cny).toBe(5);
+  });
+  it('only starts the next quest after completion and never restarts the current quest', async () => {
+    expect(() => act(game(), { type: 'startMission', missionId: 'Q1' })).toThrow('Only the next quest');
+    expect(() => act(game(), { type: 'startMission', missionId: 'Q2' })).toThrow('Only the next quest');
+    const cleared = act(await orderedTea(game()), { type: 'choose', choiceId: 'q1.pay', anchorId: 'a.vendor' });
+    expect(() => act(cleared, { type: 'startMission', missionId: 'Q1' })).toThrow('Only the next quest');
+    expect(() => act(cleared, { type: 'startMission', missionId: 'Q3' })).toThrow('Only the next quest');
+    expect(act(cleared, { type: 'startMission', missionId: 'Q2' })).toMatchObject({ missionId: 'Q2', status: 'active', xp: 100 });
   });
   it('a goodbye never pays; it offers End conversation next to Pay', async () => {
     const bye = await say(await orderedTea(game()), '谢谢，再见');

@@ -1,6 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import { TurnRequestSchema, TurnResponseSchema } from '@vibequest/shared';
-import { installScriptedApi, type Step } from '../../../../fixtures/ui/scripted-api';
+import { installScriptedApi } from '../../../../fixtures/ui/scripted-api';
 
 /** Fake microphone + playback: no device, no audible output, observable counters. */
 async function fakeMedia(page: Page, options: { deny?: boolean } = {}) {
@@ -36,7 +36,8 @@ const counter = (page: Page, name: string) => page.evaluate((key) => Number((win
 async function openPanel(page: Page) {
   await page.goto('/');
   await page.getByRole('button', { name: 'Start exploring', exact: true }).click();
-  await page.getByRole('button', { name: '老王 · Talk', exact: true }).click();
+  await page.getByTestId('world-renderer').focus();
+  await page.keyboard.press('e');
   return page.getByTestId('dialogue-panel');
 }
 function phases(api: Awaited<ReturnType<typeof installScriptedApi>>) {
@@ -160,90 +161,26 @@ test('pressing the mic interrupts the reply and records only after the speech op
   expect(api.failures).toEqual([]);
 });
 
-test('restarting during a pending reply drops the old audio', async ({ page }) => {
+test('failed-turn recovery reuses one turn ID with the refreshed version', async ({ page }) => {
   await fakeMedia(page);
-  const steps: Step[] = [{ action: { type: 'retryMission' } }];
-  const api = await installScriptedApi(page, { steps });
-  await speechTurns(page, api, 'speech-old');
-  let release = false;
-  await page.route('**/api/sessions/*/speech/*', async (route) => release
-    ? route.fulfill({ status: 200, contentType: 'audio/mpeg', body: Buffer.from('ID3fake') })
-    : route.fulfill({ status: 202, headers: { 'Retry-After': '0' }, json: { status: 'pending' } }));
-  const panel = await openPanel(page);
-  await panel.getByRole('button', { name: 'Use typed Mandarin' }).click();
-  await panel.getByRole('textbox').fill('请给我一杯茶。');
-  await panel.getByRole('button', { name: 'Send Mandarin' }).click();
-  await expect(page.getByTestId('audio-controller')).toContainText('Preparing reply audio');
-  await page.getByRole('button', { name: 'Restart quest' }).click();
-  release = true;
-  await page.waitForTimeout(500);
-  expect(await counter(page, '__plays')).toBe(0);
-  expect(phases(api)).toEqual([]);
-  expect(api.remaining()).toBe(0);
-});
-
-test('deferred turn: retry never waits for Gemini, the old reply stays silent, and failed-turn recovery reuses one turn', async ({ page }) => {
-  await fakeMedia(page);
-  const api = await installScriptedApi(page, { steps: [{ action: { type: 'retryMission' } }] });
+  const api = await installScriptedApi(page);
   const turns: { turnId: string; expectedVersion: number }[] = [];
-  const speechFetches: string[] = [];
-  let releaseOld!: () => void;
-  const held = new Promise<void>((resolve) => { releaseOld = resolve; });
-  let oldAnswered = false;
-  await page.route('**/api/sessions/*/speech/*', (route) => {
-    speechFetches.push(new URL(route.request().url()).pathname.split('/').pop()!);
-    return route.fulfill({ status: 200, contentType: 'audio/mpeg', headers: { 'X-Asset-Duration-Ms': '900' }, body: Buffer.from('ID3fake') });
-  });
   await page.route('**/api/sessions/*/turns', async (route) => {
     const input = TurnRequestSchema.parse(route.request().postDataJSON());
     turns.push(input);
-    if (turns.length === 1) { // slow Gemini turn from the abandoned attempt
-      const before = api.state();
-      await held;
-      oldAnswered = true;
-      return route.fulfill({ json: TurnResponseSchema.parse({ turnId: input.turnId, state: { ...before, version: before.version + 1 }, events: [], npcReply: '旧的回复。', speechId: 'speech-old' }) });
-    }
-    api.patch({ version: api.state().version + 1 }); // provider bookkeeping advances the version either way
-    if (turns.length === 2) return route.fulfill({ status: 503, json: { error: { code: 'PROVIDER_UNAVAILABLE', message: 'The language provider is unavailable. Retry this turn.', retryable: true } } });
-    return route.fulfill({ json: TurnResponseSchema.parse({ turnId: input.turnId, state: api.state(), events: [], npcReply: '新的回复。', speechId: 'speech-new' }) });
+    api.patch({ version: api.state().version + 1 });
+    if (turns.length === 1) return route.fulfill({ status: 503, json: { error: { code: 'PROVIDER_UNAVAILABLE', message: 'The language provider is unavailable. Retry this turn.', retryable: true } } });
+    return route.fulfill({ json: TurnResponseSchema.parse({ turnId: input.turnId, state: api.state(), events: [], npcReply: '新的回复。' }) });
   });
   const panel = await openPanel(page);
   await panel.getByRole('button', { name: 'Use typed Mandarin' }).click();
   await panel.getByRole('textbox').fill('请给我一杯茶。');
   await panel.getByRole('button', { name: 'Send Mandarin' }).click();
-  await expect.poll(() => turns.length).toBe(1);
-
-  // Retry while Gemini is still pending: the retry commits without waiting for the turn.
-  await page.getByRole('button', { name: 'Restart quest' }).click();
-  await expect.poll(() => api.remaining()).toBe(0);
-  const retried = api.requests.find((request) => (request.body as { action?: { type: string } } | null)?.action?.type === 'retryMission');
-  expect(retried).toBeTruthy();
-  expect(oldAnswered).toBe(false);
-  const attemptVersion = api.state().version;
-
-  // The old reply lands in the new attempt: it is neither shown nor fetched nor played.
-  releaseOld();
-  await expect.poll(() => oldAnswered).toBe(true);
-  await page.waitForTimeout(500);
-  await expect(page.getByText('旧的回复。')).toHaveCount(0);
-  expect(speechFetches).toEqual([]);
-  expect(await counter(page, '__plays')).toBe(0);
-  expect(phases(api)).toEqual([]);
-
-  // A failed turn in the new attempt recovers with the same turn ID and a refreshed version.
-  const fresh = page.getByTestId('dialogue-panel');
-  if (!(await fresh.isVisible())) await page.getByRole('button', { name: '老王 · Talk', exact: true }).click();
-  if (await fresh.getByRole('button', { name: 'Use typed Mandarin' }).isVisible()) await fresh.getByRole('button', { name: 'Use typed Mandarin' }).click();
-  await fresh.getByRole('textbox').fill('请给我一杯茶。');
-  await fresh.getByRole('button', { name: 'Send Mandarin' }).click();
   await expect(page.getByTestId('recovery-panel')).toContainText('Retry this turn.');
   await page.getByRole('button', { name: 'Retry request' }).click();
-  await expect(fresh.getByTestId('npc-reply')).toContainText('新的回复。');
-  expect(turns).toHaveLength(3);
-  expect(turns[2].turnId).toBe(turns[1].turnId);
-  expect(turns[1].turnId).not.toBe(turns[0].turnId);
-  expect(turns[1].expectedVersion).toBe(attemptVersion);
-  expect(turns[2].expectedVersion).toBe(attemptVersion + 1);
-  await expect.poll(() => speechFetches).toEqual(['speech-new']);
+  await expect(panel.getByTestId('npc-reply')).toContainText('新的回复。');
+  expect(turns).toHaveLength(2);
+  expect(turns[1].turnId).toBe(turns[0].turnId);
+  expect(turns[1].expectedVersion).toBe(turns[0].expectedVersion + 1);
   expect(api.failures).toEqual([]);
 });

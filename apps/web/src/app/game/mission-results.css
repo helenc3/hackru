@@ -44,7 +44,6 @@
 }
 
 /* Quest panel meta row lost its layout in the CSS refactor: tier and status must not run together. */
-.mission-meta { display: flex; justify-content: space-between; gap: 10px; font-size: 12px; color: var(--text-muted); }
 /* The server debrief sits below the actions as supporting detail; compact its inline sizing so the card leads with the summary. */
 .result-panel .skill-debrief { padding: 12px 16px !important; font-size: 13px !important; margin-top: 18px; border-top: 3px dashed var(--lavender); }
 .result-panel .skill-debrief h2 { font-size: 18px; margin: 4px 0 8px; }

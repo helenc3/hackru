@@ -2,11 +2,12 @@ import {
   AUDIO_PHASE_MAX_MS, CreateGameOptionsSchema, GameActionSchema, InternalStateSchema, PHOTO_RULES, PublicStateSchema, QuestCategorySchema, TurnEvaluationSchema, WORLD_RULES,
   type CreateGameOptions, type EngineResult, type EvidenceRecord, type ExplorationState, type GameAction, type InternalState, type NpcAction, type NpcId, type Position, type PublicInteractable, type PublicState, type QuestCategory, type TurnContext, type TurnEvaluation,
 } from '../contracts.js';
-import { authoredFacts, clarifyReplies, cues, DRINK_PRICES, groundedReplies, npcOpeners, npcs, speakMandarinReplies, STARTING_CNY } from '../content/index.js';
+import { authoredFacts, clarifyReplies, DRINK_PRICES, groundedReplies, npcOpeners, npcs, speakMandarinReplies, STARTING_CNY } from '../content/index.js';
 import { missionFor, missionSnapshot, NEXT_MISSION } from '../content/missions.js';
 import { BIAS_RULES, chunkKey, chunkOf, type Anchor, type Capability, type WorldView } from '../city/contracts.js';
 import { recordEncounters } from '../city/bias.js';
 import { text } from '../city/text-catalog.js';
+import { npcIdentity } from '../city/npc-identity.js';
 import { advanceClock } from './clock.js';
 import { selectPracticeTier, updateSkillsAfterAttempt } from './skills.js';
 export { advanceClock } from './clock.js';
@@ -32,7 +33,6 @@ const PHOTO_VIEWPOINT_RADIUS = 12;
 const INTERACTABLE_RADIUS = 60;
 
 function label(anchor: Anchor): string {
-  if (anchor.kind === 'sign' && anchor.cueId) return cues.find((cue) => cue.id === anchor.cueId)!.label;
   const row = anchor.nameKey ? text(anchor.kind === 'npc' ? 'npc-name' : 'landmark', anchor.nameKey) : undefined;
   return row?.zh ?? (anchor.role ? npcs.find((npc) => npc.id === anchor.role)!.nameZh : anchor.capability === 'hotel-landmark' ? '上海大酒店' : anchor.capability === 'river-viewpoint' ? '黄浦江观景台' : '地标');
 }
@@ -51,7 +51,7 @@ export function createGame(options: CreateGameOptions, nowMs: number): InternalS
   return InternalStateSchema.parse({
     sessionId: parsed.sessionId, worldId: parsed.worldId, attemptId: parsed.attemptId, missionId: parsed.missionId, validationMode: parsed.validationMode, inputPreference: parsed.inputPreference, providerStatus: parsed.providerStatus,
     version: 0, nodeId: mission.startNode, mode: 'practice', status: 'active', zoneId: 'historic', position: parsed.spawn, lastMovementAtMs: nowMs, tier: parsed.initialTier,
-    flags: {}, inventory: { hint: 0, cny: STARTING_CNY, drinks: [] }, purchases: [], xp: 0, badges: [], awardedRewardIds: [], unlockedMissionIds: ['Q1'], completedMissionIds: [], inspectedTargetIds: [],
+    flags: {}, inventory: { hint: 0, cny: STARTING_CNY, drinks: [] }, purchases: [], xp: 0, badges: [], awardedRewardIds: [], unlockedMissionIds: ['Q1'], completedMissionIds: [],
     npcState: Object.fromEntries(npcs.map((npc) => [npc.id, { patience: npc.initialPatience, mood: mood(npc.initialPatience), history: [], anchorId: null, repeatCount: 0, cooldownRemainingMs: 0 }])),
     directions: null, photo: null, exploration,
     evidence: [], skills: Object.fromEntries(['reading', 'listening', 'conversation', 'repair'].map((track) => [track, { mastery: 0.4, independentCount: 0 }])), difficulty: parsed.initialTier, skillUpdatedAttemptIds: [],
@@ -79,7 +79,7 @@ function terminal(state: InternalState, result: 'clear' | 'fail', events: Engine
     if (!state.completedMissionIds.includes(state.missionId)) state.completedMissionIds.push(state.missionId);
     const next = NEXT_MISSION[state.missionId];
     if (next && !state.unlockedMissionIds.includes(next)) state.unlockedMissionIds.push(next);
-    // Repeating a quest (retry) never re-grants its reward.
+    // Grant each authored reward at most once.
     if (!state.awardedRewardIds.includes(mission.reward.id)) {
       state.awardedRewardIds.push(mission.reward.id);
       state.xp += mission.reward.xp;
@@ -93,7 +93,7 @@ function terminal(state: InternalState, result: 'clear' | 'fail', events: Engine
   state.skills = updated.skills; state.skillUpdatedAttemptIds = updated.skillUpdatedAttemptIds;
   if (updated.debrief) state.debrief = updated.debrief;
   state.pauseReasons = [];
-  events.push({ id: `${state.attemptId}.result`, kind: 'result', message: result === 'clear' ? 'Quest complete.' : 'Attempt ended. Retry for a fresh attempt.' });
+  events.push({ id: `${state.attemptId}.result`, kind: 'result', message: result === 'clear' ? 'Quest complete.' : 'Attempt ended.' });
 }
 export function synchronizeGame(state: InternalState, nowMs: number): EngineResult {
   return { state: advanceClock(state, nowMs), events: [] };
@@ -157,17 +157,18 @@ export function applyAction(state: InternalState, raw: GameAction, nowMs: number
   const result = synchronizeGame(state, nowMs);
   const next = result.state;
   const events = result.events;
-  if (action.type === 'retryMission' || action.type === 'startMission') {
-    const missionId = action.type === 'retryMission' ? next.missionId : action.missionId;
+  if (action.type === 'startMission') {
+    const missionId = action.missionId;
+    requireRule(next.status === 'cleared' && NEXT_MISSION[next.missionId] === missionId, 'Only the next quest can be started after completing the current quest.');
     requireRule(next.unlockedMissionIds.includes(missionId), 'Complete the prerequisite quest first.');
     const fresh = createGame({ sessionId: next.sessionId, worldId: next.worldId, attemptId: `${missionId.toLowerCase()}.${nowMs}.${next.version + 1}`, missionId, initialTier: next.difficulty === 0 ? 0 : 1, validationMode: next.validationMode, inputPreference: next.inputPreference, providerStatus: next.providerStatus, spawn: next.position }, nowMs);
-    for (const key of ['version', 'zoneId', 'lastMovementAtMs', 'inventory', 'purchases', 'xp', 'badges', 'awardedRewardIds', 'unlockedMissionIds', 'completedMissionIds', 'inspectedTargetIds', 'directions', 'exploration', 'skills', 'evidence', 'difficulty', 'skillUpdatedAttemptIds'] as const) Object.assign(fresh, { [key]: structuredClone(next[key]) });
+    for (const key of ['version', 'zoneId', 'lastMovementAtMs', 'inventory', 'purchases', 'xp', 'badges', 'awardedRewardIds', 'unlockedMissionIds', 'completedMissionIds', 'directions', 'exploration', 'skills', 'evidence', 'difficulty', 'skillUpdatedAttemptIds'] as const) Object.assign(fresh, { [key]: structuredClone(next[key]) });
     fresh.tier = selectPracticeTier(next, missionId);
     fresh.difficulty = fresh.tier;
     return { state: fresh, events };
   }
   if (action.type === 'setInputPreference') { next.inputPreference = action.preference; return result; }
-  requireRule(next.status === 'active', 'The attempt has ended. Start or retry a quest.');
+  requireRule(next.status === 'active', 'The attempt has ended.');
   switch (action.type) {
     case 'move': {
       const position = action.position;
@@ -177,14 +178,6 @@ export function applyAction(state: InternalState, raw: GameAction, nowMs: number
       requireRule(next.validationMode || distance(position, state.position) <= WORLD_RULES.movementSpeed * Math.max(0, nowMs - (state.lastMovementAtMs ?? nowMs)) / 1000 + 1, 'Movement exceeds the authored speed.');
       next.position = position; next.zoneId = world.districtAt(position); next.lastMovementAtMs = nowMs;
       explore(next, world, nowMs);
-      break;
-    }
-    case 'inspect': {
-      const anchor = requireAnchor(next, world, action.targetId);
-      requireRule(anchor.kind === 'sign' && anchor.cueId, 'Only signs can be inspected.');
-      const cue = cues.find((entry) => entry.id === anchor.cueId)!;
-      for (const id of [anchor.id, cue.id]) if (!next.inspectedTargetIds.includes(id)) next.inspectedTargetIds = [...next.inspectedTargetIds, id].slice(-200);
-      if (cue.missionId === next.missionId) evidence(next, 'reading', 1, cue.id, Boolean(next.flags['session.assisted']));
       break;
     }
     case 'choose': {
@@ -271,7 +264,8 @@ export function dialogueContext(state: InternalState, npcId: NpcId, anchorId: st
   const npc = npcs.find((entry) => entry.id === npcId)!;
   const runtime = state.npcState[npcId];
   requireRule(runtime.patience > 0, 'The NPC needs a short break.');
-  return { missionId: state.missionId, mode: state.mode, tier: state.tier, npcId, anchorId, nameZh: label(anchor), persona: npc.persona, patience: runtime.patience, allowedIntents: [...npc.allowedIntents], facts: { ...state.secretFacts }, history: runtime.history };
+  const identity = npcIdentity(anchor.nameKey);
+  return { missionId: state.missionId, mode: state.mode, tier: state.tier, npcId, anchorId, nameZh: label(anchor), persona: identity ? `${npc.persona} Character gender: ${identity.gender}.` : npc.persona, patience: runtime.patience, allowedIntents: [...npc.allowedIntents], facts: { ...state.secretFacts }, history: runtime.history };
 }
 /** English/other-only, hostile, or unclear mixed input: never acted on, never advances, costs patience. */
 export function offTarget(evaluation: TurnEvaluation): boolean {
@@ -406,7 +400,6 @@ function interactable(state: InternalState, anchor: WorldAnchor): PublicInteract
     const payable = Boolean(orderedDrink(state)) && anchor.id === state.npcState.vendor.anchorId;
     return { ...base, kind: 'npc', role: anchor.role, ...(payable ? { choiceId: 'q1.pay' as const } : {}) };
   }
-  if (anchor.kind === 'sign') return anchor.cueId && cues.find((cue) => cue.id === anchor.cueId)?.missionId === state.missionId ? { ...base, kind: 'sign', cueId: anchor.cueId } : null;
   if (anchor.capability === 'hotel-landmark') return { ...base, kind: 'landmark' };
   if (anchor.capability === 'river-viewpoint' && state.missionId === 'Q3') {
     return state.photo?.viewpointAnchorId === anchor.id && state.photo.status !== 'captured' ? { ...base, kind: 'photo-spot', position: state.photo.spot, choiceId: 'q3.start-photo' } : { ...base, kind: 'landmark' };
@@ -445,7 +438,6 @@ export function projectPublicState(state: InternalState, nowMs: number, world: W
     sessionId: next.sessionId, worldId: next.worldId, version: next.version, missionId: next.missionId, mode: next.mode, status: next.status, zoneId: next.zoneId, position: next.position, tier: next.tier,
     objectives: mission.nodes.map((node) => ({ id: node.id, label: node.objective, complete: next.status === 'cleared' || Boolean(next.flags[node.id]) })),
     interactables,
-    visibleCues: cues.filter((cue) => next.inspectedTargetIds.includes(cue.id)).map((cue) => ({ id: cue.id, label: cue.label, text: cue.textZh })),
     npcMood: Object.fromEntries(npcs.map((npc) => [npc.id, next.npcState[npc.id].mood])), inventory: next.inventory, purchases: next.purchases,
     xp: next.xp, badges: next.badges, unlockedMissionIds: next.unlockedMissionIds, completedMissionIds: next.completedMissionIds,
     directions: next.directions, photo: next.photo, npcActions: npcActions(next), timer: null,

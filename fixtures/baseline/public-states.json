@@ -20,7 +20,6 @@
       }
     ],
     "interactables": [],
-    "visibleCues": [],
     "npcMood": {
       "vendor": "warm",
       "guide": "warm",
@@ -72,7 +71,6 @@
       }
     ],
     "interactables": [],
-    "visibleCues": [],
     "npcMood": {
       "vendor": "warm",
       "guide": "warm",
@@ -124,7 +122,6 @@
       }
     ],
     "interactables": [],
-    "visibleCues": [],
     "npcMood": {
       "vendor": "warm",
       "guide": "warm",

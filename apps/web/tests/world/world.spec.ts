@@ -61,18 +61,12 @@ async function walk(page: Page, key: string, axis: 'x' | 'z', destination: numbe
 }
 async function actions(page: Page) { return JSON.parse(await page.getByTestId('actions').innerText()); }
 
-test('sign, NPC, focus and held-key interactions use shared callbacks once', async ({ page }) => {
+test('signs are inert while NPC, focus and held-key interactions use shared callbacks once', async ({ page }) => {
   await open(page);
   await expect(page.getByTestId('world-renderer')).toHaveAttribute('data-chunks', '9');
   await expect(page.locator('[data-target-id]')).toHaveCount(0);
   await walk(page, 'w', 'z', 6.3, -1);
   await page.keyboard.press('e');
-  await expect(page.getByRole('dialog')).toContainText('茶 十元');
-  await page.waitForTimeout(150); // Position telemetry refreshes every 100 ms.
-  const paused = await coordinate(page, 'z');
-  await page.keyboard.press('w');
-  await expect.poll(() => coordinate(page, 'z')).toBe(paused);
-  await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await walk(page, 'a', 'x', 16.3, -1);
   await walk(page, 'w', 'z', 4.6, -1);
@@ -88,8 +82,7 @@ test('sign, NPC, focus and held-key interactions use shared callbacks once', asy
   await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog')).toHaveCount(0);
   const sent = await actions(page);
-  expect(sent.filter((a: { type: string }) => a.type === 'inspect')).toEqual([{ type: 'inspect', targetId: 'fixture.menu' }]);
-  expect(sent.every((a: { type: string }) => ['inspect', 'move'].includes(a.type))).toBe(true);
+  expect(sent.every((a: { type: string }) => a.type === 'move')).toBe(true);
   expect(sent.filter((a: { type: string }) => a.type === 'move').every((a: { position: { x: number; z: number } }) => Number.isFinite(a.position.x) && Number.isFinite(a.position.z))).toBe(true);
   await expect(page.getByTestId('reward-state')).toHaveText('{"xp":0,"badges":[],"inventory":{"hint":0,"cny":20,"drinks":[]}}');
 });
@@ -116,11 +109,12 @@ test('creek water blocks walking and the level bridge carries the player across'
 
 test('a failed callback records nothing; a lost WebGL context preserves the shell', async ({ page }) => {
   await open(page);
-  await walk(page, 'w', 'z', 6.3, -1);
+  await walk(page, 'w', 'z', 4.6, -1);
+  await walk(page, 'a', 'x', 16.3, -1);
   await page.getByLabel('Fail callback', { exact: true }).check();
   await page.keyboard.press('e');
   await page.waitForTimeout(200);
-  expect((await actions(page)).filter((a: { type: string }) => a.type === 'inspect')).toEqual([]);
+  await expect(page.getByRole('dialog')).toHaveCount(0);
   await page.getByLabel('Fail callback', { exact: true }).uncheck();
   await page.getByTestId('world-renderer').focus();
   await page.keyboard.press('e');

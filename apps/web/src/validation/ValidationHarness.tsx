@@ -13,7 +13,6 @@ export function ValidationHarness({ state, onAction, onTalk }: RendererProps) {
       // Validation sessions may relocate directly; the server still requires a committed walkable position.
       await onAction({ type: 'move', position: target.position });
       if (target.kind === 'npc') onTalk(target.id);
-      else if (target.kind === 'sign') await onAction({ type: 'inspect', targetId: target.id });
       else if (target.kind === 'photo-spot' && state.photo) await onAction({ type: 'choose', choiceId: 'q3.start-photo', anchorId: state.photo.viewpointAnchorId });
     })().catch(() => undefined)}>{target.kind}{target.role ? `/${target.role}` : ''} · {target.id}</button>)}</div>
     <details><summary>Projected state · no evaluator or secret facts</summary><pre>{JSON.stringify(state, null, 2)}</pre></details>

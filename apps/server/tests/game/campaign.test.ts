@@ -23,24 +23,20 @@ describe('Shanghai exploration campaign through the fixture API', () => {
     await game.pay();
     const xp = game.state.xp;
     expect(game.state).toMatchObject({ status: 'cleared', inventory: { cny: 15, drinks: ['water'] } });
-    await game.act({ type: 'retryMission' });
-    await game.talk('我要水。'); await game.talk('水五元。'); await game.pay();
-    expect(game.state.inventory).toMatchObject({ cny: 10, drinks: ['water', 'water'] });
-    expect(game.state.purchases).toHaveLength(2);
+    await game.pay(ANCHORS.vendor.id, 422);
+    await game.act({ type: 'startMission', missionId: 'Q1' }, 422);
+    expect(game.state.inventory).toMatchObject({ cny: 15, drinks: ['water'] });
+    expect(game.state.purchases).toHaveLength(1);
     expect(game.state.xp).toBe(xp);
   });
 
   it('Q1: insufficient funds rejects payment without changing money or inventory', async () => {
     const game = await campaign();
-    for (let round = 0; round < 2; round++) {
-      await game.talk('我要茶。'); await game.talk('茶十元。'); await game.pay();
-      await game.act({ type: 'retryMission' });
-    }
-    expect(game.state.inventory.cny).toBe(0);
+    await game.services.sessionStore.withSession(game.state.sessionId, async (session) => { session.state.inventory.cny = 0; });
     await game.talk('我要水。'); await game.talk('水五元。');
     const rejected = await game.pay(ANCHORS.vendor.id, 422);
     expect(rejected.body.error.code).toBe('ACTION_FORBIDDEN');
-    expect(game.state.inventory).toMatchObject({ cny: 0, drinks: ['tea', 'tea'] });
+    expect(game.state.inventory).toMatchObject({ cny: 0, drinks: [] });
   });
 
   it('Q2: only a guide in reach gives a route, and other destinations are not invented', async () => {
@@ -60,7 +56,7 @@ describe('Shanghai exploration campaign through the fixture API', () => {
     expect(game.state.status).toBe('cleared');
   });
 
-  it('Q3: missing viewpoint, wrong spot, early or failed capture never complete; retry gives no duplicate reward', async () => {
+  it('Q3: missing viewpoint, wrong spot, early or failed capture never complete; completed quests cannot restart', async () => {
     const game = await campaign(); await q1(game); await q2(game);
     await game.act({ type: 'startMission', missionId: 'Q3' });
     await game.walkTo(ANCHORS.lonely.position);
@@ -83,7 +79,7 @@ describe('Shanghai exploration campaign through the fixture API', () => {
     await game.capture('captured');
     const xp = game.state.xp;
     expect(game.state.status).toBe('cleared');
-    await game.act({ type: 'retryMission' });
-    expect(game.state).toMatchObject({ status: 'active', photo: null, xp });
+    await game.act({ type: 'startMission', missionId: 'Q3' }, 422);
+    expect(game.state).toMatchObject({ status: 'cleared', photo: { status: 'captured' }, xp });
   });
 });

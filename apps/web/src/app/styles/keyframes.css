@@ -1,16 +1,17 @@
+/* Keep layout transforms (such as popup centering) intact during entry. */
 @keyframes vq-pop {
   0% {
-    transform: scale(.92);
+    scale: .92;
     opacity: 0;
   }
 
   60% {
-    transform: scale(1.04);
+    scale: 1.04;
     opacity: 1;
   }
 
   100% {
-    transform: scale(1);
+    scale: 1;
   }
 }
 

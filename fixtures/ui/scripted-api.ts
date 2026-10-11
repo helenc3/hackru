@@ -15,9 +15,8 @@ export const fixtureState = (missionId: MissionId, validation = false): PublicSt
   objectives: [{ id: `${missionId.toLowerCase()}.goal`, label: goals[missionId], complete: false }],
   interactables: [
     { id: `ui.${roles[missionId][0]}`, kind: 'npc', role: roles[missionId][0], label: roles[missionId][1], position: spawn },
-    { id: 'ui.menu', kind: 'sign', label: '菜单', position: spawn, cueId: 'q1.menu' },
   ],
-  visibleCues: [], npcMood: { vendor: 'warm', guide: 'warm', passerby: 'warm' }, inventory: { hint: 1, cny: 20, drinks: [] }, purchases: [],
+  npcMood: { vendor: 'warm', guide: 'warm', passerby: 'warm' }, inventory: { hint: 1, cny: 20, drinks: [] }, purchases: [],
   xp: 0, badges: [], unlockedMissionIds: ['Q1', 'Q2', 'Q3'].slice(0, ['Q1', 'Q2', 'Q3'].indexOf(missionId) + 1), completedMissionIds: [],
   directions: null, photo: null, npcActions: [], timer: null, capabilities: { coach: true, hints: true, freeze: false },
   validationMode: validation, inputPreference: 'voice', providerStatus: 'fixture',

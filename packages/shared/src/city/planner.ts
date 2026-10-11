@@ -12,7 +12,7 @@ import { createRng, hashString } from './rng.js';
 // E-W roads after cities, as in central Shanghai. The Huangpu is a straight N-S corridor with
 // promenades on both banks; creeks run E-W into it west of the river. All values are tunable.
 
-export const ROAD_WIDTH = { avenue: 10, street: 7, lane: 3, promenade: 6 } as const;
+export const ROAD_WIDTH = { avenue: 5, street: 3.5, lane: 1.5, promenade: 3 } as const;
 /** Sidewalk strip kept clear of buildings on each side of every road and creek. */
 export const SIDEWALK = 2.5;
 const CREEK = { half: 4 } as const;
@@ -96,13 +96,12 @@ function crossesVerticalEdge(seed: string, cx: number, cz: number, layout: World
 
 // ---------------------------------------------------------------- districts
 
-const LAND_KINDS = (['shopping', 'historic', 'residential', 'park', 'office', 'industrial'] as const);
-const CELL = 3;
+const LAND_KINDS = (['shopping', 'park'] as const);
+const CELL = 6;
 function cellKind(seed: string, gx: number, gz: number): DistrictKind {
   const r = createRng(seed, 'cell', gx, gz);
   r(); r();
-  const far = Math.max(Math.abs(gx), Math.abs(gz)) * CELL > 9;
-  const weights = LAND_KINDS.map((kind) => DISTRICT_TARGETS[kind] * (kind === 'industrial' ? (far ? 8 : 0.3) : 1));
+  const weights = LAND_KINDS.map((kind) => DISTRICT_TARGETS[kind]);
   let roll = r() * weights.reduce((a, b) => a + b, 0);
   for (let i = 0; i < LAND_KINDS.length; i++) { roll -= weights[i]!; if (roll <= 0) return LAND_KINDS[i]!; }
   return 'shopping';
@@ -121,15 +120,11 @@ function voronoi(seed: string, cx: number, cz: number): DistrictKind {
 export function districtOf(seed: string, coord: ChunkCoord): DistrictKind {
   const { cx, cz } = coord;
   const layout = worldLayout(seed);
-  if (isRiverCol(cx)) return 'waterfront';
+  if (cx >= westBankCol() - 1 && cx <= eastBankCol() + 1 && !inSpawnBox(coord)) return 'waterfront';
   if (cx === 0 && cz === 0) return 'shopping';
-  // Lujiazui-style office cluster on the east bank.
-  if ((cx === eastBankCol() + 1 || cx === eastBankCol() + 2) && Math.abs(cz) <= 3) return 'office';
   const v = voronoi(seed, cx, cz);
-  if (cx === layout.hotel.coord.cx && cz === layout.hotel.coord.cz) return v === 'historic' || v === 'office' ? v : 'shopping';
-  if (inSpawnBox(coord)) return v === 'historic' ? 'historic' : 'shopping';
-  // Retail follows busy streets: avenue crossings turn residential/industrial blocks into shops.
-  if ((v === 'residential' || v === 'industrial') && colKind(cx) === 'avenue' && rowKind(cz) === 'avenue' && Math.max(Math.abs(cx), Math.abs(cz)) <= 9) return 'shopping';
+  if (cx === layout.hotel.coord.cx && cz === layout.hotel.coord.cz) return 'shopping';
+  if (inSpawnBox(coord)) return 'shopping';
   return v;
 }
 

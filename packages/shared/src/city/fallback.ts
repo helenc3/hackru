@@ -4,6 +4,7 @@ import {
 } from './contracts.js';
 import { CATALOG, CATALOG_VERSION, catalogEntry, resolveParams } from './catalog/index.js';
 import { TEXT_CATALOG } from './text-catalog.js';
+import { npcIdentity } from './npc-identity.js';
 import { sealManifest } from './hash.js';
 import { planChunk, SIDEWALK, worldLayout, type PlannedChunk } from './planner.js';
 import { createRng } from './rng.js';
@@ -55,6 +56,7 @@ export function generateFallbackChunk(worldId: string, seed: string, coord: Chun
   const blocks: Rect[] = [];      // occupancy of solid items (footprint for ground items, solid bbox otherwise)
   const flats: Rect[] = [];       // walkable ground cover (lawns, courtyards)
   const keep: Rect[] = [];        // stand points, spawn
+  const npcSpace: Rect[] = [];    // character bodies, including non-colliding socket vendors
   const structures: { solids: Rect[]; zones: Rect[] }[] = []; // validator "structures" (symmetric clearance rule)
   const budget = { triangles: 0, drawCalls: 0, instanced: new Set<string>() };
   let serial = 0;
@@ -62,6 +64,10 @@ export function generateFallbackChunk(worldId: string, seed: string, coord: Chun
   const entries = (filter: (entry: CatalogEntry) => boolean) => CATALOG.filter((entry) => approved(entry) && filter(entry));
   /** Names other than the quest givers, so 老王 and 小李 stay unique. */
   const extraNames = () => Object.keys(TEXT_CATALOG['npc-name']).filter((k) => !QUEST_GIVERS.includes(k));
+  const randomName = () => {
+    const gender = rng() < 0.5 ? 'male' : 'female';
+    return pick(extraNames().filter((name) => npcIdentity(name)?.gender === gender))!;
+  };
 
   if (cx === 0 && cz === 0) { const s = worldLayout(seed).spawn; keep.push(square(s.x, s.z, 1.5)); }
 
@@ -71,7 +77,7 @@ export function generateFallbackChunk(worldId: string, seed: string, coord: Chun
       if (key in overrides) { out[key] = overrides[key]!; continue; }
       switch (spec.type) {
         case 'number': { const raw = spec.min + rng() * (spec.max - spec.min); out[key] = spec.step ? Math.min(spec.max, round(spec.min + Math.round((raw - spec.min) / spec.step) * spec.step)) : round(raw); break; }
-        case 'int': out[key] = spec.min + Math.floor(rng() * (spec.max - spec.min + 1)); break;
+        case 'int': { const min = key === 'floors' || key === 'stories' ? Math.max(spec.min, spec.max - 2) : spec.min; out[key] = min + Math.floor(rng() * (spec.max - min + 1)); break; }
         case 'enum': out[key] = pick(spec.values)!; break;
         case 'boolean': out[key] = rng() < 0.5; break;
         case 'text': {
@@ -107,6 +113,13 @@ export function generateFallbackChunk(worldId: string, seed: string, coord: Chun
     const fp = shift(rotateRect({ minX: -size.w / 2, maxX: size.w / 2, minZ: -size.d / 2, maxZ: size.d / 2 }, rot), x, z);
     const solids = entry.collision(params).solids.map((r) => shift(rotateRect(r, rot), x, z));
     const attached = Boolean(options.attachTo);
+    if (npcSpace.some((space) => overlaps(fp, space))) return null;
+    if (entry.id.startsWith('an.npc.') && placements.some((other) => {
+      if (other.id === options.attachTo?.placementId) return false;
+      const catalog = catalogEntry(other.assetId)!;
+      return catalog.collision(resolveParams(catalog, other.params)).solids.some((solid) =>
+        overlaps(fp, shift(rotateRect(solid, other.rotation), other.x, other.z)));
+    })) return null;
     const wet = entry.placement === 'water' || entry.placement === 'water-edge';
     if (!attached) {
       if (fp.minX < -1e-6 || fp.minZ < -1e-6 || fp.maxX > CHUNK_SIZE + 1e-6 || fp.maxZ > CHUNK_SIZE + 1e-6) return null;
@@ -137,9 +150,20 @@ export function generateFallbackChunk(worldId: string, seed: string, coord: Chun
     if (structure(entry, solids, attached)) structures.push({ solids, zones: clearanceZones(entry, params, x, z, rot) });
     const id = `p${++serial}`;
     placements.push({ id, assetId: entry.id, params: rawParams, x, z, rotation: rot, ...(options.attachTo ? { attachTo: options.attachTo } : {}) });
+    if (entry.id.startsWith('an.npc.')) npcSpace.push(fp);
     return id;
   }
   const parentOf = (id: string) => placements.find((p) => p.id === id)!;
+  /** A failed gameplay assembly must leave neither scenery nor occupancy/budget behind. */
+  function transaction(build: () => boolean): boolean {
+    const lists = [placements, anchors, blocks, flats, keep, npcSpace, structures];
+    const lengths = lists.map((list) => list.length);
+    const saved = { serial, triangles: budget.triangles, drawCalls: budget.drawCalls, instanced: new Set(budget.instanced) };
+    if (build()) return true;
+    lists.forEach((list, i) => { list.length = lengths[i]!; });
+    serial = saved.serial; budget.triangles = saved.triangles; budget.drawCalls = saved.drawCalls; budget.instanced = saved.instanced;
+    return false;
+  }
   /** Attach an entry to a parent's socket of one of the given kinds; returns the new placement ID. */
   function attach(parentId: string, kinds: readonly string[], candidates: CatalogEntry[], overrides: ParamValues = {}, required = false): string | null {
     const parent = parentOf(parentId);
@@ -151,7 +175,7 @@ export function generateFallbackChunk(worldId: string, seed: string, coord: Chun
       const entry = pick(fits);
       if (!entry) continue;
       const p = rotatePoint(socket.x, socket.z, parent.rotation);
-      const x = Math.max(0, Math.min(CHUNK_SIZE, parent.x + p.x)), z = Math.max(0, Math.min(CHUNK_SIZE, parent.z + p.z));
+      const x = parent.x + p.x, z = parent.z + p.z;
       const id = place(entry, randomParams(entry, overrides), x, z, ((parent.rotation + socket.facing) % 360) as Rot, { attachTo: { placementId: parentId, socketId: socket.id }, required });
       if (id) return id;
     }
@@ -182,7 +206,8 @@ export function generateFallbackChunk(worldId: string, seed: string, coord: Chun
 
   // ---------------------------------------------------------------- quest anchors
 
-  const vendorEntries = entries((e) => e.capabilities.includes('drink-vendor') && e.placement !== 'socket');
+  // Vendors always come with a visible serving stand, rather than a character outside a shop shell.
+  const vendorEntries = entries((e) => e.id === 'an.vendor.drink-stall' || e.id === 'an.vendor.cafe-counter');
   const npcVendor = entries((e) => e.id === 'an.npc.vendor' || (e.capabilities.includes('drink-vendor') && e.placement === 'socket'));
   const menuSigns = entries((e) => e.capabilities.includes('readable-sign') && Object.values(e.params).some((p) => p.type === 'text' && p.catalog === 'menu'));
   function vendorAt(standX: number, standZ: number, id: string, nameKey: string, required: boolean): boolean {
@@ -196,9 +221,12 @@ export function generateFallbackChunk(worldId: string, seed: string, coord: Chun
       const valid = resolved(entry, params);
       if (!valid) continue;
       const c = behind(face, front, along, entry.footprint(valid).d / 2);
-      const placementId = place(entry, params, c.x, c.z, FACE[face].rot, { required });
+      let placementId: string | null = null;
+      if (!transaction(() => {
+        placementId = place(entry, params, c.x, c.z, FACE[face].rot, { required });
+        return Boolean(placementId && attach(placementId, ['npc'], npcVendor, { nameKey }, required));
+      })) continue;
       if (!placementId) continue;
-      attach(placementId, ['npc'], npcVendor, { nameKey }, required);
       addAnchor({ id, placementId, capability: 'drink-vendor', kind: 'npc', role: 'vendor', nameKey, x: round(standX), z: round(standZ) });
       // A readable menu beside the counter (q1.menu reading evidence).
       const sign = pick(menuSigns);
@@ -221,9 +249,10 @@ export function generateFallbackChunk(worldId: string, seed: string, coord: Chun
     if (!dir) { const { face } = frontage(standX, standZ); dir = { dx: -FACE[face].dx, dz: -FACE[face].dz }; }
     const fx = standX + dir.dx * 1.2, fz = standZ + dir.dz * 1.2;
     const facing: Face = dir.dx > 0 ? 'w' : dir.dx < 0 ? 'e' : dir.dz > 0 ? 'n' : 's';
-    const figures = entries((e) => e.capabilities.includes(capability) && e.placement !== 'socket');
+    // Capability also belongs to scenery (the info board), which has no character mesh.
+    const figures = entries((e) => e.id === `an.npc.${role}` && e.capabilities.includes(capability));
     for (const entry of figures) {
-      const nameKey = fixedName ?? pick(extraNames())!;
+      const nameKey = fixedName ?? randomName();
       const placementId = place(entry, randomParams(entry, 'nameKey' in entry.params ? { nameKey } : {}), fx, fz, FACE[facing].rot, { onRoad: true, required });
       if (!placementId) continue;
       addAnchor({ id, placementId, capability, kind: 'npc', role, nameKey, x: round(standX), z: round(standZ) });
@@ -260,7 +289,7 @@ export function generateFallbackChunk(worldId: string, seed: string, coord: Chun
   for (const required of plan.requiredAnchors) {
     const near = required.near ?? { x: CHUNK_SIZE / 2, z: CHUNK_SIZE / 2 };
     switch (required.capability) {
-      case 'drink-vendor': vendorAt(near.x, near.z, required.anchorId, required.nameKey ?? pick(extraNames())!, true); break;
+      case 'drink-vendor': vendorAt(near.x, near.z, required.anchorId, required.nameKey ?? randomName(), true); break;
       case 'direction-helper': figureAt(near.x, near.z, 'direction-helper', required.anchorId, null, true, required.nameKey); break;
       case 'river-viewpoint': viewpointAt(near.x, near.z, required.anchorId, true); break;
       case 'photo-passerby': {
@@ -300,6 +329,27 @@ export function generateFallbackChunk(worldId: string, seed: string, coord: Chun
       }
     }
   }
+  const lots = computeLots(plan.roads, plan.water);
+  // Place optional NPCs before waterfront decorations and buildings.
+  const facing = lots.filter((lot) => lot.faces.length);
+  if (!requiredKinds.has('drink-vendor') && facing.length && rng() < Math.min(1, VENDOR_BASE[district] * weight('drink-vendor'))) {
+    const lot = pick(facing)!, face = pick(lot.faces)!;
+    const span = FACE[face].dz !== 0 ? [lot.rect.minX + 3, lot.rect.maxX - 3] : [lot.rect.minZ + 3, lot.rect.maxZ - 3];
+    if (span[1]! > span[0]!) {
+      const along = span[0]! + rng() * (span[1]! - span[0]!);
+      const front = frontLine(lot.rect, face);
+      const stand = behind(face, front, along, -SIDEWALK / 2);
+      vendorAt(stand.x, stand.z, anchorId('vendor'), randomName(), false);
+    }
+  }
+  if (!requiredKinds.has('direction-helper') && district !== 'industrial' && facing.length && rng() < Math.min(1, 0.3 * weight('direction-helper'))) {
+    const lot = pick(facing)!, face = pick(lot.faces)!;
+    const along = FACE[face].dz !== 0 ? (lot.rect.minX + lot.rect.maxX) / 2 : (lot.rect.minZ + lot.rect.maxZ) / 2;
+    const stand = behind(face, frontLine(lot.rect, face), along, -0.6);
+    figureAt(stand.x, stand.z, 'direction-helper', anchorId('guide'), null, false);
+  }
+
+
   const railing = entries((e) => e.id === 'wf.railing')[0] ?? entries((e) => e.category === 'waterfront' && e.placement === 'water-edge' && e.attachesTo === undefined && e.collision(resolveParams(e)).walkable.length === 0)[0];
   const lengthParam = railing && Object.entries(railing.params).find(([, spec]) => spec.type === 'number' && spec.max >= 10)?.[0];
   /** Railings straddle a water edge, skipping bridges and kept zones. */
@@ -339,26 +389,6 @@ export function generateFallbackChunk(worldId: string, seed: string, coord: Chun
 
   // ---------------------------------------------------------------- lots and frontage
 
-  const lots = computeLots(plan.roads, plan.water);
-  // Optional quest anchors before buildings so their sidewalks stay clear.
-  const facing = lots.filter((lot) => lot.faces.length);
-  if (!requiredKinds.has('drink-vendor') && facing.length && rng() < Math.min(1, VENDOR_BASE[district] * weight('drink-vendor'))) {
-    const lot = pick(facing)!, face = pick(lot.faces)!;
-    const span = FACE[face].dz !== 0 ? [lot.rect.minX + 3, lot.rect.maxX - 3] : [lot.rect.minZ + 3, lot.rect.maxZ - 3];
-    if (span[1]! > span[0]!) {
-      const along = span[0]! + rng() * (span[1]! - span[0]!);
-      const front = frontLine(lot.rect, face);
-      const stand = behind(face, front, along, -SIDEWALK / 2);
-      vendorAt(stand.x, stand.z, anchorId('vendor'), pick(extraNames())!, false);
-    }
-  }
-  if (!requiredKinds.has('direction-helper') && district !== 'industrial' && facing.length && rng() < Math.min(1, 0.3 * weight('direction-helper'))) {
-    const lot = pick(facing)!, face = pick(lot.faces)!;
-    const along = FACE[face].dz !== 0 ? (lot.rect.minX + lot.rect.maxX) / 2 : (lot.rect.minZ + lot.rect.maxZ) / 2;
-    const stand = behind(face, frontLine(lot.rect, face), along, -0.6);
-    figureAt(stand.x, stand.z, 'direction-helper', anchorId('guide'), null, false);
-  }
-
   const buildings = entries((e) => e.category === 'building' && e.placement === 'ground' && e.districts.includes(district) && !/wall|gate/.test(e.id));
   const frontageExtras = entries((e) => e.id === 'st.metro.entrance' && e.districts.includes(district));
   const modules = entries((e) => e.category === 'storefront' && e.placement === 'socket' && e.collision(resolveParams(e)).solids.length === 0 && e.districts.includes(district));
@@ -374,7 +404,7 @@ export function generateFallbackChunk(worldId: string, seed: string, coord: Chun
     let cursor = start + rng() * 0.8, deepest = 0, metro = false;
     while (cursor < end - 2.5 && kit.length) {
       let placed = false;
-      for (let attempt = 0; attempt < 6 && !placed; attempt++) {
+      for (let attempt = 0; attempt < 16 && !placed; attempt++) {
         const useMetro: boolean = !metro && frontageExtras.length > 0 && rng() < 0.08;
         const entry = useMetro ? frontageExtras[0]! : pick(kit)!;
         const params = randomParams(entry);
@@ -388,7 +418,7 @@ export function generateFallbackChunk(worldId: string, seed: string, coord: Chun
         placed = true; metro ||= Boolean(useMetro);
         deepest = Math.max(deepest, d);
         if (rng() < ATTACH_P[district]) for (let k = 0; k < 4; k++) if (!attach(id, ['storefront', 'door', 'window', 'sign', 'awning', 'lamp', 'balcony'], modules)) break;
-        cursor += w + (/lanehouse/.test(entry.id) && rng() < 0.6 ? 0 : 0.5 + rng() * 1.5);
+        cursor += w + entry.clearance.side * 2 + 0.25;
       }
       if (!placed) cursor += 1;
     }
@@ -404,35 +434,41 @@ export function generateFallbackChunk(worldId: string, seed: string, coord: Chun
       if (w >= 4 && d >= 4) place(lawn, { ...randomParams(lawn), width: round(w), depth: round(d) }, (rect.minX + rect.maxX) / 2, (rect.minZ + rect.maxZ) / 2, 0);
     }
     const features = entries((e) => e.category === 'landscape' && e.districts.includes('park') && e.id !== 'ls.park.lawn' && e.id !== 'ls.courtyard.tiles');
-    scatter(rect, features, 10, 's');
-    scatter(rect, entries((e) => e.id === 'st.bench' || e.id === 'st.lamp.lantern-post'), 3, 's');
+    arrangeFeatures(rect, features, 10, 's');
+    arrangeFeatures(rect, entries((e) => e.id === 'st.bench' || e.id === 'st.lamp.lantern-post'), 3, 's');
   }
   function interiorFill(rect: Rect, face: Face) {
-    const big = entries((e) => e.category === 'building' && e.placement === 'ground' && e.districts.includes(district) && (district === 'residential' ? /apartment|courtyard/.test(e.id) : /courtyard|wall|warehouse\.shed/.test(e.id)));
-    scatter(rect, big, 2, face);
-    const green = entries((e) => e.category === 'landscape' && e.districts.includes(district) && e.id !== 'ls.park.lawn');
-    scatter(rect, green, 5, face);
+    // Fill block interiors with aligned rows; greenery belongs to parks and sidewalk slots.
+    for (let z = rect.minZ + 4; z < rect.maxZ - 3; z += 9) {
+      for (let x = rect.minX + 3; x < rect.maxX - 2; x += 6) {
+        for (const entry of kit.filter((e) => /shop.twostory|restaurant.noodle/.test(e.id))) {
+          const params = randomParams(entry, { width: 4 });
+          const valid = resolved(entry, params);
+          if (!valid) continue;
+          const f = entry.footprint(valid);
+          const [w, d] = FACE[face].dz !== 0 ? [f.w, f.d] : [f.d, f.w];
+          if (x - w / 2 < rect.minX || x + w / 2 > rect.maxX || z - d / 2 < rect.minZ || z + d / 2 > rect.maxZ) continue;
+          if (place(entry, params, x, z, FACE[face].rot)) break;
+        }
+      }
+    }
   }
-  /** Rejection-sample a few items inside a rect, all facing one way. */
-  function scatter(rect: Rect, list: CatalogEntry[], count: number, face: Face) {
+  /** Authored park grid: clear paths between rows, with furniture at fixed stations. */
+  function arrangeFeatures(rect: Rect, list: CatalogEntry[], count: number, face: Face) {
     if (!list.length) return;
-    for (let i = 0, tries = 0; i < count && tries < count * 6; tries++) {
-      const entry = pick(list)!;
-      const params = randomParams(entry);
-      const valid = resolved(entry, params);
-      if (!valid) continue;
-      const size = entry.footprint(valid);
-      const [w, d] = FACE[face].dz !== 0 ? [size.w, size.d] : [size.d, size.w];
-      if (w > rect.maxX - rect.minX || d > rect.maxZ - rect.minZ) continue;
-      const x = rect.minX + w / 2 + rng() * (rect.maxX - rect.minX - w), z = rect.minZ + d / 2 + rng() * (rect.maxZ - rect.minZ - d);
-      if (place(entry, params, x, z, FACE[face].rot)) i++;
+    let placed = 0, station = 0;
+    for (let z = rect.minZ + 3; z <= rect.maxZ - 3 && placed < count; z += 6) {
+      for (let x = rect.minX + 3; x <= rect.maxX - 3 && placed < count; x += 6) {
+        const entry = list[station++ % list.length]!;
+        if (place(entry, randomParams(entry), x, z, FACE[face].rot)) placed++;
+      }
     }
   }
 
   // ---------------------------------------------------------------- sidewalk furniture
 
   const props = entries((e) => (e.category === 'street' || e.category === 'landscape') && e.placement === 'sidewalk' && e.districts.includes(district) && e.capabilities.length === 0 && e.collision(resolveParams(e)).solids.length > 0);
-  const propWeights = props.flatMap((e) => (/^ls\.tree/.test(e.id) ? [e, e, e] : /lamp/.test(e.id) ? [e, e] : [e]));
+  const stationKits = [/^ls\.tree/, /lamp/, /bench|bikerack|sharedbikes/, /^ls\.tree/].map((pattern) => props.filter((e) => pattern.test(e.id)));
   const named = (e: CatalogEntry) => Object.entries(e.params).find(([, spec]) => spec.type === 'text' && spec.catalog === 'road-name')?.[0];
   plan.roads.forEach((road, index) => sidewalk(road, index));
   function sidewalk(road: Road, index: number) {
@@ -442,10 +478,12 @@ export function generateFallbackChunk(worldId: string, seed: string, coord: Chun
     for (const side of [-1, 1] as const) {
       const face: Face = horizontal ? (side < 0 ? 's' : 'n') : (side < 0 ? 'e' : 'w');
       const line = horizontal ? (side < 0 ? rect.minZ - 0.7 : rect.maxZ + 0.7) : (side < 0 ? rect.minX - 0.7 : rect.maxX + 0.7);
-      for (let s = a + 2 + rng() * 3; s < b - 2; s += 5 + rng() * 3) {
+      for (let s = a + 4; s < b - 2; s += 8) {
         const x = horizontal ? s : line, z = horizontal ? line : s;
         if (others.some((r) => overlaps(square(x, z, 2.5), r))) continue;
-        const entry = pick(propWeights);
+        const slot = Math.floor((s - a) / 8);
+        const candidates = stationKits[slot % stationKits.length]!;
+        const entry = candidates[(index + slot) % candidates.length] ?? props[slot % props.length];
         if (!entry) return;
         const roadKey = named(entry);
         place(entry, randomParams(entry, roadKey && road.nameKey ? { [roadKey]: road.nameKey } : {}), x, z, FACE[face].rot);
@@ -468,7 +506,10 @@ export function generateFallbackChunk(worldId: string, seed: string, coord: Chun
   });
   // Safety net: optional pieces that the local checks missed (e.g. an anchor on a lot cut off by a
   // creek) are dropped deterministically; required anchors are never dropped.
-  return validateManifest(manifest, plan).ok ? manifest : repairManifest(manifest, plan) ?? manifest;
+  if (validateManifest(manifest, plan).ok) return manifest;
+  const repaired = repairManifest(manifest, plan);
+  if (repaired && validateManifest(repaired, plan).ok) return repaired;
+  throw new Error(`Fallback city generation failed validation for ${worldId} chunk ${cx},${cz}`);
 }
 
 function frontLine(rect: Rect, face: Face): number {

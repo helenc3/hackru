@@ -1,7 +1,7 @@
 import { useMemo, useRef, type RefObject } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { CanvasTexture, SRGBColorSpace, type Group } from 'three';
-import { text, type ParamValues, type Position, type TextCatalogName } from '@vibequest/shared';
+import { npcIdentity, text, type ParamValues, type Position, type TextCatalogName } from '@vibequest/shared';
 import { candy, INK, Toon } from '../../world/toon';
 import { Npc } from '../../world/characters';
 import type { AssetComponent } from './types';
@@ -144,13 +144,12 @@ function RiverViewpoint({ params, still }: { params: ParamValues; still: boolean
   </group>;
 }
 
-const outfitLook: Record<string, string> = { apron: 'xiaolin', smart: 'achen', casual: 'passerby' };
 const nobody: RefObject<{ position: Position } | null> = { current: null };
 const origin: Position = { x: 0, z: 0 };
 function figure(defaultOutfit: string): AssetComponent {
   return function NpcFigure({ params, seed }) {
     return <group userData={{ clearView: 'solid' }}>
-      <Npc id={outfitLook[str(params, 'outfit', defaultOutfit)] ?? 'passerby'} index={seed % 7} look={nobody as RefObject<{ position: Position }>} offset={origin} />
+      <Npc id={npcIdentity(str(params, 'nameKey', 'xiaoli'))?.look ?? 'achen'} outfit={str(params, 'outfit', defaultOutfit)} index={seed % 7} look={nobody as RefObject<{ position: Position }>} offset={origin} />
     </group>;
   };
 }

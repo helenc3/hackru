@@ -1,6 +1,6 @@
 import {
   ActionRequestSchema, CreateSessionRequestSchema, TurnRequestSchema, TurnResponseSchema, createGame, applyAction, applyEvaluation, isClosingLine, projectPublicState,
-  synchronizeGame, dialogueContext, turnActions, groundedReply, createFixtureDialogueProvider, EngineRuleError, validateEvaluationForContext,
+  synchronizeGame, dialogueContext, turnActions, groundedReply, createFixtureDialogueProvider, EngineRuleError, validateEvaluationForContext, npcIdentity,
   type PublicState, type TurnRequest, type TurnContext, type TurnResponse, type ActionResponse, type WorldView,
 } from '@vibequest/shared';
 import { randomUUID } from 'node:crypto';
@@ -91,7 +91,7 @@ export function createGameRouter(services: ServerServices): Router {
         const cached = existing(session, body.actionId, payload);
         if (cached) return cached.response;
         version(session, body.expectedVersion);
-        if (session.state.pendingTurn && body.action.type !== 'retryMission') throw new HttpError(409, 'TURN_PENDING', 'Wait for the pending turn or retry the mission.', true);
+        if (session.state.pendingTurn) throw new HttpError(409, 'TURN_PENDING', 'Wait for the pending turn.', true);
         const nowMs = Date.now(); sync(session, nowMs);
         if (body.action.type === 'audioPhase' && session.abandonedAudioOperationIds.has(body.action.operationId)) throw new HttpError(422, 'AUDIO_ATTEMPT_ABANDONED', 'Audio operation belongs to an abandoned attempt.');
         // Register playback on a detached candidate so rejected actions cannot mutate state.
@@ -134,7 +134,7 @@ export async function runTurn(services: ServerServices, id: string, body: TurnRe
     const cached = existing(session, body.turnId, payload);
     if (cached) return { cached };
     if (options.checkVersion !== false) version(session, body.expectedVersion);
-    if (session.state.pendingTurn) throw new HttpError(409, 'TURN_PENDING', 'Wait for the pending turn or retry the mission.', true);
+    if (session.state.pendingTurn) throw new HttpError(409, 'TURN_PENDING', 'Wait for the pending turn.', true);
     const nowMs = Date.now(); sync(session, nowMs);
     const context = dialogueContext(session.state, body.npcId, body.anchorId, viewOf(services, session));
     if (session.state.activeAudioOperationId) throw new HttpError(422, 'AUDIO_BUSY', 'Finish the current audio operation before submitting.');
@@ -185,7 +185,8 @@ async function evaluate(services: ServerServices, body: TurnRequest, pending: Pe
       if (options.spokenReply) speech = { npcReply: spoken && !verifiedRoute && spoken.length <= 240 ? spoken : replyZh }; // audio already streamed live
       else {
         const speechId = randomUUID();
-        registerSpeechJob(session, { id: speechId, sessionId: session.id, attemptId: pending.attemptId, turnId: body.turnId, replyZh, voiceKey: body.npcId, operationId: speechId, status: 'pending' });
+        const nameKey = world.anchor(body.anchorId)?.nameKey;
+        registerSpeechJob(session, { id: speechId, sessionId: session.id, attemptId: pending.attemptId, turnId: body.turnId, replyZh, voiceKey: npcIdentity(nameKey) ? `npc:${nameKey}` : body.npcId, operationId: speechId, status: 'pending' });
         speech = { npcReply: replyZh, speechId };
       }
       const ended = Boolean(engine.conversationEnded || (evaluation.intent !== 'request_repeat' && isClosingLine(spoken)));

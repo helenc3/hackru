@@ -1,4 +1,4 @@
-import { TranscriptionRecordSchema, type InternalState, type NpcId, type TranscriptionRecord, type TurnRequest, type InputSource } from '@vibequest/shared';
+import { TranscriptionRecordSchema, type InternalState, type TranscriptionRecord, type TurnRequest, type InputSource } from '@vibequest/shared';
 import { HttpError } from './errors.js';
 
 export interface SpeechJob {
@@ -7,7 +7,7 @@ export interface SpeechJob {
   attemptId: string;
   turnId: string;
   replyZh: string;
-  voiceKey: NpcId;
+  voiceKey: string;
   operationId: string;
   status: 'pending' | 'ready' | 'failed';
   assetDurationMs?: number;

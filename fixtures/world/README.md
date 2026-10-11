@@ -11,7 +11,7 @@ camera; drag with the left mouse button to turn; E invokes the nearest target
 within the shared 2-unit range. The fixture city (`city.ts`) is a static 3 × 3
 park with a creek and a level bridge, passed to `WorldRenderer` as `manifests`.
 Append `?stream` to stream chunks from `/api` instead (tests mock the routes) to
-exercise IndexedDB persistence and spawn restore. Delay and failure switches
+exercise server-owned chunk streaming and reload. Delay and failure switches
 exercise asynchronous callbacks. Sign and dialogue panels pause movement and
 close with Escape.
 
@@ -27,8 +27,8 @@ npm run test:e2e -- apps/web/tests/world
 The owned tests cover camera-relative movement, normalized speed, water
 collision, bridge crossing, uncommitted-chunk blocking, click-to-walk routing,
 anchor callback IDs, interaction deduplication, focused-panel movement pause,
-chunk streaming priority/batching/retry, IndexedDB spawn restore with zero
-spawn regeneration, and unsupported/lost WebGL recovery. The performance case records three 2-second rendered-frame
+chunk streaming priority/batching/retry, server cache reuse after reload with zero
+chunk regeneration, and unsupported/lost WebGL recovery. The performance case records three 2-second rendered-frame
 windows after warm-up at a 1440×900 browser viewport and writes a screenshot
 and GPU/FPS evidence into the ignored `test-results/` directory.
 

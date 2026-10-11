@@ -29,7 +29,7 @@ describe('reservation, idempotency and audio integrity', () => {
     const stale = await request(game.app).post(path).send({ ...body, actionId: 'fresh-id' }).expect(409);
     expect(stale.body.error.code).toBe('STALE_VERSION');
   });
-  it('shares pending duplicates, permits retry immediately, and discards the old result', async () => {
+  it('shares pending duplicates and blocks actions until the provider finishes', async () => {
     const game = await prepared();
     const output = deferred<TurnEvaluation>(); const started = deferred<void>(); let calls = 0;
     game.services.dialogueProvider.evaluate = async () => { calls++; started.resolve(); return output.promise; };
@@ -42,20 +42,16 @@ describe('reservation, idempotency and audio integrity', () => {
     expect(reserved.body.state.version).toBe(body.expectedVersion + 1);
     await request(game.app).post(`${path}/turns`).send({ ...body, input: { text: '我要水。', source: 'typed' } }).expect(409);
     await request(game.app).post(`${path}/actions`).send({ actionId: 'blocked', expectedVersion: reserved.body.state.version, action: { type: 'move', position: { x: 0, z: 1 } } }).expect(409);
-    const retry = await request(game.app).post(`${path}/actions`).send({ actionId: 'retry', expectedVersion: reserved.body.state.version, action: { type: 'retryMission' } }).expect(200);
-    expect(retry.body.state.status).toBe('active');
-    for (const response of await Promise.all([first, duplicate])) expect(response.body.error.code).toBe('ATTEMPT_ABANDONED');
-    expect(calls).toBe(1);
     const oldReply = await createFixtureDialogueProvider().evaluate({ missionId: 'Q1', mode: 'practice', tier: 1, npcId: 'vendor', anchorId: ANCHORS.vendor.id, nameZh: '老王', persona: 'cafe', patience: 5, allowedIntents: ['order_drink'], facts: {}, history: [] }, '我要茶。');
     output.resolve(oldReply);
-    await new Promise<void>((resolve) => setImmediate(resolve));
-    await new Promise<void>((resolve) => setImmediate(resolve));
+    const [firstReply, duplicateReply] = await Promise.all([first, duplicate]);
+    expect(firstReply.status).toBe(200);
+    expect(duplicateReply.body).toEqual(firstReply.body);
+    expect(calls).toBe(1);
     const session = (await game.services.sessionStore.get(game.state.sessionId))!;
-    expect(session.state).toMatchObject({ xp: 0, pendingTurn: null, purchases: [], version: retry.body.state.version });
-    expect(session.state.npcState.vendor.history).toEqual([]);
-    expect(session.speechJobs.size).toBe(0);
-    expect(session.state.pauseReasons).toEqual([]);
-    await request(game.app).post(`${path}/turns`).send({ ...body, expectedVersion: retry.body.state.version }).expect(409);
+    expect(session.state).toMatchObject({ xp: 0, pendingTurn: null, purchases: [] });
+    expect(session.state.npcState.vendor.history).toHaveLength(2);
+    expect(session.speechJobs.size).toBe(1);
   });
   it('allows failed-provider retry with the same ID and rejects malformed evaluations without quest changes', async () => {
     const game = await prepared();
@@ -105,7 +101,8 @@ describe('reservation, idempotency and audio integrity', () => {
     expect(edited.body.state.status).toBe('active');
     expect(session.state.evidence.find((entry) => entry.turnId === 'edited-turn')?.conversationSource).toBe('edited');
     expect(session.transcriptions.get('transcription-1')?.editedText).toBe('我要水。');
-    await action('retry-audio', { type: 'retryMission' });
+    await action('pay', { type: 'choose', choiceId: 'q1.pay', anchorId: ANCHORS.vendor.id });
+    await action('next-quest', { type: 'startMission', missionId: 'Q2' });
     await action('old-callback', { type: 'audioPhase', operationId: job.operationId, phase: 'playing' }, 422);
     await action('old-recording-callback', { type: 'audioPhase', operationId: job.operationId, phase: 'recording' }, 422);
     expect(session.transcriptions.size).toBe(0); expect(session.speechJobs.size).toBe(0);

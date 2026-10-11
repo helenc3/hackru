@@ -7,6 +7,27 @@ const message = (value: Record<string, unknown>) => value as unknown as LiveServ
 const turnResponse = (events: { message: string }[]) => ({ turnId: 't', events, npcReply: 'x', state: { objectives: [{ id: 'a', label: 'Confirm the price.', complete: false }] } }) as unknown as TurnResponse;
 
 describe('live bridge', () => {
+  it('uses character speech instead of the model audio and waits before closing a farewell', async () => {
+    const events: ServerEvent[] = [];
+    let finishSpeech!: () => void;
+    const spoken: string[] = [];
+    const bridge = createLiveBridge({
+      send: (event) => events.push(event),
+      live: { sendAudio: () => undefined, sendNote: () => undefined, close: () => undefined },
+      turn: async (_, reply) => { await reply(); return { ...turnResponse([]), npcReply: '再见！', conversationEnded: true }; },
+      note: () => undefined,
+      speak: (text) => { spoken.push(text); return new Promise<void>((resolve) => { finishSpeech = resolve; }); },
+    });
+    bridge.onLiveMessage(message({ serverContent: { inputTranscription: { text: '再见', finished: true } } }));
+    bridge.onLiveMessage(message({ data: 'MODEL_AUDIO', serverContent: { outputTranscription: { text: '再见！' }, turnComplete: true } }));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(spoken).toEqual(['再见！']);
+    expect(events.some((event) => event.type === 'audio' || event.type === 'closed')).toBe(false);
+    finishSpeech();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(events.at(-1)).toEqual({ type: 'closed', reason: 'farewell' });
+  });
+
   it('relays audio, runs one engine turn per finished utterance, and feeds the spoken reply back', async () => {
     const events: ServerEvent[] = [];
     const live = { audio: [] as string[], notes: [] as string[], closed: false, sendAudio: (d: string) => { live.audio.push(d); }, sendNote: (t: string) => { live.notes.push(t); }, close: () => { live.closed = true; } };

@@ -17,11 +17,11 @@ export const MissionIdSchema = z.enum(['Q1', 'Q2', 'Q3']);
 export const ZoneIdSchema = z.enum(['shopping', 'historic', 'residential', 'office', 'waterfront', 'park', 'industrial']);
 /** NPC roles. Many anchor instances in the city share a role; dialogue state is per role. */
 export const NpcIdSchema = z.enum(['vendor', 'guide', 'passerby']);
-/** Readable world text the player can inspect (reading evidence). Positions come from chunk anchors. */
+/** Authored text identifiers for scenery signs. Positions come from chunk anchors. */
 export const CueIdSchema = z.enum(['q1.menu', 'q2.hotel-sign', 'q3.river-sign']);
 export const ChoiceIdSchema = z.enum(['q1.pay', 'q3.start-photo']);
 export const IntentSchema = z.enum(['order_drink', 'accept_substitute', 'cancel_order', 'confirm_drink_price', 'ask_directions', 'request_photo', 'request_repeat', 'greeting', 'farewell', 'unknown']);
-export const GameActionTypeSchema = z.enum(['move', 'inspect', 'choose', 'photoCapture', 'audioPhase', 'useItem', 'pausePractice', 'resumePractice', 'setInputPreference', 'retryMission', 'startMission']);
+export const GameActionTypeSchema = z.enum(['move', 'choose', 'photoCapture', 'audioPhase', 'useItem', 'pausePractice', 'resumePractice', 'setInputPreference', 'startMission']);
 export const DESTINATION_ALIASES = {
   'grand-hotel': ['上海大酒店', '大酒店', 'Shanghai Grand Hotel'],
   'huangpu-river': ['黄浦江', '江边', '外滩', 'Huangpu River'],
@@ -66,8 +66,6 @@ export type AudioPhase = z.infer<typeof AudioPhaseSchema>;
 export const GameActionSchema = z.discriminatedUnion('type', [
   /** Server derives zone/chunk from committed manifests; the position must lie in a committed, walkable chunk. */
   z.strictObject({ type: z.literal('move'), position: PositionSchema }),
-  /** targetId is a chunk anchor ID of kind 'sign' (its cueId comes from the anchor). */
-  z.strictObject({ type: z.literal('inspect'), targetId: identifier }),
   /** anchorId: the vendor anchor for q1.pay; the photo-spot anchor for q3.start-photo. */
   z.strictObject({ type: z.literal('choose'), choiceId: ChoiceIdSchema, anchorId: identifier }),
   /** Acknowledges the NPC-triggered countdown capture for the server-issued photo request. */
@@ -77,7 +75,6 @@ export const GameActionSchema = z.discriminatedUnion('type', [
   z.strictObject({ type: z.literal('pausePractice') }),
   z.strictObject({ type: z.literal('resumePractice') }),
   z.strictObject({ type: z.literal('setInputPreference'), preference: InputPreferenceSchema }),
-  z.strictObject({ type: z.literal('retryMission') }),
   z.strictObject({ type: z.literal('startMission'), missionId: MissionIdSchema }),
 ]);
 export type GameAction = z.infer<typeof GameActionSchema>;
@@ -105,8 +102,8 @@ export const PurchaseRecordSchema = z.strictObject({ id: identifier, attemptId: 
 export type PurchaseRecord = z.infer<typeof PurchaseRecordSchema>;
 export const InventorySchema = z.strictObject({ hint: z.number().int().min(0).max(3), cny: z.number().int().min(0).max(1000), drinks: z.array(DrinkSchema.exclude(['coffee'])).max(20) });
 export type Inventory = z.infer<typeof InventorySchema>;
-export const InteractableKindSchema = z.enum(['npc', 'sign', 'choice', 'photo-spot', 'landmark']);
-export const PublicInteractableSchema = z.strictObject({ id: identifier, kind: InteractableKindSchema, role: NpcIdSchema.optional(), label: shortText, position: PositionSchema, choiceId: ChoiceIdSchema.optional(), cueId: CueIdSchema.optional() });
+export const InteractableKindSchema = z.enum(['npc', 'choice', 'photo-spot', 'landmark']);
+export const PublicInteractableSchema = z.strictObject({ id: identifier, kind: InteractableKindSchema, role: NpcIdSchema.optional(), label: shortText, position: PositionSchema, choiceId: ChoiceIdSchema.optional() });
 export type PublicInteractable = z.infer<typeof PublicInteractableSchema>;
 /** Server-verified route from the committed street graph (Q2). Never model-authored. */
 export const DirectionsSchema = z.strictObject({ routeId: identifier, fromAnchorId: identifier, hotelAnchorId: identifier, textZh: z.string().min(1).max(240), steps: z.array(z.strictObject({ textZh: z.string().min(1).max(80), english: shortText })).min(1).max(8) });
@@ -131,7 +128,6 @@ export const PublicStateSchema = z.strictObject({
   objectives: z.array(z.strictObject({ id: identifier, label: shortText, complete: z.boolean() })).max(20),
   /** Anchors from committed chunks near the player that the current quest can use, plus quest-specific spots. */
   interactables: z.array(PublicInteractableSchema).max(40),
-  visibleCues: z.array(z.strictObject({ id: CueIdSchema, label: shortText, text: z.string().max(500).optional() })).max(12),
   npcMood: z.record(NpcIdSchema, MoodSchema), inventory: InventorySchema, purchases: z.array(PurchaseRecordSchema).max(50),
   xp: count, badges: z.array(identifier).max(10), unlockedMissionIds: z.array(MissionIdSchema).min(1).max(3), completedMissionIds: z.array(MissionIdSchema).max(3),
   directions: DirectionsSchema.nullable(), photo: PhotoRequestSchema.nullable(),
@@ -143,7 +139,7 @@ export const PublicStateSchema = z.strictObject({
   debrief: DebriefSchema.optional(),
 }).superRefine((state, context) => {
   if (state.status === 'active' && state.debrief) context.addIssue({ code: 'custom', path: ['debrief'], message: 'Debrief exists only after an attempt ends.' });
-  for (const [field, values] of [['objectives', state.objectives], ['interactables', state.interactables], ['visibleCues', state.visibleCues]] as const) {
+  for (const [field, values] of [['objectives', state.objectives], ['interactables', state.interactables]] as const) {
     if (new Set(values.map((value) => value.id)).size !== values.length) context.addIssue({ code: 'custom', path: [field], message: 'IDs must be unique.' });
   }
 });
@@ -186,7 +182,7 @@ export type TurnEvaluation = z.infer<typeof TurnEvaluationSchema>;
 export const TurnContextSchema = z.strictObject({ missionId: MissionIdSchema, mode: ModeSchema, tier: TierSchema, npcId: NpcIdSchema, anchorId: identifier, nameZh: shortText, persona: z.string().min(1).max(500), patience: z.number().int().min(0).max(5), allowedIntents: z.array(IntentSchema).min(1).max(10), facts: z.record(identifier, z.string().max(500)), history: z.array(z.strictObject({ role: z.enum(['player', 'npc']), text: z.string().max(500) })).max(12) });
 export type TurnContext = z.infer<typeof TurnContextSchema>;
 export interface DialogueProvider { evaluate(context: TurnContext, playerText: string): Promise<TurnEvaluation> }
-export interface SpeechProvider { synthesize(text: string, voiceKey: string): Promise<Uint8Array>; transcribe(audio: Uint8Array, mimeType: string): Promise<string> }
+export interface SpeechProvider { synthesize(text: string, voiceKey: string): Promise<Uint8Array>; synthesizePcm?(text: string, voiceKey: string): Promise<Uint8Array>; transcribe(audio: Uint8Array, mimeType: string): Promise<string> }
 
 // Context-dependent validation stays reusable for the provider owner. Validation only:
 // confidence thresholds and progression belong to the engine.
@@ -319,7 +315,7 @@ export const InternalStateSchema = z.strictObject({
   lastMovementAtMs: z.number().int().nonnegative().optional(),
   flags: FlagsSchema, inventory: InventorySchema, purchases: z.array(PurchaseRecordSchema).max(50), xp: count, badges: z.array(identifier).max(10), awardedRewardIds: z.array(identifier).max(100),
   unlockedMissionIds: z.array(MissionIdSchema).min(1).max(3), completedMissionIds: z.array(MissionIdSchema).max(3),
-  inspectedTargetIds: z.array(identifier).max(200), npcState: z.record(NpcIdSchema, NpcRuntimeStateSchema),
+  npcState: z.record(NpcIdSchema, NpcRuntimeStateSchema),
   directions: DirectionsSchema.nullable(), photo: PhotoRequestSchema.nullable(), exploration: ExplorationStateSchema,
   evidence: z.array(EvidenceRecordSchema).max(500), skills: SkillTracksSchema, difficulty: TierSchema, skillUpdatedAttemptIds: z.array(identifier).max(100),
   pauseReasons: z.array(PauseReasonSchema).max(5), audioOperations: z.array(AudioOperationSchema).max(100), activeAudioOperationId: identifier.nullable(),

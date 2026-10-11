@@ -15,7 +15,7 @@ const sessionRequest = { initialTier: 0, providerMode: 'fixture' };
 const actionRequest = {
   actionId: 'bootstrap-action',
   expectedVersion: 0,
-  action: { type: 'inspect', targetId: 'an.sign.menu' },
+  action: { type: 'setInputPreference', preference: 'typed-accessibility' },
 };
 const turnRequest = {
   turnId: 'bootstrap-turn',

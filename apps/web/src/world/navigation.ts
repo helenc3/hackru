@@ -35,14 +35,13 @@ export function movePlayer(view: Walkable, position: Position, right: number, fo
 }
 
 export function nearbyTargets(state: Pick<PublicState, 'interactables'>, position: Position) {
-  const priority = { sign: 0, npc: 1, 'photo-spot': 2, choice: 3, landmark: 4 };
+  const priority = { npc: 1, 'photo-spot': 2, choice: 3, landmark: 4 };
   return state.interactables.filter((target) => target.kind !== 'landmark' && distance(target.position, position) <= WORLD_RULES.interactionRadius)
     .sort((a, b) => distance(a.position, position) - distance(b.position, position) || priority[a.kind] - priority[b.kind]);
 }
 
 /** NPCs open a conversation (onTalk) and landmarks are labels only; both return null. */
 export function targetAction(target: PublicState['interactables'][number], photo?: PublicState['photo']): GameAction | null {
-  if (target.kind === 'sign') return { type: 'inspect', targetId: target.id };
   if (target.kind === 'photo-spot') return { type: 'choose', choiceId: 'q3.start-photo', anchorId: photo?.viewpointAnchorId ?? target.id };
   if (target.kind === 'choice') {
     const id = ChoiceIdSchema.safeParse(target.choiceId);

@@ -10,6 +10,14 @@ import {
 } from '../src/fixtures.js';
 
 describe('shared contract boundary fixtures', () => {
+  it('rejects the removed quest restart action', () => {
+    expect(GameActionSchema.safeParse({ type: 'retryMission' }).success).toBe(false);
+  });
+
+  it('rejects removed sign inspection actions', () => {
+    expect(GameActionSchema.safeParse({ type: 'inspect', targetId: 'a.menu' }).success).toBe(false);
+  });
+
   it('validates all three quests without inventing completed gameplay', () => {
     for (const state of Object.values(baselineStates)) {
       expect(PublicStateSchema.parse(state)).toEqual(state);

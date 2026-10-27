@@ -2,6 +2,7 @@ import { test, expect } from '../../../../tests/support/browser-test';
 import { installScriptedApi } from '../../../../fixtures/ui/scripted-api';
 
 test('start screen selects English for the actual session and continues it without changing language', async ({ page }) => {
+  test.setTimeout(60_000); // Two page loads, a world render and a conversation on software WebGL.
   const api = await installScriptedApi(page, { steps: [{ text: 'I want tea.', reply: 'Tea is ten yuan.' }] });
   await page.goto('/');
   const selector = page.getByLabel('Conversation language', { exact: true });

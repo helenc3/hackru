@@ -8,6 +8,8 @@ The quest graphs, coordinates, prices, interaction range, payment, route verific
 
 Live conversation still requires the usual server-side Gemini and ElevenLabs keys. Tests use injected providers or explicitly labelled fixture sessions, never paid services. Fixture examples include:
 
+For offline manual testing, set `ENABLE_DEMO_FIXTURES=true` in your local `.env`, restart development, and select **Fixture demonstration · scripted** plus **English — Testing**. Use **Use typed English** and the fixed phrases below. Recording/transcription and voiced replies still need the existing provider keys.
+
 | Purpose | English fixture phrase |
 |---|---|
 | Greeting / small talk | Hello. / I am from America. / This is my first visit. |

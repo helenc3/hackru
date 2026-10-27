@@ -1,4 +1,5 @@
 import { TurnEvaluationSchema, type DialogueProvider, type Intent, type Slot } from '../contracts.js';
+import { conversationContent } from '../language.js';
 import { smallTalkReplies } from '../content/facts.js';
 
 /** Only documented fixture utterances; never a general language interpreter. */
@@ -40,6 +41,27 @@ const examples: Record<string, { intent: Intent; slots: Slot[] }> = {
   '能帮我拍一张照片吗': { intent: 'request_photo', slots: [] },
   'canyoutakemyphoto': { intent: 'request_photo', slots: [] },
 };
+/** Fixed English examples for offline testing, not a live language model. */
+const englishExamples: Record<string, { intent: Intent; slots: Slot[] }> = {
+  hello: { intent: 'greeting', slots: [] }, hi: { intent: 'greeting', slots: [] },
+  iamfromamerica: { intent: 'small_talk', slots: [] }, thisismyfirstvisit: { intent: 'small_talk', slots: [] },
+  shanghaiisbeautiful: { intent: 'small_talk', slots: [] }, theweatherisnice: { intent: 'small_talk', slots: [] },
+  goodbye: { intent: 'farewell', slots: [] }, bye: { intent: 'farewell', slots: [] },
+  iwantcoffee: { intent: 'order_drink', slots: [{ key: 'drink', value: 'coffee' }] },
+  iwanttea: { intent: 'order_drink', slots: [{ key: 'drink', value: 'tea' }] },
+  pleasegivemeacupoftea: { intent: 'order_drink', slots: [{ key: 'drink', value: 'tea' }] },
+  iwantwater: { intent: 'order_drink', slots: [{ key: 'drink', value: 'water' }] },
+  pleasegivemeacupofwater: { intent: 'order_drink', slots: [{ key: 'drink', value: 'water' }] },
+  illhaveteainstead: { intent: 'accept_substitute', slots: [{ key: 'drink', value: 'tea' }] },
+  yes: { intent: 'confirm_drink_price', slots: [] }, okay: { intent: 'confirm_drink_price', slots: [] },
+  cancelmyorder: { intent: 'cancel_order', slots: [] },
+  pleasesaythatagain: { intent: 'request_repeat', slots: [] },
+  howdoigettotheshanghaigrandhotel: { intent: 'ask_directions', slots: [{ key: 'destination', value: 'grand-hotel' }] },
+  whereistheshanghaigrandhotel: { intent: 'ask_directions', slots: [{ key: 'destination', value: 'grand-hotel' }] },
+  howdoigettothetrainstation: { intent: 'ask_directions', slots: [{ key: 'destination', value: 'other' }] },
+  canyoutakemyphoto: { intent: 'request_photo', slots: [] },
+  pleasetakemyphoto: { intent: 'request_photo', slots: [] },
+};
 // Decimal digits and Mandarin digit/unit forms are normalized without guessing.
 export function parseFixturePrice(text: string): number | undefined {
   const normalized = text.normalize('NFKC');
@@ -58,15 +80,21 @@ export function parseFixturePrice(text: string): number | undefined {
 }
 export function createFixtureDialogueProvider(): DialogueProvider {
   return { evaluate: async (context, playerText) => {
+    const english = context.language === 'en';
+    const englishText = playerText.normalize('NFKC').toLowerCase().replace(/[^a-z0-9]/g, '');
     const text = playerText.normalize('NFKC').replace(/[。，？！,.?!\s]/g, '');
-    let matched = examples[text] ?? examples[playerText];
+    let matched = english ? englishExamples[englishText] : examples[text] ?? examples[playerText];
     const priceMatch = /^(茶|水)([0-9零一二两三四五六七八九十百千壹贰叁]+)元$/.exec(text);
-    if (priceMatch) {
+    if (priceMatch && !english) {
       const price = parseFixturePrice(priceMatch[2]!);
       matched = { intent: 'confirm_drink_price', slots: [{ key: 'drink', value: priceMatch[1] === '茶' ? 'tea' : 'water' }, ...(price === undefined ? [] : [{ key: 'priceCny' as const, value: price }])] };
     }
+    const englishPrice = /^(tea|water)([0-9]+)(?:yuan|cny)?$/.exec(englishText);
+    if (english && englishPrice) matched = { intent: 'confirm_drink_price', slots: [{ key: 'drink', value: englishPrice[1] as 'tea' | 'water' }, { key: 'priceCny', value: Number(englishPrice[2]) }] };
     const allowed = matched && context.allowedIntents.includes(matched.intent);
-    const insult = text === '你真笨';
-    return TurnEvaluationSchema.parse({ intent: allowed ? matched.intent : 'unknown', slots: allowed ? matched.slots : [], evidenceQuote: allowed ? playerText : '', intentGrade: { score: allowed ? 0.95 : 0, confidence: allowed ? 0.95 : 0.5 }, clarity: allowed ? 0.9 : 0.3, courtesy: insult ? 0 : 0.8, targetLanguageUse: /^[A-Za-z\s]+$/.test(text) ? 'no' : allowed ? 'yes' : 'uncertain', interaction: insult ? 'insult' : allowed ? matched.intent === 'request_repeat' ? 'repeat' : 'relevant' : 'irrelevant', replyZh: allowed && matched.intent === 'small_talk' ? smallTalkReplies[context.npcId][Math.floor(context.history.length / 2) % 2]! : '请再说一遍。', coach: { understood: allowed ? 'Recognized a documented fixture request.' : 'This fixture phrase is not recognized.', explanation: 'Fixture mode recognizes a fixed set of example phrases.', improvedExample: '请再说一遍。' } });
+    const insult = text === '你真笨' || (english && englishText === 'youarestupid');
+    const languageUse = english ? /[A-Za-z]/.test(playerText) ? 'yes' : 'no' : /^[A-Za-z\s]+$/.test(text) ? 'no' : allowed ? 'yes' : 'uncertain';
+    const content = conversationContent(context.language);
+    return TurnEvaluationSchema.parse({ intent: allowed ? matched.intent : 'unknown', slots: allowed ? matched.slots : [], evidenceQuote: allowed ? playerText : '', intentGrade: { score: allowed ? 0.95 : 0, confidence: allowed ? 0.95 : 0.5 }, clarity: allowed ? 0.9 : 0.3, courtesy: insult ? 0 : 0.8, targetLanguageUse: languageUse, interaction: insult ? 'insult' : allowed ? matched.intent === 'request_repeat' ? 'repeat' : 'relevant' : 'irrelevant', replyZh: allowed && matched.intent === 'small_talk' ? (english ? content.smallTalkReplies : smallTalkReplies)[context.npcId][Math.floor(context.history.length / 2) % 2]! : content.groundedReplies.clarification, coach: { understood: allowed ? 'Recognized a documented fixture request.' : 'This fixture phrase is not recognized.', explanation: 'Fixture mode recognizes a fixed set of example phrases.', improvedExample: english ? 'Please say that again.' : '请再说一遍。' } });
   } };
 }

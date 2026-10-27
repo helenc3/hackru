@@ -1,6 +1,6 @@
 import { expect, type Page, type Route } from '@playwright/test';
 import {
-  ActionRequestSchema, ChunkRequestSchema, ChunkRestoreRequestSchema, CreateSessionRequestSchema, PublicStateSchema, TurnRequestSchema, TurnResponseSchema,
+  worldText, ActionRequestSchema, ChunkRequestSchema, ChunkRestoreRequestSchema, CreateSessionRequestSchema, PublicStateSchema, TurnRequestSchema, TurnResponseSchema,
   generateFallbackChunk, seedFromWorldId, type GameAction, type MissionId, type PublicState,
 } from '@vibequest/shared';
 
@@ -48,7 +48,7 @@ export async function installScriptedApi(page: Page, options: { mission?: Missio
     if (path === '/api/sessions') {
       const input = CreateSessionRequestSchema.parse(body);
       expect(input.validationMode).toBe(options.validation ?? false);
-      state = PublicStateSchema.parse({ ...state, inputPreference: input.inputPreference, tier: input.initialTier, ...(input.worldId ? { worldId: input.worldId } : {}) });
+      state = PublicStateSchema.parse({ ...state, language: input.language, interactables: state.interactables.map((item) => ({ ...item, label: worldText(item.label, input.language) })), inputPreference: input.inputPreference, tier: input.initialTier, ...(input.worldId ? { worldId: input.worldId } : {}) });
       return json(route, { state });
     }
     if (request.method() === 'GET') return json(route, { state });

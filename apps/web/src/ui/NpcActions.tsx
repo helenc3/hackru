@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { NpcAction, PublicState, RendererProps } from '@vibequest/shared';
+import { languageTag, type NpcAction, type PublicState, type RendererProps } from '@vibequest/shared';
 import { requestWalk } from '../world/walk-request';
 
 const drinkNames = { tea: '茶 tea', water: '水 water' } as const;
@@ -26,7 +26,7 @@ export function NpcActions({ state, anchorId, extra = [], pending, onAction, onC
         case 'pay': {
           const short = state.inventory.cny < action.priceCny;
           return <button key="pay" className="button primary" disabled={pending || paying || short} data-testid="pay-button" onClick={() => void pay(action)}>
-            <span lang="zh-Hans">付款</span> · Pay ¥{action.priceCny} for <span lang="zh-Hans">{drinkNames[action.drink]}</span>{short ? ` (only ¥${state.inventory.cny} left)` : ''}</button>;
+            <span>{state.language === 'en' ? 'Pay' : '付款'}</span> · Pay ¥{action.priceCny} for <span lang={languageTag(state.language)}>{state.language === 'en' ? action.drink : drinkNames[action.drink]}</span>{short ? ` (only ¥${state.inventory.cny} left)` : ''}</button>;
         }
         case 'show-directions': return <button key="directions" className="button secondary" data-testid="show-directions" onClick={onClose}>Show directions</button>;
         // Walk after the panel closes and hands focus back to the world.

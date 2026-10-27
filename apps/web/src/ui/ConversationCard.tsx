@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import type { NpcId, PublicState, RendererProps, TurnResponse } from '@vibequest/shared';
+import { languageTag, type NpcId, PublicState, RendererProps, TurnResponse } from '@vibequest/shared';
 import { CoachPanel } from './CoachPanel';
 import { NpcActions } from './NpcActions';
 import { useEscape } from './use-escape';
@@ -19,9 +19,9 @@ export function ConversationCard({ summary, turn, state, pending, onAction, onCl
   return <section className="conversation-card" role="dialog" aria-labelledby="conversation-title" data-testid="conversation-card">
     <button ref={close} type="button" className="button secondary result-close" onClick={onClose} aria-label="Close conversation summary">✕</button>
     <span className="eyebrow">CONVERSATION COMPLETE</span>
-    <h2 id="conversation-title"><span lang="zh-Hans">{summary.npc.name}</span> said goodbye.</h2>
+    <h2 id="conversation-title"><span lang={languageTag(state.language)}>{summary.npc.name}</span> said goodbye.</h2>
     <p>{spoken.length} lines exchanged · mood {state.npcMood[summary.npc.role]}</p>
-    {spoken.length > 0 && <div className="chat-thread" aria-label="Conversation transcript">{spoken.map((line, index) => <p key={index} className={`bubble ${line.role}`} lang="zh-Hans">{line.text}</p>)}</div>}
+    {spoken.length > 0 && <div className="chat-thread" aria-label="Conversation transcript">{spoken.map((line, index) => <p key={index} className={`bubble ${line.role}`} lang={languageTag(state.language)}>{line.text}</p>)}</div>}
     <CoachPanel state={state} turn={turn} />
     <h3>Quest progress</h3>
     <ul className="result-objectives" aria-label="Quest summary">{state.objectives.map((objective) => <li key={objective.id}><input type="checkbox" checked={objective.complete} readOnly tabIndex={-1} aria-label={objective.label} /><span>{objective.label}</span></li>)}</ul>

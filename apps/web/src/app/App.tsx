@@ -127,7 +127,7 @@ export function App() {
       <RecoveryPanel problem={session.problem} pending={session.pending} state={state} onRetry={session.retry} onRefresh={session.refresh} onNew={leave} onDismiss={session.dismiss} />
       {session.events.length > 0 && <section className="event-feed" aria-label="Quest updates" aria-live="polite">{session.events.slice(-3).map((event) => <p key={event.id}>{event.message}</p>)}</section>}
       {npc && state.status === 'active' && <DialoguePanel key={`${state.sessionId}:${state.missionId}:${npc.anchorId}`} state={state} npc={npc} pending={session.pending} turn={session.turnNpc === npc.anchorId ? session.turn : null} onAction={onAction} onSubmit={session.submit} onLiveTurn={session.applyTurn} onClose={closeConversation} />}
-      {state.directions && !npc && <DirectionsCard directions={state.directions} pending={session.pending || !guide} onRepeat={() => onTalk(state.directions!.fromAnchorId)} />}
+      {state.directions && !npc && <DirectionsCard language={state.language} directions={state.directions} pending={session.pending || !guide} onRepeat={() => onTalk(state.directions!.fromAnchorId)} />}
       {state.photo && <PhotoOverlay state={state} pending={session.pending} onAction={onAction} />}
       {conversation && !npc && state.status === 'active' && <ConversationCard summary={conversation} turn={conversation.turn} state={state} pending={session.pending} onAction={onAction} onClose={closeConversationCard} />}
       {(review ? results[review] : resultsClosed ? null : state.status !== 'active' ? state : null) && <ResultPanel state={(review && results[review]) ?? state} live={state} pending={session.pending} onAction={onAction} onExit={leave} onClose={closeResults} />}

@@ -1,4 +1,4 @@
-import { TranscriptionRecordSchema, type InternalState, type TranscriptionRecord, type TurnRequest, type InputSource } from '@vibequest/shared';
+import { MAX_NPC_REPLY_LENGTH, TranscriptionRecordSchema, type InternalState, type TranscriptionRecord, type TurnRequest, type InputSource } from '@vibequest/shared';
 import { HttpError } from './errors.js';
 
 export interface SpeechJob {
@@ -113,7 +113,7 @@ export function resolveTranscription(session: SessionRecord, input: TurnRequest[
 
 export function registerSpeechJob(session: SessionRecord, job: SpeechJob): boolean {
   if (job.sessionId !== session.id || job.attemptId !== session.state.attemptId) return false;
-  if (job.status !== 'pending' || job.audio || job.assetDurationMs !== undefined || !job.replyZh.trim() || job.replyZh.length > 240) {
+  if (job.status !== 'pending' || job.audio || job.assetDurationMs !== undefined || !job.replyZh.trim() || job.replyZh.length > (session.state.language === 'en' ? MAX_NPC_REPLY_LENGTH : 240)) {
     throw new HttpError(422, 'INVALID_SPEECH_JOB', 'New speech jobs must contain a bounded committed reply and be pending.');
   }
   if (session.speechJobs.has(job.id) || [...session.speechJobs.values()].some((existing) => existing.turnId === job.turnId || existing.operationId === job.operationId)) {

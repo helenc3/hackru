@@ -1,7 +1,7 @@
 import {
   ActionRequestSchema, CreateSessionRequestSchema, TurnRequestSchema, TurnResponseSchema, createGame, applyAction, applyEvaluation, isClosingLine, projectPublicState,
   synchronizeGame, dialogueContext, turnActions, createFixtureDialogueProvider, EngineRuleError, validateEvaluationForContext, npcIdentity,
-  type PublicState, type TurnRequest, type TurnContext, type TurnResponse, type ActionResponse, type WorldView,
+  MAX_NPC_REPLY_LENGTH, type PublicState, type TurnRequest, type TurnContext, type TurnResponse, type ActionResponse, type WorldView,
 } from '@vibequest/shared';
 import { randomUUID } from 'node:crypto';
 import { Router, type Response } from 'express';
@@ -73,7 +73,7 @@ export function createGameRouter(services: ServerServices): Router {
       if (parsed.data.providerMode === 'fixture' && !services.config.enableDemoFixtures) throw new HttpError(422, 'FIXTURES_DISABLED', 'Fixture sessions are disabled.');
       const nowMs = Date.now();
       const world = services.worlds.open(parsed.data.worldId);
-      const session = await store.create(createGame({ sessionId: randomUUID(), worldId: world.worldId, attemptId: randomUUID(), missionId: 'Q1', initialTier: parsed.data.initialTier, validationMode: parsed.data.validationMode, inputPreference: parsed.data.inputPreference, providerStatus: parsed.data.providerMode === 'fixture' ? 'fixture' : 'live', spawn: world.spawn }, nowMs));
+      const session = await store.create(createGame({ language: parsed.data.language, sessionId: randomUUID(), worldId: world.worldId, attemptId: randomUUID(), missionId: 'Q1', initialTier: parsed.data.initialTier, validationMode: parsed.data.validationMode, inputPreference: parsed.data.inputPreference, providerStatus: parsed.data.providerMode === 'fixture' ? 'fixture' : 'live', spawn: world.spawn }, nowMs));
       response.status(201).json({ state: projectPublicState(session.state, nowMs, services.worlds.view(world.worldId)) });
     } catch (error) { await sendError(response, error); }
   });
@@ -187,13 +187,13 @@ async function evaluate(services: ServerServices, body: TurnRequest, pending: Pe
       next.version++;
       const history = next.npcState[body.npcId].history;
       // The engine's committed line (it may be a pacing question rather than the grounded fact reply), bounded for speech and the response.
-      const replyZh = history.at(-1)!.text.slice(0, 240);
+      const replyZh = history.at(-1)!.text.slice(0, MAX_NPC_REPLY_LENGTH);
       // Verified directions are authoritative: the live model's own words never replace the route text.
       const verifiedRoute = engine.events.some((event) => event.kind === 'directions');
       let speech: { npcReply: string; speechId?: string };
       let job: Parameters<typeof registerSpeechJob>[1] | undefined;
       if (options.spokenReply) {
-        speech = { npcReply: spoken && !verifiedRoute && next.status !== 'failed' && spoken.length <= 240 ? spoken : replyZh }; // audio already streamed live; an NPC leaving in annoyance shows the authored line
+        speech = { npcReply: spoken && !verifiedRoute && next.status !== 'failed' && spoken.length <= MAX_NPC_REPLY_LENGTH ? spoken : replyZh }; // audio already streamed live; an NPC leaving in annoyance shows the authored line
         history.at(-1)!.text = speech.npcReply; // history holds what the player actually heard, so the next classification and request_repeat match it
       } else {
         const speechId = randomUUID();

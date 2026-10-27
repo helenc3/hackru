@@ -1,4 +1,5 @@
 import { TurnResponseSchema, type TurnResponse } from '@vibequest/shared';
+import { watchLiveSpeech } from './speech-mouth';
 import { setAudioActivity } from './audio-bus';
 
 /**
@@ -27,6 +28,7 @@ export function startLiveVoice(sessionId: string, npcId: string, anchorId: strin
   const protocol = location.protocol === 'https:' ? 'wss' : 'ws';
   const ws = new WebSocket(`${protocol}://${location.host}/api/sessions/${encodeURIComponent(sessionId)}/live?npcId=${encodeURIComponent(npcId)}&anchorId=${encodeURIComponent(anchorId)}`);
   let ctx: AudioContext | null = null;
+  let mouth: ReturnType<typeof watchLiveSpeech> | null = null;
   let stream: MediaStream | null = null;
   let ready = false, stopped = false, paused = false, speaking = false;
   let cursor = 0;
@@ -62,7 +64,9 @@ export function startLiveVoice(sessionId: string, npcId: string, anchorId: strin
     if (stopped) { for (const track of stream.getTracks()) track.stop(); return; }
     ctx = new AudioContext();
     await ctx.resume().catch(() => undefined);
+    if (stopped) { void ctx.close().catch(() => undefined); return; }
     if (ctx.state === 'suspended') throw new Error('audio-blocked'); // autoplay policy: no gesture yet, so nothing would be heard or captured
+    try { mouth = watchLiveSpeech(ctx); } catch { /* Visual enhancement must not interrupt voice. */ }
     const source = ctx.createMediaStreamSource(stream);
     const rate = ctx.sampleRate;
     if (ctx.audioWorklet) {
@@ -76,7 +80,7 @@ export function startLiveVoice(sessionId: string, npcId: string, anchorId: strin
       node.onaudioprocess = (event) => pushCapture(event.inputBuffer.getChannelData(0).slice(), rate);
       source.connect(node); node.connect(ctx.destination);
     }
-    if (stopped) { void ctx.close().catch(() => undefined); return; }
+    if (stopped) { mouth?.stop(); mouth = null; void ctx.close().catch(() => undefined); return; }
     setAudioActivity('recording');
     status('live');
   }
@@ -87,7 +91,7 @@ export function startLiveVoice(sessionId: string, npcId: string, anchorId: strin
     const channel = buffer.getChannelData(0);
     for (let i = 0; i < samples.length; i++) channel[i] = samples[i]! / 32768;
     const node = ctx.createBufferSource();
-    node.buffer = buffer; node.connect(ctx.destination);
+    node.buffer = buffer; node.connect(ctx.destination); mouth?.connect(node);
     const start = Math.max(ctx.currentTime, cursor);
     node.start(start); cursor = start + buffer.duration;
     playing.add(node);
@@ -132,8 +136,8 @@ export function startLiveVoice(sessionId: string, npcId: string, anchorId: strin
     ws.close();
     if (stream) for (const track of stream.getTracks()) track.stop();
     setAudioActivity('idle');
-    const finish = () => { void ctx?.close().catch(() => undefined); if (reason !== undefined) listener({ kind: 'status', status: 'ended', reason }); };
-    if (playing.size === 0) { flush(); finish(); return; }
+    const finish = () => { mouth?.stop(); mouth = null; void ctx?.close().catch(() => undefined); if (reason !== undefined) listener({ kind: 'status', status: 'ended', reason }); };
+    if (reason === undefined || playing.size === 0) { flush(); finish(); return; }
     const cap = setTimeout(finish, 6_000);
     for (const node of playing) node.onended = () => { playing.delete(node); if (playing.size === 0) { clearTimeout(cap); finish(); } };
   }

@@ -15,6 +15,8 @@ import { GlossPopover } from '../dictionary/GlossPopover';
 import { ReviewPanel } from '../dictionary/ReviewPanel';
 import { useApiHealth } from './use-api-health';
 import { useSession } from './use-session';
+import { useTranscripts } from './use-transcripts';
+import { EventFeed } from '../ui/EventFeed';
 import { focusWorld } from './focus-world';
 import { LookupPanel } from '../dictionary/LookupPanel';
 import './game.css';
@@ -28,6 +30,7 @@ const previewAction = async () => undefined;
 const previewTalk = () => undefined;
 
 export function App() {
+  const { showTranscripts, setShowTranscripts } = useTranscripts();
   const { health, healthProblem, retryHealth } = useApiHealth();
   const validation = Boolean(ValidationHarness && validationRequested && health?.features.validationHarness);
   const session = useSession(validationRequested);
@@ -80,11 +83,16 @@ export function App() {
 
   const onTalk = useCallback((anchorId: string) => {
     const target = session.state?.status === 'active' ? session.state.interactables.find((item) => item.id === anchorId && item.kind === 'npc' && item.role) : undefined;
-    if (target?.role) { setNpc({ anchorId, role: target.role, name: target.label }); setConversation(null); }
+    if (target?.role) { setNpc({ anchorId, role: target.role, name: target.label, nameKey: target.nameKey }); setConversation(null); }
   }, [session.state]);
 
   if (validationRequested && health && !validation) return <main className="validation-denied"><h1>Internal validation is unavailable.</h1><p>This entry requires a development build and server validation configuration.</p><a href="/">Return to the game</a></main>;
-  const starter = <><StartPanel validation={validation} fixtures={health?.features.fixtures ?? false} pending={session.pending || !health || validationRequested && !validation} resumeId={session.resumeId} onStart={session.start} onContinue={session.refresh} />
+  const continueSession = async () => {
+    await session.refresh();
+    // An intro choice to listen/speak takes precedence over a remembered typed-input mode.
+    if (!showTranscripts) await session.onAction({ type: 'setInputPreference', preference: 'voice' });
+  };
+  const starter = <><StartPanel validation={validation} fixtures={health?.features.fixtures ?? false} pending={session.pending || !health || validationRequested && !validation} resumeId={session.resumeId} onStart={session.start} onContinue={continueSession} showTranscripts={showTranscripts} onTranscriptsChange={setShowTranscripts} />
     <RecoveryPanel problem={session.problem} pending={session.pending} onRetry={session.retry} onRefresh={session.refresh} onNew={session.abandon} onDismiss={session.dismiss} />
     {healthProblem && <aside role="alert" className="recovery-panel">{healthProblem}<button className="button secondary" onClick={retryHealth}>Retry API connection</button></aside>}
   </>;
@@ -97,6 +105,7 @@ export function App() {
   }
 
   const state = session.state;
+  const displayText = showTranscripts || state.inputPreference === 'typed-accessibility';
   const guide = state.directions ? state.interactables.find((item) => item.id === state.directions?.fromAnchorId && item.kind === 'npc') : undefined;
 
   return <div className="game-shell" data-testid="game-shell" data-dialogue-open={Boolean(npc)}>
@@ -118,18 +127,23 @@ export function App() {
             </g>
           </svg>
         </summary>
-        <div className="settings-popover"><h2>Audio settings</h2><AudioController state={state} onAction={onAction} speechId={session.turn?.speechId} /><h2 className="settings-controls-title">Controls</h2><dl className="controls-list"><dt>WASD / arrows</dt><dd>Walk</dd><dt>Click</dt><dd>Walk there</dd><dt>Drag sideways</dt><dd>Orbit camera</dd><dt>Drag up / down</dt><dd>Tilt camera</dd><dt>E</dt><dd>Interact with the nearest target</dd><dt>Esc</dt><dd>Close a conversation</dd></dl></div>
+        <div className="settings-popover"><h2>Audio settings</h2><AudioController state={state} onAction={onAction} speechId={session.turn?.speechId} />
+          <label className="transcript-setting"><input type="checkbox" checked={showTranscripts} onChange={(event) => {
+            const show = event.target.checked; setShowTranscripts(show);
+            if (!show && state.inputPreference !== 'voice') void onAction({ type: 'setInputPreference', preference: 'voice' }).catch(() => undefined);
+          }} /> Show conversation transcripts</label>
+          <h2 className="settings-controls-title">Controls</h2><dl className="controls-list"><dt>WASD / arrows</dt><dd>Walk and strafe</dd><dt>Click world / Shift</dt><dd>Lock mouse to look</dd><dt>Talk</dt><dd>Walk close to an NPC to begin speaking</dd><dt>E</dt><dd>Interact with objects / talk again</dd><dt>Esc</dt><dd>Release mouse / close conversation</dd></dl></div>
       </details>
       </div></header>
     <main className="game-main">
-      <div className="game-world" id="world"><WorldRenderer key={attempt} conversationOpen={Boolean(npc)} state={state} onAction={onAction} onTalk={onTalk} guidanceContainer={guidanceContainer} /></div>
+      <div className="game-world" id="world"><WorldRenderer key={attempt} conversationOpen={Boolean(npc)} autoEngage={!conversation && !review && !session.problem && !state.photo} state={state} onAction={onAction} onTalk={onTalk} guidanceContainer={guidanceContainer} /></div>
       <QuestPanel state={state} results={results} onReview={openReview} conversationOpen={Boolean(npc)} guidanceRef={setGuidanceContainer} />
       <RecoveryPanel problem={session.problem} pending={session.pending} state={state} onRetry={session.retry} onRefresh={session.refresh} onNew={leave} onDismiss={session.dismiss} />
-      {session.events.length > 0 && <section className="event-feed" aria-label="Quest updates" aria-live="polite">{session.events.slice(-3).map((event) => <p key={event.id}>{event.message}</p>)}</section>}
-      {npc && state.status === 'active' && <DialoguePanel key={`${state.sessionId}:${state.missionId}:${npc.anchorId}`} state={state} npc={npc} pending={session.pending} turn={session.turnNpc === npc.anchorId ? session.turn : null} onAction={onAction} onSubmit={session.submit} onLiveTurn={session.applyTurn} onClose={closeConversation} />}
-      {state.directions && !npc && <DirectionsCard directions={state.directions} pending={session.pending || !guide} onRepeat={() => onTalk(state.directions!.fromAnchorId)} />}
+      <EventFeed key={state.sessionId} events={session.events} />
+      {npc && state.status === 'active' && <DialoguePanel key={`${state.sessionId}:${state.missionId}:${npc.anchorId}`} state={state} npc={npc} pending={session.pending} turn={session.turnNpc === npc.anchorId ? session.turn : null} onAction={onAction} onSubmit={session.submit} onLiveTurn={session.applyTurn} onClose={closeConversation} showTranscripts={showTranscripts} />}
+      {state.directions && !npc && <DirectionsCard directions={state.directions} pending={session.pending || !guide} onRepeat={() => onTalk(state.directions!.fromAnchorId)} showTranscripts={displayText} />}
       {state.photo && <PhotoOverlay state={state} pending={session.pending} onAction={onAction} />}
-      {conversation && !npc && state.status === 'active' && <ConversationCard summary={conversation} turn={conversation.turn} state={state} pending={session.pending} onAction={onAction} onClose={closeConversationCard} />}
+      {conversation && !npc && state.status === 'active' && <ConversationCard summary={conversation} turn={conversation.turn} state={state} pending={session.pending} onAction={onAction} onClose={closeConversationCard} showTranscripts={displayText} />}
       {(review ? results[review] : resultsClosed ? null : state.status !== 'active' ? state : null) && <ResultPanel state={(review && results[review]) ?? state} live={state} pending={session.pending} onAction={onAction} onExit={leave} onClose={closeResults} />}
       {validation && state.validationMode && ValidationHarness && <Suspense fallback={<p>Loading internal validator…</p>}><ValidationHarness state={state} onAction={onAction} onTalk={onTalk} /></Suspense>}
     </main>

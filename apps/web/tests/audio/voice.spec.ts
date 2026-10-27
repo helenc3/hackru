@@ -33,8 +33,9 @@ async function fakeMedia(page: Page, options: { deny?: boolean } = {}) {
 }
 const counter = (page: Page, name: string) => page.evaluate((key) => Number((window as unknown as Record<string, unknown>)[key]), name);
 
-async function openPanel(page: Page) {
+async function openPanel(page: Page, showTranscripts = true) {
   await page.goto('/', { waitUntil: 'domcontentloaded' });
+  if (!showTranscripts) await page.getByLabel('Show conversation transcripts', { exact: true }).uncheck();
   await page.getByRole('button', { name: 'Start exploring', exact: true }).click();
   await page.getByTestId('world-renderer').focus();
   await page.keyboard.press('e');
@@ -60,6 +61,22 @@ async function transcribeAs(page: Page, text: string) {
   });
   return uploads;
 }
+
+test('transcripts-off records and auto-submits Mandarin without exposing the transcript', async ({ page }) => {
+  await fakeMedia(page);
+  const api = await installScriptedApi(page, { steps: [{ text: '请给我一杯茶。', reply: '一杯茶十元。' }] });
+  await transcribeAs(page, '请给我一杯茶。');
+  const panel = await openPanel(page, false);
+  await panel.getByRole('button', { name: 'Start recording', exact: true }).click();
+  await panel.getByRole('button', { name: 'Stop recording', exact: true }).click();
+  await expect(panel).toContainText('Sending your recording in');
+  await expect(panel.getByRole('textbox')).toHaveCount(0);
+  await expect(panel.locator('.bubble.player, .bubble.npc')).toHaveCount(0);
+  await expect.poll(() => api.requests.filter((request) => request.path.endsWith('/turns')).length, { timeout: 10000 }).toBe(1);
+  const request = api.requests.find((item) => item.path.endsWith('/turns'))!;
+  expect(TurnRequestSchema.parse(request.body).input).toMatchObject({ source: 'stt', text: '请给我一杯茶。', transcriptionId: 'tx-1' });
+  await expect(panel.locator('.bubble.player, .bubble.npc')).toHaveCount(0);
+});
 
 test('nothing records at load; a recording becomes a transcript that only Send submits', async ({ page }) => {
   await fakeMedia(page);

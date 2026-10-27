@@ -33,10 +33,13 @@ describe('regional planner', () => {
     }
   });
 
-  it('halves avenues, streets, lanes and promenades from their original widths', () => {
+  it('widens streets and avenues by 1.3× while keeping shared connectors consistent', () => {
     const roads = Array.from({ length: 9 }, (_, i) => planChunk(SEEDS[0]!, { cx: i - 4, cz: -1 }).roads).flat();
-    expect(roads.filter((r) => r.kind === 'street').every((r) => r.width === 3.5)).toBe(true);
-    expect(roads.filter((r) => r.kind === 'avenue').every((r) => r.width === 5)).toBe(true);
+    expect(roads.filter((r) => r.kind === 'street').every((r) => r.width === 4.55)).toBe(true);
+    expect(roads.filter((r) => r.kind === 'avenue').every((r) => r.width === 6.5)).toBe(true);
+    const banks = Array.from({ length: 9 }, (_, i) => planChunk(SEEDS[0]!, { cx: i - 2, cz: 0 })).flatMap((p) => p.roads).filter((r) => r.kind === 'promenade');
+    expect(banks.length).toBeGreaterThan(0);
+    expect(banks.every((r) => r.width === 3.9)).toBe(true);
   });
 
   it('ends seam-crossing roads exactly on the edge at the connector offset', () => {

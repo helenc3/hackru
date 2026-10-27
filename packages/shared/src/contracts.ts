@@ -94,7 +94,7 @@ export const PurchaseRecordSchema = z.strictObject({ id: identifier, attemptId: 
 export const InventorySchema = z.strictObject({ hint: z.number().int().min(0).max(3), cny: z.number().int().min(0).max(1000), drinks: z.array(DrinkSchema.exclude(['coffee'])).max(20) });
 export type Inventory = z.infer<typeof InventorySchema>;
 export const InteractableKindSchema = z.enum(['npc', 'choice', 'photo-spot', 'landmark']);
-export const PublicInteractableSchema = z.strictObject({ id: identifier, kind: InteractableKindSchema, role: NpcIdSchema.optional(), label: shortText, position: PositionSchema, choiceId: ChoiceIdSchema.optional() });
+export const PublicInteractableSchema = z.strictObject({ id: identifier, kind: InteractableKindSchema, role: NpcIdSchema.optional(), label: shortText, nameKey: identifier.optional(), position: PositionSchema, choiceId: ChoiceIdSchema.optional() });
 export type PublicInteractable = z.infer<typeof PublicInteractableSchema>;
 /** Server-verified route from the committed street graph (Q2). Never model-authored. */
 export const DirectionsSchema = z.strictObject({ routeId: identifier, fromAnchorId: identifier, hotelAnchorId: identifier, textZh: z.string().min(1).max(240), steps: z.array(z.strictObject({ textZh: z.string().min(1).max(80), english: shortText })).min(1).max(8) });

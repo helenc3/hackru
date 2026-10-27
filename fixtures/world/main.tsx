@@ -10,6 +10,10 @@ import '../../apps/web/src/app/styles.css';
 // `?stream` instead streams from /api (tests mock the routes) to exercise server-owned streaming.
 const streaming = new URLSearchParams(location.search).has('stream');
 const manifests = streaming ? undefined : fixtureCity();
+// A wall immediately behind spawn exercises the shoulder camera without changing ordinary journeys.
+if (new URLSearchParams(location.search).has('camera-wall')) manifests?.find((chunk) => chunk.coord.cx === 0 && chunk.coord.cz === 0)?.placements.push({
+  id: 'camera-wall', assetId: 'bld.warehouse.shed', params: { width: 8, depth: 6 }, x: 20, z: 15, rotation: 0,
+});
 const at = (x: number, z: number) => ({ x, z });
 const baseline: PublicState = {
   sessionId: 'fixture-session', worldId: streaming ? 'stream-world' : FIXTURE_WORLD, version: 0, missionId: 'Q1', mode: 'practice', status: 'active', zoneId: 'park', position: at(20, 10), tier: 0,

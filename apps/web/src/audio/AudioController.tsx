@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
+import { watchClipSpeech } from './speech-mouth';
 import type { AudioControllerProps } from '@vibequest/shared';
 import { fetchSpeech, setAudioActivity, setBlockedPlay, setInterrupt, useAudioActivity } from './audio-bus';
 
-type Track = { id: string; url: string };
+type Track = { id: string; url: string; clip: Blob };
 
 /** One playback lane for NPC replies. Playback never changes quest state by itself. */
 export function AudioController({ state, onAction, speechId }: AudioControllerProps) {
   const element = useRef<HTMLAudioElement | null>(null);
+  const mouthCleanup = useRef<() => void>(() => {});
   const [muted, setMuted] = useState(false);
   const [status, setStatus] = useState('Audio ready');
   const [failed, setFailed] = useState<string | null>(null);
@@ -27,7 +29,7 @@ export function AudioController({ state, onAction, speechId }: AudioControllerPr
   /** Ends the current track; only the first play of a speech operation reports its phases. */
   function settle(track: Track, report: boolean): Promise<void> {
     if (playing.current !== track) return Promise.resolve();
-    playing.current = null;
+    playing.current = null; mouthCleanup.current();
     setAudioActivity('idle');
     if (!report) return Promise.resolve();
     const idle = () => onAction({ type: 'audioPhase', operationId: track.id, phase: 'idle' });
@@ -52,6 +54,7 @@ export function AudioController({ state, onAction, speechId }: AudioControllerPr
     setAudioActivity('playing'); setFailed(null); setBlockedTrack(null);
     player.muted = muted;
     player.src = track.url;
+    mouthCleanup.current(); mouthCleanup.current = watchClipSpeech(player, track.clip);
     player.onended = () => { setStatus('Audio ready'); settle(track, report); };
     player.onerror = () => { setFailed(track.id); setStatus('Audio playback failed. Retry or read the reply.'); settle(track, report); };
     setStatus('Playing reply…');
@@ -86,14 +89,14 @@ export function AudioController({ state, onAction, speechId }: AudioControllerPr
     fetchSpeech(state.sessionId, speechId, controller.signal).then((clip) => {
       if (controller.signal.aborted || token !== scope.current) return;
       url = URL.createObjectURL(clip);
-      void play({ id: speechId, url });
+      void play({ id: speechId, url, clip });
     }).catch(() => { if (!controller.signal.aborted) { setFailed(speechId); setStatus('Reply audio is unavailable. Retry or read the reply.'); } });
     return () => { controller.abort(); if (url && last.current?.url !== url) URL.revokeObjectURL(url); };
   }, [speechId, state.sessionId, refetch]);
 
   // Retry/new attempt: stop everything and ignore late audio.
   useEffect(() => () => {
-    scope.current++;
+    scope.current++; mouthCleanup.current();
     element.current?.pause();
     playing.current = null; if (last.current) URL.revokeObjectURL(last.current.url); last.current = null; setAudioActivity('idle');
   }, [attempt]);

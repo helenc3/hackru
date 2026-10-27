@@ -9,7 +9,7 @@ export const CHUNK_SIZE = 40;
 export const SPAWN_RADIUS_CHUNKS = 1;
 export const VISIBLE_RADIUS_CHUNKS = 1;
 export const PREFETCH_RADIUS_CHUNKS = 2;
-export const GENERATOR_VERSION = 2;
+export const GENERATOR_VERSION = 3;
 export const CITY_LIMITS = { maxPlacements: 160, maxAnchors: 12, maxRoads: 24, maxWater: 8, maxBridges: 4, maxTriangles: 120_000, maxDrawCalls: 400 } as const;
 /** deadlineMs started at 8 s; a measured live claude-opus-5-5 chunk took ~12 s (27k input / 1k output tokens), so prefetch waits 20 s. Urgent requests still commit a seeded fallback immediately. */
 export const GENERATION_RULES = { concurrency: 2, deadlineMs: 20_000, retries: 1, batchSize: 6, sessionCallCap: 60, sessionTokenCap: 400_000 } as const;

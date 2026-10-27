@@ -12,3 +12,5 @@
 @import './game/validation-overlay.css';
 @import './game/mission-results.css';
 @import './game/quest-cards.css';
+
+@import './game/dialogue-sprites.css';

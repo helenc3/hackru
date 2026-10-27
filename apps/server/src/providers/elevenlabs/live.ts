@@ -1,5 +1,5 @@
 import { ElevenLabsClient } from '@elevenlabs/elevenlabs-js';
-import { characterDescriptions, npcIdentity, type NpcId, type SpeechProvider } from '@vibequest/shared';
+import { characterDescriptions, npcIdentity, MAX_NPC_REPLY_LENGTH, type NpcId, type SpeechProvider } from '@vibequest/shared';
 import { HttpError } from '../../errors.js';
 
 /**
@@ -16,7 +16,7 @@ export const DEFAULT_VOICE_IDS = Object.fromEntries(characterDescriptions.map((n
 
 export const MAX_CLIP_BYTES = 3 * 1024 * 1024;
 // Verified Q2 routes run up to 240 characters (DirectionsSchema.textZh).
-const MAX_REPLY_CHARS = 240;
+const MAX_REPLY_CHARS = MAX_NPC_REPLY_LENGTH;
 
 export interface ElevenLabsSpeechOptions {
   apiKey: string;
@@ -60,14 +60,14 @@ export function voiceFor(voiceIds: ElevenLabsSpeechOptions['voiceIds'], voiceKey
 export function createElevenLabsSpeechProvider(options: ElevenLabsSpeechOptions): SpeechProvider {
   const client = new ElevenLabsClient({ apiKey: options.apiKey });
   return {
-    async *streamPcm(text, voiceKey) {
+    async *streamPcm(text, voiceKey, language = 'zh') {
       const line = text.trim();
-      if (!line || line.length > MAX_REPLY_CHARS) throw new HttpError(422, 'INVALID_SPEECH_TEXT', 'NPC speech must be 1-240 characters.');
+      if (!line || line.length > (language === 'en' ? MAX_REPLY_CHARS : 240)) throw new HttpError(422, 'INVALID_SPEECH_TEXT', `NPC speech must be 1-${language === 'en' ? MAX_REPLY_CHARS : 240} characters.`);
       const voiceId = voiceFor(options.voiceIds, voiceKey);
       let stream: ReadableStream<Uint8Array>;
       try {
         stream = await client.textToSpeech.stream(voiceId,
-          { text: line, modelId: options.ttsModel, outputFormat: 'pcm_24000', languageCode: 'zh' },
+          { text: line, modelId: options.ttsModel, outputFormat: 'pcm_24000', languageCode: language },
           { timeoutInSeconds: options.ttsTimeoutSeconds ?? 5, maxRetries: 0 });
       } catch { throw speechUnavailable(); }
       // PCM16 samples are 2 bytes; network chunks may split one, so carry an odd byte to the next chunk.
@@ -81,27 +81,27 @@ export function createElevenLabsSpeechProvider(options: ElevenLabsSpeechOptions)
         }
       } catch { throw speechUnavailable(); }
     },
-    async synthesizePcm(text, voiceKey) {
+    async synthesizePcm(text, voiceKey, language = 'zh') {
       const line = text.trim();
-      if (!line || line.length > MAX_REPLY_CHARS) throw new HttpError(422, 'INVALID_SPEECH_TEXT', 'NPC speech must be 1-240 characters.');
+      if (!line || line.length > (language === 'en' ? MAX_REPLY_CHARS : 240)) throw new HttpError(422, 'INVALID_SPEECH_TEXT', `NPC speech must be 1-${language === 'en' ? MAX_REPLY_CHARS : 240} characters.`);
       const voiceId = voiceFor(options.voiceIds, voiceKey);
       try {
         const stream = await client.textToSpeech.convert(voiceId,
-          { text: line, modelId: options.ttsModel, outputFormat: 'pcm_24000', languageCode: 'zh' },
+          { text: line, modelId: options.ttsModel, outputFormat: 'pcm_24000', languageCode: language },
           { timeoutInSeconds: options.ttsTimeoutSeconds ?? 5, maxRetries: 0 });
         const audio = await readAll(stream);
         if (!audio.length) throw new Error('empty audio');
         return audio;
       } catch { throw speechUnavailable(); }
     },
-    async synthesize(text, voiceKey) {
+    async synthesize(text, voiceKey, language = 'zh') {
       const line = text.trim();
-      if (!line || line.length > MAX_REPLY_CHARS) throw new HttpError(422, 'INVALID_SPEECH_TEXT', 'NPC speech must be 1-240 characters.');
+      if (!line || line.length > (language === 'en' ? MAX_REPLY_CHARS : 240)) throw new HttpError(422, 'INVALID_SPEECH_TEXT', `NPC speech must be 1-${language === 'en' ? MAX_REPLY_CHARS : 240} characters.`);
       const voiceId = voiceFor(options.voiceIds, voiceKey);
       try {
         const stream = await client.textToSpeech.convert(
           voiceId,
-          { text: line, modelId: options.ttsModel, outputFormat: 'mp3_44100_128', languageCode: 'zh' },
+          { text: line, modelId: options.ttsModel, outputFormat: 'mp3_44100_128', languageCode: language },
           { timeoutInSeconds: options.ttsTimeoutSeconds ?? 5, maxRetries: 0 },
         );
         const audio = await readAll(stream);
@@ -111,11 +111,11 @@ export function createElevenLabsSpeechProvider(options: ElevenLabsSpeechOptions)
         throw speechUnavailable(); // Fixed message: never echo keys or provider bodies.
       }
     },
-    async transcribe(audio, mimeType) {
+    async transcribe(audio, mimeType, language = 'zh') {
       if (!audio.length || audio.length > MAX_CLIP_BYTES) throw new HttpError(413, 'CLIP_TOO_LARGE', 'Clips must be between 1 byte and 3 MB.');
       try {
         const result = await client.speechToText.convert(
-          { file: { data: audio, filename: 'clip', contentType: mimeType }, modelId: options.sttModel, languageCode: 'zh', diarize: false, tagAudioEvents: false },
+          { file: { data: audio, filename: 'clip', contentType: mimeType }, modelId: options.sttModel, languageCode: language, diarize: false, tagAudioEvents: false },
           { timeoutInSeconds: options.sttTimeoutSeconds ?? 8, maxRetries: 0 },
         );
         return (result.text ?? '').trim();

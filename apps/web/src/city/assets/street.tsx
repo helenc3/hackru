@@ -1,6 +1,7 @@
 import { useEffect, useMemo } from 'react';
 import { CanvasTexture, SRGBColorSpace } from 'three';
-import { text, type ParamValues } from '@vibequest/shared';
+import { type ParamValues } from '@vibequest/shared';
+import { useCityText } from '../language';
 import { candy, INK, Toon } from '../../world/toon';
 import { Lantern } from '../../world/decor';
 import type { AssetComponent } from './types';
@@ -93,7 +94,7 @@ const PavedLane: AssetComponent = ({ params }) => {
 };
 
 const MetroEntrance: AssetComponent = ({ params }) => {
-  const sign = text('landmark', String(params.sign))?.zh ?? '地铁';
+  const sign = useCityText('landmark', String(params.sign));
   const glass = params.variant === 'glass-box';
   return <>
     {/* Side and back walls; the stair mouth opens to +z. */}
@@ -188,7 +189,7 @@ const TrashBin: AssetComponent = ({ params }) => {
 
 const BusStop: AssetComponent = ({ params }) => {
   const l = n(params, 'length');
-  const road = text('road-name', String(params.road))?.zh ?? '';
+  const road = useCityText('road-name', String(params.road));
   return <>
     <Box at={[0, 1.2, -.675]} size={[l, 2.2, .1]} color="#9fd8ff" />
     {[-1, 1].map((s) => <Box key={s} at={[s * (l / 2 - .1), 1.2, -.3]} size={[.12, 2.4, .12]} color="#5b6070" />)}
@@ -199,7 +200,7 @@ const BusStop: AssetComponent = ({ params }) => {
 };
 
 const StreetSign: AssetComponent = ({ params }) => {
-  const road = text('road-name', String(params.road))?.zh ?? '';
+  const road = useCityText('road-name', String(params.road));
   const arrow = params.arrow === 'left' ? '← ' : params.arrow === 'right' ? ' →' : '';
   const label = params.arrow === 'left' ? arrow + road : road + arrow;
   return <>

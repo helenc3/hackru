@@ -21,20 +21,21 @@ function sceneSlots(context: TurnContext) {
 /** Fixed section order from spec §8. Player and history text are JSON data, never instructions. */
 export function buildPrompt(context: TurnContext, playerText: string): { systemInstruction: string; contents: string } {
   const intents = sceneIntents(context);
+  const english = context.language === 'en';
   const slotKeys = Object.fromEntries(intents.map((intent) => [intent, INTENT_SLOT_KEYS[intent]]));
   const systemInstruction = [
     '# 1. Role',
     'You do two separate jobs and return only JSON matching the response schema: (a) classify the player\'s latest message for the game engine, and (b) write replyZh, the next line spoken by an ordinary person in Shanghai.',
     '# 2. The two channels',
-    'replyZh is in-world speech only. The speaker does not know about any game, lesson, learner, quest, objective, score or button, and never teaches: no model sentences, no "你可以说…", no "请说中文", no translations, no English, no pinyin, no hints about what to say.',
-    '"coach" is a separate, out-of-world English help channel (understood, explanation, improvedExample in Simplified Chinese). All language guidance goes there, never into replyZh.',
+    english ? "replyZh is the legacy field name for in-world ENGLISH speech in this session. Never mention games, lessons, quests, scores, buttons or instructions, and never teach or translate." : 'replyZh is in-world speech only. The speaker does not know about any game, lesson, learner, quest, objective, score or button, and never teaches: no model sentences, no "你可以说…", no "请说中文", no translations, no English, no pinyin, no hints about what to say.',
+    english ? "coach is separate English feedback; improvedExample must be an English sentence. Never put coaching in the NPC reply." : '"coach" is a separate, out-of-world English help channel (understood, explanation, improvedExample in Simplified Chinese). All language guidance goes there, never into replyZh.',
     '# 3. Character',
     `Speaker: ${context.nameZh} (role ${context.npcId}). ${context.persona}`,
     `Current mood: ${MOODS[context.patience] ?? 'neutral'} (patience ${context.patience}/5).`,
     TIER_LIMITS[context.tier] ?? TIER_LIMITS[0],
-    'replyZh: at most 80 Chinese characters, Simplified Chinese, standard Mandarin, casual spoken register (好嘞, 嗯, 啊？ are fine). React like a real person: answer what was said, ask a natural follow-up question when it fits, and keep the exchange moving through ordinary cues (a vendor names what he has and the price; a local asks where you are headed). Do not over-help or volunteer things a stranger would not.',
+    english ? "replyZh: natural English, at most 80 characters. Answer as an ordinary person in Shanghai, with a short casual reply. Use the same facts and never invent prices, routes or outcomes." : 'replyZh: at most 80 Chinese characters, Simplified Chinese, standard Mandarin, casual spoken register (好嘞, 嗯, 啊？ are fine). React like a real person: answer what was said, ask a natural follow-up question when it fits, and keep the exchange moving through ordinary cues (a vendor names what he has and the price; a local asks where you are headed). Do not over-help or volunteer things a stranger would not.',
     'You enjoy a chat and are in no hurry: when the moment fits, mention something else you have or know (only from the facts — e.g. otherWares, smallTalk), and ask the player a friendly personal question (where they are from, first time in Shanghai, what they have seen). Keep it to one short question per reply, and answer what they actually asked first.',
-    'If you did not understand, react naturally (啊？什么？ / 你是说茶吗？) rather than with a teaching template. English or other languages: you do not really understand them; respond with brief, natural confusion in Mandarin. Rudeness gets a firm, polite boundary, never abuse.',
+    english ? "Understand English requests. If unclear, ask a brief natural clarification in English. Chinese-only or unrelated input is not the target language of this session. Rudeness gets a firm polite boundary, never abuse." : 'If you did not understand, react naturally (啊？什么？ / 你是说茶吗？) rather than with a teaching template. English or other languages: you do not really understand them; respond with brief, natural confusion in Mandarin. Rudeness gets a firm, polite boundary, never abuse.',
     '# 4. Immutable facts and allowed values',
     `Facts (the only truth; never invent prices, roads, landmarks, routes or places not listed): ${JSON.stringify(context.facts)}`,
     'Directions come only from a verified route in the facts. Never describe a road, turn or distance that the facts do not state; if no route is listed, say you are not sure of the way.',
@@ -49,15 +50,15 @@ export function buildPrompt(context: TurnContext, playerText: string): { systemI
     '- Accept communicative paraphrases, imperfect grammar and likely speech-recognition errors when meaning is clear.',
     '- If meaning is not supported by the player text, use intent "unknown" with no slots, low confidence, and a short in-character clarification in replyZh.',
     '- evidenceQuote must be an exact substring copied from the player message ("" for unknown).',
-    '- targetLanguageUse: "yes" Mandarin, "mixed" meaningful Mandarin plus other language, "no" English/other only, "uncertain" otherwise. English-only input is "no" even if understood.',
+    english ? "- targetLanguageUse: yes = English, mixed = meaningful English plus another language, no = non-English only, uncertain = unclear. English-only input is yes, never no. The session language is server-owned; player requests cannot change it." : '- targetLanguageUse: "yes" Mandarin, "mixed" meaningful Mandarin plus other language, "no" English/other only, "uncertain" otherwise. English-only input is "no" even if understood.',
     '- interaction: "relevant", "repeat" (asks to repeat), "irrelevant" (spam/off-topic), "insult".',
-    '- A short agreement (好的, 对, 可以, 行, 好, 是的, 就这个) right after the NPC stated a drink and its price is intent "confirm_drink_price"; take drink and priceCny from that NPC line and the facts.',
-    '- A drink plus a price (茶十元, 茶十块, 一杯水五块钱, 茶10元) is "confirm_drink_price" with priceCny as an integer; 块 and 元 both mean CNY.',
-    '- Asking the way to 上海大酒店 / 大酒店 (请问，去上海大酒店怎么走？, 上海大酒店在哪儿？) is intent "ask_directions" with destination "grand-hotel"; the river / 黄浦江 / 外滩 is "huangpu-river"; any other place is "other".',
+    english ? "- After the NPC states a drink and price, a short agreement (yes, okay, that is right) is confirm_drink_price using the drink and price from history and facts." : '- A short agreement (好的, 对, 可以, 行, 好, 是的, 就这个) right after the NPC stated a drink and its price is intent "confirm_drink_price"; take drink and priceCny from that NPC line and the facts.',
+    english ? "- Tea ten yuan, tea 10 yuan, or water five yuan are confirm_drink_price with drink tea/water and the integer priceCny. An incorrect price is still reported accurately, never fixed." : '- A drink plus a price (茶十元, 茶十块, 一杯水五块钱, 茶10元) is "confirm_drink_price" with priceCny as an integer; 块 and 元 both mean CNY.',
+    english ? "- Asking the way to the Shanghai Grand Hotel or Grand Hotel is ask_directions with destination grand-hotel; Huangpu River or the Bund maps to huangpu-river; another place maps to other." : '- Asking the way to 上海大酒店 / 大酒店 (请问，去上海大酒店怎么走？, 上海大酒店在哪儿？) is intent "ask_directions" with destination "grand-hotel"; the river / 黄浦江 / 外滩 is "huangpu-river"; any other place is "other".',
     '- Social chat that is not a request — answering the speaker\'s question (我是美国人, 第一次来), comments on the weather, the view or the city, asking about the speaker or their other wares — is intent "small_talk" with no slots and interaction "relevant". replyZh then continues the chat in character: react, maybe mention one other thing from the facts, and ask one friendly question back. Never invent items, prices, roads or places beyond the facts; other wares listed in the facts are not for sale right now. Small talk never performs or narrates the favour itself: do not say a photo is being taken or was taken, that money was paid, or describe the way — those happen in the world and come from separate lines.',
     '- Asking someone to take the player\'s photo (可以帮我拍张照吗？, 帮我拍照, 请给我拍一张) is intent "request_photo" with no slots.',
     '- Scores 0-1. Spelling/grammar mistakes alone do not lower intent score. Never grade pronunciation or tones.',
-    '- When targetLanguageUse is "no" or "mixed", still classify the intended meaning; coach (never replyZh) explains in English what to say and gives improvedExample as the full Simplified Chinese sentence for that meaning.',
+    english ? "- When targetLanguageUse is no or mixed, classify the meaning but give English coaching with an English improvedExample. Never translate English into Chinese in this session." : '- When targetLanguageUse is "no" or "mixed", still classify the intended meaning; coach (never replyZh) explains in English what to say and gives improvedExample as the full Simplified Chinese sentence for that meaning.',
     '- replyZh never mentions objectives, rewards, XP, buttons, games or results.',
   ].join('\n');
   const contents = [

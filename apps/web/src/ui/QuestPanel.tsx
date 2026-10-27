@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { MissionIdSchema, type MissionId, type PublicState } from '@vibequest/shared';
+import { languageName, worldText, MissionIdSchema, type MissionId, type PublicState } from '@vibequest/shared';
 import { missionTitles } from './ResultPanel';
 
 /** English instructions per quest (NEW_QUESTS.md); world text stays Simplified Chinese. */
@@ -17,7 +17,7 @@ export function QuestPanel({ state, results, onReview, conversationOpen = false,
     <div className="quest-guidance" ref={guidanceRef} />
     {open && <>
     <hr className="quest-guidance-divider" />
-    <p className="quest-instructions">{missionInstructions[state.missionId]}</p>
+    <p className="quest-instructions">{worldText(missionInstructions[state.missionId], state.language).replaceAll('in Mandarin', `in ${languageName(state.language)}`)}</p>
     <ul className="mission-progress" aria-label="Quest progress" data-testid="mission-progress">{MissionIdSchema.options.map((id) => { const result = results[id]; return <li key={id} data-locked={!state.unlockedMissionIds.includes(id)}>
       <input type="checkbox" checked={state.completedMissionIds.includes(id)} readOnly tabIndex={-1} aria-label={`${missionTitles[id]} cleared`} />
       <span>{missionTitles[id]}</span>

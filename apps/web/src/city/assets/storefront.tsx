@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { CanvasTexture, SRGBColorSpace, type Group, type MeshBasicMaterial } from 'three';
-import { text as catalogText, type ParamValues, type TextCatalogName } from '@vibequest/shared';
+import { type ParamValues, type TextCatalogName } from '@vibequest/shared';
+import { useCityText } from '../language';
 import { candy, INK, Toon } from '../../world/toon';
 import type { AssetComponent } from './types';
 
@@ -21,7 +22,7 @@ const DOOR_FACADE_OFFSET = 0.1;
  * fetch a font at runtime, which is not guaranteed offline and rarely covers Hanzi.
  */
 function useLabel(catalog: TextCatalogName, key: string, { vertical = false, ink = '#fff6e8', background = 'transparent', glow }: { vertical?: boolean; ink?: string; background?: string; glow?: string }) {
-  const zh = catalogText(catalog, key)?.zh.split('\n')[0] ?? '';
+  const zh = useCityText(catalog, key).split('\n')[0] ?? '';
   const texture = useMemo(() => {
     const chars = [...zh];
     const cell = 128;

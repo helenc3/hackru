@@ -2,7 +2,8 @@ import {
   AUDIO_PHASE_MAX_MS, CreateGameOptionsSchema, GameActionSchema, InternalStateSchema, PHOTO_RULES, PublicStateSchema, QuestCategorySchema, TurnEvaluationSchema, WORLD_RULES,
   type CreateGameOptions, type EngineResult, type EvidenceRecord, type ExplorationState, type GameAction, type InternalState, type NpcAction, type NpcId, type Position, type PublicInteractable, type PublicState, type QuestCategory, type TurnContext, type TurnEvaluation,
 } from '../contracts.js';
-import { authoredFacts, clarifyReplies, DRINK_PRICES, groundedReplies, impatienceReplies, npcOpeners, npcs, pacingReplies, speakMandarinReplies, STARTING_CNY } from '../content/index.js';
+import { conversationContent, conversationFacts, directionsText, languageName, worldText } from '../language.js';
+import { authoredFacts, DRINK_PRICES, npcs, STARTING_CNY } from '../content/index.js';
 import { missionFor, missionSnapshot, NEXT_MISSION } from '../content/missions.js';
 import { BIAS_RULES, chunkKey, chunkOf, type Anchor, type Capability, type WorldView } from '../city/contracts.js';
 import { recordEncounters } from '../city/bias.js';
@@ -38,9 +39,9 @@ const QUEST_CAPABILITIES: Partial<Record<Capability, QuestCategory>> = { 'drink-
 const PHOTO_VIEWPOINT_RADIUS = 12;
 const INTERACTABLE_RADIUS = 60;
 
-function label(anchor: Anchor): string {
+function label(anchor: Anchor, language: InternalState['language'] = 'zh'): string {
   const row = anchor.nameKey ? text(anchor.kind === 'npc' ? 'npc-name' : 'landmark', anchor.nameKey) : undefined;
-  return row?.zh ?? (anchor.role ? npcs.find((npc) => npc.id === anchor.role)!.nameZh : anchor.capability === 'hotel-landmark' ? '上海大酒店' : anchor.capability === 'river-viewpoint' ? '黄浦江观景台' : '地标');
+  return (language === 'en' ? row?.english : row?.zh) ?? (anchor.role ? npcs.find((npc) => npc.id === anchor.role)!.nameZh : anchor.capability === 'hotel-landmark' ? '上海大酒店' : anchor.capability === 'river-viewpoint' ? '黄浦江观景台' : '地标');
 }
 function requireAnchor(state: InternalState, world: WorldView, anchorId: string, radius: number = WORLD_RULES.interactionRadius): WorldAnchor {
   const anchor = world.anchor(anchorId);
@@ -55,7 +56,7 @@ export function createGame(options: CreateGameOptions, nowMs: number): InternalS
   const snapshot = missionSnapshot[parsed.missionId];
   const exploration: ExplorationState = { activeMs: 0, lastActiveAtMs: nowMs, visitedChunkKeys: [chunkKey(chunkOf(parsed.spawn))], lastEncounter: Object.fromEntries(QuestCategorySchema.options.map((category) => [category, { activeMs: 0, visitedChunks: 0 }])) as ExplorationState['lastEncounter'] };
   return InternalStateSchema.parse({
-    sessionId: parsed.sessionId, worldId: parsed.worldId, attemptId: parsed.attemptId, missionId: parsed.missionId, validationMode: parsed.validationMode, inputPreference: parsed.inputPreference, providerStatus: parsed.providerStatus,
+    language: parsed.language, sessionId: parsed.sessionId, worldId: parsed.worldId, attemptId: parsed.attemptId, missionId: parsed.missionId, validationMode: parsed.validationMode, inputPreference: parsed.inputPreference, providerStatus: parsed.providerStatus,
     version: 0, nodeId: mission.startNode, mode: 'practice', status: 'active', zoneId: 'shopping', position: parsed.spawn, lastMovementAtMs: nowMs, tier: parsed.initialTier,
     flags: {}, inventory: { hint: 0, cny: STARTING_CNY, drinks: [] }, purchases: [], xp: 0, badges: [], awardedRewardIds: [], unlockedMissionIds: ['Q1'], completedMissionIds: [],
     npcState: Object.fromEntries(npcs.map((npc) => [npc.id, { patience: npc.initialPatience, mood: mood(npc.initialPatience), history: [], anchorId: null, repeatCount: 0, cooldownRemainingMs: 0 }])),
@@ -169,7 +170,7 @@ export function applyAction(state: InternalState, raw: GameAction, nowMs: number
     const retryAfterFailure = next.status === 'failed' && next.missionId === missionId;
     requireRule(retryAfterFailure || (next.status === 'cleared' && NEXT_MISSION[next.missionId] === missionId), 'Only the next quest, or a failed quest, can be started.');
     requireRule(next.unlockedMissionIds.includes(missionId), 'Complete the prerequisite quest first.');
-    const fresh = createGame({ sessionId: next.sessionId, worldId: next.worldId, attemptId: `${missionId.toLowerCase()}.${nowMs}.${next.version + 1}`, missionId, initialTier: next.difficulty === 0 ? 0 : 1, validationMode: next.validationMode, inputPreference: next.inputPreference, providerStatus: next.providerStatus, spawn: next.position }, nowMs);
+    const fresh = createGame({ language: next.language, sessionId: next.sessionId, worldId: next.worldId, attemptId: `${missionId.toLowerCase()}.${nowMs}.${next.version + 1}`, missionId, initialTier: next.difficulty === 0 ? 0 : 1, validationMode: next.validationMode, inputPreference: next.inputPreference, providerStatus: next.providerStatus, spawn: next.position }, nowMs);
     for (const key of ['version', 'zoneId', 'lastMovementAtMs', 'inventory', 'purchases', 'xp', 'badges', 'awardedRewardIds', 'unlockedMissionIds', 'completedMissionIds', 'directions', 'exploration', 'skills', 'evidence', 'difficulty', 'skillUpdatedAttemptIds'] as const) Object.assign(fresh, { [key]: structuredClone(next[key]) });
     fresh.tier = selectPracticeTier(next, missionId);
     fresh.difficulty = fresh.tier;
@@ -252,7 +253,7 @@ export function applyAction(state: InternalState, raw: GameAction, nowMs: number
       const level = Math.min(3, Number(next.flags[`${next.nodeId}-hint-level`] ?? 0) + 1);
       next.flags[`${next.nodeId}-hint-level`] = level;
       const hint = missionFor(next.missionId).hints.find((entry) => entry.nodeId === next.nodeId && entry.level === level)!;
-      events.push({ id: `${next.attemptId}.hint-${level}`, kind: 'objective', message: hint.text });
+      events.push({ id: `${next.attemptId}.hint-${level}`, kind: 'objective', message: worldText(hint.text, next.language) });
       next.inventory.hint--; break;
     }
     case 'pausePractice':
@@ -274,7 +275,7 @@ export function dialogueContext(state: InternalState, npcId: NpcId, anchorId: st
   const runtime = state.npcState[npcId];
   requireRule(runtime.patience > 0, 'The NPC needs a short break.');
   const identity = npcIdentity(anchor.nameKey);
-  return { missionId: state.missionId, mode: state.mode, tier: state.tier, npcId, anchorId, nameZh: label(anchor), persona: identity ? `${npc.persona} Character gender: ${identity.gender}.` : npc.persona, patience: runtime.patience, allowedIntents: [...npc.allowedIntents], facts: { ...state.secretFacts }, history: runtime.history };
+  return { language: state.language, missionId: state.missionId, mode: state.mode, tier: state.tier, npcId, anchorId, nameZh: label(anchor, state.language), persona: identity ? `${npc.persona} Character gender: ${identity.gender}.` : npc.persona, patience: runtime.patience, allowedIntents: [...npc.allowedIntents], facts: conversationFacts({ ...state.secretFacts }, state.language), history: runtime.history };
 }
 /** English/other-only, hostile, or unclear mixed input: never acted on, never advances, costs patience. */
 export function offTarget(evaluation: TurnEvaluation): boolean {
@@ -293,13 +294,14 @@ function completeDrinkConfirmation(state: InternalState, evaluation: TurnEvaluat
   return { ...evaluation, slots };
 }
 /** An NPC line that closes the exchange ("thanks, come again", "bye"): the conversation ends after it, whoever said goodbye first. */
-const CLOSING_LINE = /再见|拜拜|慢走|欢迎(?:您)?(?:再来|下次|常来)|下次(?:再来|见)|回头见|一路(?:顺风|平安)|路上小心/;
+const CLOSING_LINE = /\b(?:goodbye|bye|take care|see you)\b|再见|拜拜|慢走|欢迎(?:您)?(?:再来|下次|常来)|下次(?:再来|见)|回头见|一路(?:顺风|平安)|路上小心/i;
 export function isClosingLine(text: string | undefined): boolean { return Boolean(text && CLOSING_LINE.test(text)); }
 /** Authored Mandarin for every fact-bearing reply. The model's replyZh is used only for small talk (bounded by the smallTalk/otherWares facts). */
 export function groundedReply(state: InternalState, npcId: NpcId, evaluation: TurnEvaluation, _world?: WorldView): string {
+  const { groundedReplies, npcOpeners, speakMandarinReplies, clarifyReplies } = conversationContent(state.language);
   const slot = (key: string) => evaluation.slots.find((entry) => entry.key === key)?.value;
   const anchorId = state.npcState[npcId].anchorId;
-  if (evaluation.interaction === 'insult') return '请礼貌一点。';
+  if (evaluation.interaction === 'insult') return state.language === 'en' ? 'Please be polite.' : '请礼貌一点。';
   const byNode = (table: Record<string, string>) => table[`${state.nodeId}.${String(state.flags['q1.drink'] ?? '')}`] ?? table[state.nodeId] ?? table.default!;
   if (offTarget(evaluation)) return byNode(speakMandarinReplies);
   if (evaluation.intent === 'unknown') return byNode(clarifyReplies);
@@ -316,7 +318,7 @@ export function groundedReply(state: InternalState, npcId: NpcId, evaluation: Tu
   }
   if (evaluation.intent === 'ask_directions') {
     if (slot('destination') !== 'grand-hotel') return groundedReplies.unknownPlace;
-    return state.directions && state.directions.fromAnchorId === anchorId ? state.directions.textZh : groundedReplies.noRoute;
+    return state.directions && state.directions.fromAnchorId === anchorId ? directionsText(state.directions, state.language) : groundedReplies.noRoute;
   }
   if (evaluation.intent === 'request_photo') {
     const photo = state.photo && state.photo.passerbyAnchorId === anchorId ? state.photo : null;
@@ -380,6 +382,7 @@ export function applyEvaluation(state: InternalState, npcId: NpcId, anchorId: st
   nowMs = Math.floor(nowMs); // timestamps are integer ms
   const result = synchronizeGame(state, nowMs);
   const next = result.state;
+  const { pacingReplies, impatienceReplies } = conversationContent(next.language);
   let evaluation = completeDrinkConfirmation(next, TurnEvaluationSchema.parse(raw));
   dialogueContext(next, npcId, anchorId, world);
   const anchor = world.anchor(anchorId)!;
@@ -419,7 +422,7 @@ export function applyEvaluation(state: InternalState, npcId: NpcId, anchorId: st
     const hint = missionFor(next.missionId).hints.find((entry) => entry.nodeId === next.nodeId && entry.level === 2);
     if (hint) {
       next.flags[`${next.nodeId}-hint-level`] = 2; next.flags['session.assisted'] = true;
-      result.events.push({ id: `${next.attemptId}.vocab-${next.nodeId}`, kind: 'objective', message: `Hint: ${hint.text}` });
+      result.events.push({ id: `${next.attemptId}.vocab-${next.nodeId}`, kind: 'objective', message: `Hint: ${worldText(hint.text, next.language)}` });
     }
   }
   if (evaluation.intent === 'request_repeat') {
@@ -429,7 +432,7 @@ export function applyEvaluation(state: InternalState, npcId: NpcId, anchorId: st
     npc.patience = Math.max(0, npc.patience - 1);
     next.xp = Math.max(0, next.xp - 5);
     const name = label(anchor);
-    result.events.push({ id: `${next.attemptId}.language-${next.pendingTurn!.turnId}`, kind: 'objective', message: evaluation.interaction === 'insult' ? `${name} is upset: -5 XP. Stay polite.` : evaluation.targetLanguageUse === 'no' ? `${name} didn't understand English: -5 XP. Try it in Mandarin.` : `${name} didn't follow that: -5 XP. Try a short Mandarin sentence.` });
+    result.events.push({ id: `${next.attemptId}.language-${next.pendingTurn!.turnId}`, kind: 'objective', message: evaluation.interaction === 'insult' ? `${name} is upset: -5 XP. Stay polite.` : evaluation.targetLanguageUse === 'no' ? next.language === 'en' ? `${name} did not understand: -5 XP. Try it in English.` : `${name} didn't understand English: -5 XP. Try it in Mandarin.` : `${name} didn't follow that: -5 XP. Try a short ${languageName(next.language)} sentence.` });
   }
   npc.mood = mood(npc.patience);
   const deferrals = `${prefix(next)}.deferrals`;
@@ -460,7 +463,7 @@ export function applyEvaluation(state: InternalState, npcId: NpcId, anchorId: st
 
 function interactable(state: InternalState, anchor: WorldAnchor): PublicInteractable | null {
   const mission = missionFor(state.missionId);
-  const base = { id: anchor.id, label: label(anchor), position: anchor.position };
+  const base = { id: anchor.id, label: label(anchor, state.language), position: anchor.position };
   if (anchor.kind === 'npc') {
     if (!anchor.role || !mission.npcRoles.includes(anchor.role)) return null;
     const payable = Boolean(orderedDrink(state)) && anchor.id === state.npcState.vendor.anchorId;
@@ -506,15 +509,16 @@ export function projectPublicState(state: InternalState, nowMs: number, world: W
   const interactables = nearby.flatMap((anchor) => {
     const entry = interactable(next, anchor);
     // The pay step is also its own choice target at the vendor, alongside the NPC.
-    return !entry ? [] : entry.choiceId === 'q1.pay' ? [entry, { id: `${anchor.id}.pay`, kind: 'choice' as const, label: '付款', position: anchor.position, choiceId: 'q1.pay' as const }] : [entry];
+    return !entry ? [] : entry.choiceId === 'q1.pay' ? [entry, { id: `${anchor.id}.pay`, kind: 'choice' as const, label: worldText('付款', next.language), position: anchor.position, choiceId: 'q1.pay' as const }] : [entry];
   }).slice(0, 40);
+  const target = questTarget(next, world);
   return PublicStateSchema.parse({
-    sessionId: next.sessionId, worldId: next.worldId, version: next.version, missionId: next.missionId, mode: next.mode, status: next.status, zoneId: next.zoneId, position: next.position, tier: next.tier,
-    objectives: mission.nodes.map((node) => ({ id: node.id, label: node.objective, complete: next.status === 'cleared' || Boolean(next.flags[node.id]) })),
+    language: next.language, sessionId: next.sessionId, worldId: next.worldId, version: next.version, missionId: next.missionId, mode: next.mode, status: next.status, zoneId: next.zoneId, position: next.position, tier: next.tier,
+    objectives: mission.nodes.map((node) => ({ id: node.id, label: worldText(node.objective, next.language), complete: next.status === 'cleared' || Boolean(next.flags[node.id]) })),
     interactables,
     npcMood: Object.fromEntries(npcs.map((npc) => [npc.id, next.npcState[npc.id].mood])), inventory: next.inventory, purchases: next.purchases,
     xp: next.xp, badges: next.badges, unlockedMissionIds: next.unlockedMissionIds, completedMissionIds: next.completedMissionIds,
-    directions: next.directions, photo: next.photo, npcActions: npcActions(next), questTarget: questTarget(next, world), timer: null,
+    directions: next.directions, photo: next.photo, npcActions: npcActions(next), questTarget: target && next.language === 'en' ? { ...target, label: target.english } : target, timer: null,
     capabilities: { coach: true, hints: true, freeze: false }, validationMode: next.validationMode, inputPreference: next.inputPreference, providerStatus: next.providerStatus,
     ...(next.debrief ? { debrief: next.debrief } : {}),
   });

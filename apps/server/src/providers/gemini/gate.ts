@@ -1,4 +1,4 @@
-import type { NpcId, TurnContext, TurnEvaluation } from '@vibequest/shared';
+import { languageName, type NpcId, type TurnContext, type TurnEvaluation } from '@vibequest/shared';
 
 const CLARIFY: Record<NpcId, string> = {
   vendor: '啊？你要喝点什么？',
@@ -13,11 +13,11 @@ export function clarificationEvaluation(context: TurnContext): TurnEvaluation {
     intent: 'unknown', slots: [], evidenceQuote: '',
     intentGrade: { score: 0, confidence: 0 }, clarity: 0, courtesy: 0.5,
     targetLanguageUse: 'uncertain', interaction: 'relevant',
-    replyZh: CLARIFY[context.npcId],
+    replyZh: context.language === 'en' ? 'Sorry, could you say that again?' : CLARIFY[context.npcId],
     coach: {
       understood: 'I could not tell what you meant.',
-      explanation: 'Try one short Mandarin sentence that says what you want.',
-      improvedExample: EXAMPLE[context.npcId],
+      explanation: `Try one short ${languageName(context.language)} sentence that says what you want.`,
+      improvedExample: context.language === 'en' ? { vendor: 'I would like tea, please.', guide: 'How do I get to the Shanghai Grand Hotel?', passerby: 'Could you take my photo?' }[context.npcId] : EXAMPLE[context.npcId],
     },
   };
 }

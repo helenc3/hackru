@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type PointerEvent } from 'react';
-import type { RecorderProps } from '@vibequest/shared';
+import { languageName, type RecorderProps } from '@vibequest/shared';
 import { AudioApiError, finishConfirmation, interruptPlayback, setAudioActivity, setConfirmation, uploadClip, useAudioActivity } from './audio-bus';
 
 const MAX_MS = 15_000;
@@ -17,6 +17,7 @@ function supportedMime(): string | null {
 
 /** User-activated push-to-record. Transcripts are proposals: only the panel's Send creates a turn. */
 export function Recorder({ state, onAction, onTranscript }: RecorderProps) {
+  const language = languageName(state.language);
   const [status, setStatus] = useState<Status>('idle');
   const [message, setMessage] = useState('');
   const capture = useRef<Capture | null>(null);
@@ -43,13 +44,13 @@ export function Recorder({ state, onAction, onTranscript }: RecorderProps) {
 
   async function start() {
     const mimeType = supportedMime();
-    if (!mimeType) { setStatus('unsupported'); setMessage('This browser cannot record audio here. Type your Mandarin instead.'); return; }
+    if (!mimeType) { setStatus('unsupported'); setMessage('This browser cannot record audio here. Type your request instead.'); return; }
     setStatus('starting'); setMessage(''); pendingStop.current = false;
     let stream: MediaStream;
     try { stream = await navigator.mediaDevices.getUserMedia({ audio: true }); } catch (error) {
       const denied = error instanceof DOMException && (error.name === 'NotAllowedError' || error.name === 'SecurityError');
       setStatus(denied ? 'denied' : 'error');
-      setMessage(denied ? 'Microphone access was blocked. Allow it in the browser, or type your Mandarin instead.' : 'No microphone could be opened. Re-record or type instead.');
+      setMessage(denied ? 'Microphone access was blocked. Allow it in the browser, or type your request instead.' : 'No microphone could be opened. Re-record or type instead.');
       return;
     }
     const operationId = crypto.randomUUID();
@@ -122,7 +123,7 @@ export function Recorder({ state, onAction, onTranscript }: RecorderProps) {
       await idle;
       if (error instanceof AudioApiError && error.code === 'ATTEMPT_ABANDONED') { setStatus('idle'); return; }
       setStatus('error');
-      setMessage(error instanceof AudioApiError && error.code === 'EMPTY_TRANSCRIPT' ? 'No Mandarin was heard. Re-record closer to the microphone, or type instead.' : 'The recording could not be transcribed. Re-record or type instead.');
+      setMessage(error instanceof AudioApiError && error.code === 'EMPTY_TRANSCRIPT' ? `No ${language} was heard. Re-record closer to the microphone, or type instead.` : 'The recording could not be transcribed. Re-record or type instead.');
     } finally { if (upload.current === controller) upload.current = null; }
   }
 
@@ -135,7 +136,7 @@ export function Recorder({ state, onAction, onTranscript }: RecorderProps) {
       <span className="mic-symbol" aria-hidden="true">{recording ? '●' : '◉'}</span>
       <div>
         <strong>{recording ? 'Listening…' : status === 'transcribing' ? 'Got it…' : 'Hold to talk'}</strong>
-        <p>{recording ? 'Release or tap Stop when you finish.' : activity === 'playing' ? 'Tap to interrupt and speak.' : 'Speak Mandarin. Hold the button, or tap to start and stop.'}</p>
+        <p>{recording ? 'Release or tap Stop when you finish.' : activity === 'playing' ? 'Tap to interrupt and speak.' : `Speak ${language}. Hold the button, or tap to start and stop.`}</p>
       </div>
       <button type="button" onPointerDown={down} onPointerUp={up} onPointerCancel={up} disabled={!recording && (busy || blocked || status === 'unsupported')}
         onKeyDown={(event) => { if (event.repeat || (event.key !== ' ' && event.key !== 'Enter')) return; event.preventDefault(); if (recording) stop(); else if (!busy) void start(); }}>

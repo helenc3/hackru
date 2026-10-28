@@ -6,6 +6,7 @@ import { WebSocketServer, type WebSocket } from 'ws';
 import { HttpError } from '../errors.js';
 import { TRANSCRIPTION_TTL_MS } from '../routes/audio.js';
 import { runTurn } from '../routes/game.js';
+import { directionsText } from '@vibequest/shared';
 import type { ServerServices } from '../services.js';
 import { registerTranscription } from '../session-store.js';
 
@@ -189,15 +190,16 @@ const ROLE_GOALS: Record<NpcId, string> = {
 };
 
 function liveInstruction(context: TurnContext): string {
+  const english = context.language === 'en';
   return [
     `You are ${context.nameZh}, an ordinary person in a Shanghai neighbourhood, talking with someone who has just come up to you. ${context.persona}`,
-    'You know nothing about games, lessons, learners, quests or buttons, and you never teach: no model sentences, no "你可以说…", no "请说中文", no English, no pinyin, no translations, no explanations.',
-    'Speak only Simplified Chinese, standard Mandarin, casually and naturally: at most two short sentences per reply (a route you were given may be longer). Answer what was said and ask a natural follow-up when it fits.',
+    english ? "You know nothing about games, lessons, quests or buttons. Converse naturally in English. Never teach, translate, give hints, or use pinyin." : 'You know nothing about games, lessons, learners, quests or buttons, and you never teach: no model sentences, no "你可以说…", no "请说中文", no English, no pinyin, no translations, no explanations.',
+    english ? "Speak only English, casually and naturally, with at most two short sentences per reply (verified routes may be longer). Understand English requests and answer what was said." : 'Speak only Simplified Chinese, standard Mandarin, casually and naturally: at most two short sentences per reply (a route you were given may be longer). Answer what was said and ask a natural follow-up when it fits.',
     `Immutable facts, the only truth; never invent prices, roads, landmarks or places not listed: ${JSON.stringify(context.facts)}`,
     ROLE_GOALS[context.npcId],
     'You like a chat and are in no hurry. Mention something else you have or know when it fits (only from the facts: otherWares, smallTalk — other wares are not for sale right now), and ask one friendly personal question per reply (where they are from, first time in Shanghai, what they have seen). Never claim something happened that has not (a photo taken, money paid).',
     'The first time someone asks you for something (a drink, the way, a photo) before you have chatted at all, answer with a friendly question first and help once they reply or ask again.',
-    'If you did not catch what they meant, react like a real person (啊？什么？ / 你是说茶吗？). If they speak English or another language, you do not really understand it: show brief, natural confusion in Mandarin and do not act on it.',
+    english ? "If you did not catch what they meant, ask a natural clarification in English. English is the target language of this session; never reject it for not being Mandarin. Other-language-only input gets brief confusion in English." : 'If you did not catch what they meant, react like a real person (啊？什么？ / 你是说茶吗？). If they speak English or another language, you do not really understand it: show brief, natural confusion in Mandarin and do not act on it.',
     'Rudeness gets a firm, polite boundary, never abuse.',
     'Lines starting with [context] describe what just happened around you, not something the other person said; take them into account silently and never read them aloud.',
   ].join('\n');
@@ -205,7 +207,7 @@ function liveInstruction(context: TurnContext): string {
 
 /** In-world context after a committed turn; the verified route must be spoken exactly, since the model may have improvised. */
 export function alignmentNote(turn: TurnResponse): string | undefined {
-  if (turn.events.some((event) => event.kind === 'directions') && turn.state.directions) return `[context] Tell them this route word for word, adding nothing: ${turn.state.directions.textZh}`;
+  if (turn.events.some((event) => event.kind === 'directions') && turn.state.directions) return `[context] Tell them this route word for word, adding nothing: ${directionsText(turn.state.directions, turn.state.language)}`;
   if (turn.state.photo?.status === 'accepted') return '[context] You agreed to take their photo. Tell them to stand where the river is behind them; you count down once they are ready.';
   // The engine's patience count: near its limit the NPC shows it (the engine ends the attempt at the limit).
   if (turn.state.status === 'active' && Object.values(turn.state.npcMood).includes('terse')) return '[context] You have been chatting a long time and have things to do. Show some impatience and say you need to get going soon.';
@@ -271,9 +273,9 @@ export function attachLiveRelay(server: Server, services: ServerServices, option
       speak: !(provider.streamPcm || provider.synthesizePcm) ? undefined : async (text, signal, onAudio) => {
         const epoch = speechEpoch;
         // Stream when the provider can, so the first words play while the rest is still being generated.
-        const chunks = provider.streamPcm ? provider.streamPcm(text, voiceKey) : (async function* () {
+        const chunks = provider.streamPcm ? provider.streamPcm(text, voiceKey, context.language) : (async function* () {
           if (!provider.synthesizePcm) throw new HttpError(503, 'SPEECH_UNAVAILABLE', 'Mandarin speech is temporarily unavailable.', true);
-          yield await provider.synthesizePcm(text, voiceKey);
+          yield await provider.synthesizePcm(text, voiceKey, context.language);
         })();
         for await (const audio of chunks) {
           if (torn || signal.aborted || epoch !== speechEpoch) return; // leaving the loop cancels the provider stream

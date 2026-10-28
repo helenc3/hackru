@@ -17,7 +17,7 @@ If the segment is complete on remote `main`, verify its completion record and do
 
 ## Product invariants
 
-- Mandarin Chinese target language, Simplified Chinese world text and standard Mandarin audio; English instructions; single-player desktop browser.
+- Mandarin Chinese is the default target language; the human-authorized English testing option uses the same quest rules with English conversation, signs and audio. Session language is server-owned and persists across Continue and quest changes (see docs/ENGLISH_TESTING.md). English instructions; single-player desktop browser.
 - Character voice assignments must use only the human-approved ElevenLabs IDs in [docs/MANDARIN_VOICES.md](docs/MANDARIN_VOICES.md). Pass Simplified Chinese Hanzi directly to synthesis; do not convert to pinyin or IPA. Other catalog voices remain untested; Anna Su “Casual, Friendly and Bright” was explicitly rejected.
 - Spec 2.0 campaign: three exploration quests offered in order — Q1 buy a drink, Q2 directions to 上海大酒店, Q3 a photo at 黄浦江 ([docs/NEW_QUESTS.md](docs/NEW_QUESTS.md)). No boss mode, boss timer, or freeze.
 - The world is a Shanghai-style city streamed in chunks ([docs/CITY_GENERATION.md](docs/CITY_GENERATION.md), [frozen contracts](proposals/city-streaming-contracts.md)). Claude composes neighborhoods only from the approved component catalog behind `ENABLE_CLAUDE_CITY`; deterministic code validates every manifest, and a seeded fallback always works. Never execute generated code or download generated asset URLs.
@@ -26,7 +26,7 @@ If the segment is complete on remote `main`, verify its completion record and do
 - AI interprets language and proposes dialogue or city layouts; deterministic rules own game facts, routes, landmark locations, progression, inventory, purchases, photos, and reward grants. Generating a feature or an AI claim of success never completes a quest.
 - Developer-harness interactions grant no player achievement. Subtitle-assisted replies and edited transcripts never become independent listening/spoken evidence.
 - No API secrets in the browser or commits. Tests default to fixture providers.
-- No extra language, multiplayer, authentication, procedural quests, continuous voice, or pronunciation grader. City generation is limited to the catalog-only streamed city above.
+- No languages beyond Mandarin and the English testing option, multiplayer, authentication, procedural quests, continuous voice, or pronunciation grader. City generation is limited to the catalog-only streamed city above.
 
 ## Testing policy
 

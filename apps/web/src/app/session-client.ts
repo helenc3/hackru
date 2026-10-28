@@ -16,7 +16,7 @@ import {
 
 /** A transport seam, not a fixture engine. The server implements these routes. */
 type CreateSessionInput = Pick<CreateSessionRequest, 'initialTier' | 'providerMode'>
-  & Partial<Pick<CreateSessionRequest, 'validationMode' | 'inputPreference' | 'worldId'>>;
+  & Partial<Pick<CreateSessionRequest, 'validationMode' | 'inputPreference' | 'worldId' | 'language'>>;
 
 export class SessionClientError extends Error {
   readonly status: number;

@@ -106,20 +106,30 @@ export async function interact(page: Page, targetId: string) {
 
 export async function say(page: Page, text: string) {
   const panel = page.getByTestId('dialogue-panel');
-  const typed = panel.getByRole('button', { name: 'Use typed Mandarin', exact: true });
+  const typed = panel.getByRole('button', { name: /^Use typed (?:Mandarin|English)$/ });
   if (await typed.count()) await typed.click();
   // Count replies, not text: an NPC may legitimately say the same line twice.
   const replies = panel.locator('.bubble.npc:not(.partial)');
   const before = await replies.count();
   await panel.getByRole('textbox').fill(text);
-  await panel.getByRole('button', { name: 'Send Mandarin' }).click();
+  await panel.getByRole('button', { name: /^Send (?:Mandarin|English)$/ }).click();
   // A quest-completing turn ends the attempt, which closes the conversation; the caller reads the result.
   // Once a goal button is up the text box is gone (only the button finishes the task).
-  const box = panel.getByRole('textbox');
-  await expect.poll(async () => !await panel.count() || !await box.count() || await box.inputValue() === '').toBe(true);
-  if (!await panel.count()) return null;
-  await expect.poll(() => replies.count()).toBeGreaterThan(before);
-  return panel.getByTestId('npc-reply').innerText();
+  let reply: string | null = null;
+  await expect.poll(async () => {
+    // Observe one DOM snapshot. Separate locator waits race a completed quest
+    // removing the panel/textbox and can wait on an element that no longer exists.
+    const result = await panel.evaluateAll((panels, previous) => {
+      const current = panels[0];
+      if (!current) return { ready: true, reply: null };
+      const box = current.querySelector<HTMLTextAreaElement>('textarea');
+      const lines = current.querySelectorAll('.bubble.npc:not(.partial)');
+      return { ready: (!box || box.value === '') && lines.length > previous, reply: lines[lines.length - 1]?.textContent ?? null };
+    }, before);
+    reply = result.reply;
+    return result.ready;
+  }).toBe(true);
+  return reply;
 }
 
 /** Small-talk turns through the NPC's warm-up: `turns` defaults to filling the exchanges before the goal request. */
@@ -130,9 +140,10 @@ export async function chat(page: Page, turns = GOAL_WARMUP_EXCHANGES - 2) {
 
 export const closeConversation = (page: Page) => page.getByTestId('dialogue-panel').getByRole('button', { name: 'Close conversation' }).click();
 
-export async function startWorld(page: Page, provider: 'live' | 'fixture' = 'fixture', base = '') {
+export async function startWorld(page: Page, provider: 'live' | 'fixture' = 'fixture', base = '', language: 'zh' | 'en' = 'zh') {
   await page.goto(`${base}/`, { waitUntil: 'domcontentloaded' });
   await page.getByLabel('Conversation provider').selectOption(provider);
+  await page.getByLabel('Conversation language', { exact: true }).selectOption(language);
   await page.getByRole('button', { name: 'Start exploring' }).click();
   await worldReady(page);
 }

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { npcOpeners, pendingGoalAction, type PublicState, type RendererProps, type TurnRequest, type TurnResponse } from '@vibequest/shared';
+import { conversationContent, languageName, languageTag, pendingGoalAction, type PublicState, type RendererProps, type TurnRequest, type TurnResponse } from '@vibequest/shared';
 import { Recorder } from '../audio/Recorder';
 import { finishConfirmation, useAudioActivity } from '../audio/audio-bus';
 import { startLiveVoice, type LiveStatus } from '../audio/live-voice';
@@ -21,11 +21,13 @@ export function DialoguePanel({ state, npc, pending, turn, onAction, onSubmit, o
   onAction: RendererProps['onAction']; onSubmit: (npc: NpcTarget, input: TurnRequest['input']) => Promise<void>; onLiveTurn?: (npc: NpcTarget, turn: TurnResponse) => void; onClose: (ended?: ConversationSummary) => void;
 }) {
   const name = npc.name;
+  const language = state.language ?? 'zh';
+  const languageLabel = languageName(language);
   const [draft, setDraft] = useState('');
   const [transcription, setTranscription] = useState<{ id: string; original: string } | null>(null);
   const [countdown, setCountdown] = useState<number | null>(null);
   // NEW_QUESTS: the NPC speaks first (the vendor opens with 你想喝什么？).
-  const [thread, setThread] = useState<Line[]>(() => [{ role: 'npc', text: npcOpeners[npc.role] }]);
+  const [thread, setThread] = useState<Line[]>(() => [{ role: 'npc', text: conversationContent(language).npcOpeners[npc.role] }]);
   const threadRef = useRef<Line[]>([]); threadRef.current = thread;
   // A goodbye closes with the exchange attached so the app can show the conversation summary card.
   const finish = useCallback(() => onClose({ npc, thread: threadRef.current }), [onClose, npc]);
@@ -120,20 +122,20 @@ export function DialoguePanel({ state, npc, pending, turn, onAction, onSubmit, o
     {isLaoWang(npc) && <NpcPortrait npc={npc} mood={state.npcMood[npc.role]} />}
     <div className="dialogue-dock">
     <div ref={contentRef} className="dialogue-content">
-    <header><div><span className="eyebrow">CONVERSATION</span><h2 id="dialogue-title" lang="zh-Hans">{name}</h2><span className="mood-label">{roleNames[npc.role]}</span></div><button ref={firstButton} className="button secondary" onClick={() => onClose()} aria-label="Close conversation">Close · Esc</button></header>
+    <header><div><span className="eyebrow">CONVERSATION</span><h2 id="dialogue-title" lang={languageTag(language)}>{name}</h2><span className="mood-label">{roleNames[npc.role]}</span></div><button ref={firstButton} className="button secondary" onClick={() => onClose()} aria-label="Close conversation">Close · Esc</button></header>
     {(thread.length > 0 || outgoing) && <div className="chat-thread" aria-live="polite">
       {thread.map((line, index) => !displayText && line.role !== 'notice' ? null : line.role === 'coach'
-        ? <div key={index} className="bubble coach" data-testid="live-coach"><span>{line.feedback.understood}</span><span>{line.feedback.explanation}</span><span className="mandarin-chip" lang="zh-Hans">{line.feedback.improvedExample}</span></div>
+        ? <div key={index} className="bubble coach" data-testid="live-coach"><span>{line.feedback.understood}</span><span>{line.feedback.explanation}</span><span className="mandarin-chip" lang={languageTag(language)}>{line.feedback.improvedExample}</span></div>
         : line.role === 'notice' ? <TimedNotice key={index}>{line.text}</TimedNotice>
-        : <p key={index} className={`bubble ${line.role}`} lang="zh-Hans" {...(index === lastNpc ? { 'data-testid': 'npc-reply' } : {})}
+        : <p key={index} className={`bubble ${line.role}`} lang={languageTag(language)} {...(index === lastNpc ? { 'data-testid': 'npc-reply' } : {})}
           {...(line.role === 'npc' ? { tabIndex: 0, title: 'Shift+click a word, or press Enter, for pinyin and English', onKeyDown: (event: React.KeyboardEvent<HTMLElement>) => { if (event.key === 'Enter') { event.preventDefault(); explainElement(event.currentTarget); } } } : {})}>{line.text}</p>)}
-      {displayText && outgoing && <p className="bubble player sending" lang="zh-Hans">{outgoing}</p>}
+      {displayText && outgoing && <p className="bubble player sending" lang={languageTag(language)}>{outgoing}</p>}
     </div>}
     {!displayText && <p className="conversation-status">Transcripts off · listen and speak.</p>}
     {!showTranscripts && displayText && <p className="conversation-status">Typed accessibility is showing text.</p>}
     {displayText && liveActive && (partial.player || partial.npc) && <div className="chat-thread" aria-hidden="true">
-      {partial.npc && <p className="bubble npc partial" lang="zh-Hans">{partial.npc}</p>}
-      {partial.player && <p className="bubble player partial" lang="zh-Hans">{partial.player}</p>}
+      {partial.npc && <p className="bubble npc partial" lang={languageTag(language)}>{partial.npc}</p>}
+      {partial.player && <p className="bubble player partial" lang={languageTag(language)}>{partial.player}</p>}
     </div>}
     {blockedPlay && <div className="conversation-status" role="status">Audio is waiting for a click. <button type="button" className="button secondary" onClick={blockedPlay}>Play reply</button></div>}
     {pending && <div className="conversation-status" role="status">{name} is thinking<span className="thinking-dots" aria-hidden="true"><i /><i /><i /></span></div>}
@@ -149,15 +151,15 @@ export function DialoguePanel({ state, npc, pending, turn, onAction, onSubmit, o
     {!closing && <>
     {!goal && <>
     {!liveActive && <div className="recorder-mount" aria-busy={pending}><Recorder state={state} npcId={npc.role} onAction={onAction} onTranscript={(result) => { setTranscription({ id: result.transcriptionId, original: result.text }); setDraft(result.text); setCountdown(AUTO_SEND_SECONDS); }} /></div>}
-    <button className="button secondary" disabled={pending} onClick={() => void onAction({ type: 'setInputPreference', preference: state.inputPreference === 'voice' ? 'typed-accessibility' : 'voice' }).catch(() => undefined)}>{state.inputPreference === 'voice' ? 'Use typed Mandarin' : 'Use voice'}</button>
+    <button className="button secondary" disabled={pending} onClick={() => void onAction({ type: 'setInputPreference', preference: state.inputPreference === 'voice' ? 'typed-accessibility' : 'voice' }).catch(() => undefined)}>{state.inputPreference === 'voice' ? `Use typed ${languageLabel}` : 'Use voice'}</button>
     {displayText && (state.inputPreference === 'typed-accessibility' || transcription) && <form onSubmit={(event) => { event.preventDefault(); void send(); }}>
-      <label className="field-label" htmlFor="mandarin-input">{transcription ? 'What you said' : 'Typed Mandarin'}</label>
-      <textarea id="mandarin-input" lang="zh-Hans" value={draft} maxLength={500} rows={3} disabled={pending}
+      <label className="field-label" htmlFor="mandarin-input">{transcription ? 'What you said' : `Typed ${languageLabel}`}</label>
+      <textarea id="mandarin-input" lang={languageTag(language)} value={draft} maxLength={500} rows={3} disabled={pending}
         onChange={(event) => { setCountdown(null); setDraft(event.target.value); }} onCompositionStart={() => { composing.current = true; setCountdown(null); }} onCompositionEnd={() => { composing.current = false; }}
         onKeyDown={(event) => {
           if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); if (!composing.current && !event.nativeEvent.isComposing && event.nativeEvent.keyCode !== 229) void send(); }
         }} />
-      <div className="input-footer"><span>{countdown !== null ? <strong className="countdown">Sending in {countdown}…</strong> : transcription ? 'Edit if that is not what you said.' : 'Typed input does not count as spoken evidence.'}</span><button className="button primary" type="submit" disabled={pending || !draft.trim()}>Send Mandarin</button></div>
+      <div className="input-footer"><span>{countdown !== null ? <strong className="countdown">Sending in {countdown}…</strong> : transcription ? 'Edit if that is not what you said.' : 'Typed input does not count as spoken evidence.'}</span><button className="button primary" type="submit" disabled={pending || !draft.trim()}>Send {languageLabel}</button></div>
     </form>}
     </>}
     <NpcActions state={state} anchorId={npc.anchorId} extra={turn?.actions} pending={pending} onAction={onAction} onClose={() => onClose()} onEnd={finish} />

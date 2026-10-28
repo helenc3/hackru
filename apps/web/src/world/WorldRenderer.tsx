@@ -1,7 +1,7 @@
 import { Component, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Canvas, useThree } from '@react-three/fiber';
 import { createPortal } from 'react-dom';
-import { VISIBLE_RADIUS_CHUNKS, chunkOf, chunkOrigin, seedFromWorldId, text, worldLayout, type ChunkManifest, type Position, type RendererProps } from '@vibequest/shared';
+import { VISIBLE_RADIUS_CHUNKS, chunkOf, chunkOrigin, seedFromWorldId, text, worldLayout, languageTag, type GameLanguage, type ChunkManifest, type Position, type RendererProps } from '@vibequest/shared';
 import { AutoEngage } from './auto-engage';
 import { distance, nearbyTargets, nextLeg, targetAction } from './navigation';
 import { registerWalkHandler } from './walk-request';
@@ -13,6 +13,7 @@ import { useReducedMotion } from './toon';
 import { requestWalk } from './walk-request';
 import { Motion, type Landmark } from './Motion';
 import { initialPosition, type Runtime } from './runtime';
+import { CityLanguageContext } from '../city/language';
 import { CityScene } from '../city/CityScene';
 import { useCity, type CityHandle } from '../city/use-city';
 import './world.css';
@@ -62,7 +63,7 @@ function ContextLossHandler({ onFailure }: { onFailure: () => void }) {
 }
 
 /** DOM labels for landmark and NPC anchors in the visible 3 × 3 (names come from the reviewed text catalog). */
-function anchorLabels(city: CityHandle, position: Position): Landmark[] {
+function anchorLabels(city: CityHandle, position: Position, language: GameLanguage = 'zh'): Landmark[] {
   const centre = chunkOf(position);
   const out: Landmark[] = [];
   for (const manifest of city.manifests.values()) {
@@ -70,7 +71,7 @@ function anchorLabels(city: CityHandle, position: Position): Landmark[] {
     const origin = chunkOrigin(manifest.coord);
     for (const anchor of manifest.anchors) {
       const row = anchor.nameKey ? text(anchor.kind === 'npc' ? 'npc-name' : 'landmark', anchor.nameKey) : undefined;
-      if (row && (anchor.kind === 'landmark' || anchor.kind === 'npc')) out.push({ id: anchor.id, label: row.zh, x: origin.x + anchor.x, z: origin.z + anchor.z });
+      if (row && (anchor.kind === 'landmark' || anchor.kind === 'npc')) out.push({ id: anchor.id, label: language === 'en' ? row.english : row.zh, x: origin.x + anchor.x, z: origin.z + anchor.z });
     }
   }
   return out.slice(0, 24);
@@ -260,7 +261,7 @@ export function WorldRenderer({ state, onAction, onTalk, preview = false, manife
   }
 
   const nearby = nearbyTargets(state, position);
-  const marks = useMemo(() => anchorLabels(city, position), [city.revision, Math.floor(position.x / 10), Math.floor(position.z / 10)]);
+  const marks = useMemo(() => anchorLabels(city, position, state.language), [state.language, city.revision, Math.floor(position.x / 10), Math.floor(position.z / 10)]);
   const loading = !preview && !city.ready(position);
   const interactRef = useRef(interact); interactRef.current = interact;
   useEffect(() => {
@@ -324,7 +325,7 @@ export function WorldRenderer({ state, onAction, onTalk, preview = false, manife
     {hasWebGl ? <CanvasBoundary onFailure={() => { runtime.current.keys.clear(); runtime.current.path = []; runtime.current.active = false; setHasWebGl(false); }}><Canvas dpr={testProfile().lightweight ? .5 : [1, 1.5]} camera={{ position: [state.position.x, 8.5, state.position.z + 9], fov: 52, near: .1, far: 150 }} gl={{ antialias: !testProfile().lightweight, powerPreference: 'high-performance' }}
       fallback={<CompatibilityRecovery />}>
       <ContextLossHandler onFailure={() => { runtime.current.keys.clear(); runtime.current.path = []; runtime.current.active = false; setHasWebGl(false); }} />
-      <CityScene city={city} runtime={runtime} position={position} /><Cue at={nearby[0]?.position} /><Motion conversationOpen={conversationOpen} still={still} runtime={runtime} root={root} labels={labels} marks={marks} city={city} state={state} tick={setPosition} sync={sync} /><DestinationMarker runtime={runtime} />
+      <CityLanguageContext.Provider value={state.language ?? 'zh'}><CityScene city={city} runtime={runtime} position={position} /></CityLanguageContext.Provider><Cue at={nearby[0]?.position} /><Motion conversationOpen={conversationOpen} still={still} runtime={runtime} root={root} labels={labels} marks={marks} city={city} state={state} tick={setPosition} sync={sync} /><DestinationMarker runtime={runtime} />
       <FarRiver river={river} runtime={runtime} />{!preview && state.questTarget && <QuestBeacon target={state.questTarget.position} still={still} />}
     </Canvas></CanvasBoundary> : <CompatibilityRecovery />}
     {hasWebGl && <>
@@ -332,12 +333,12 @@ export function WorldRenderer({ state, onAction, onTalk, preview = false, manife
         <button type="button" className="button secondary" onClick={() => { if (mouseLocked || bounded.current) releaseMouse(); else lockMouse(); }}>{mouseLocked ? 'Unlock mouse · Esc' : boundedLook ? 'Release mouse look · Esc' : 'Lock mouse · Shift'}</button>
         {lockError && boundedLook && <span role="status">Browser blocked mouse capture. Move over the world to look; Esc releases the cursor.</span>}
       </div>}
-      <div className="district-labels" aria-hidden="true">{marks.map((mark, i) => <span key={`${mark.label}@${mark.x},${mark.z}`} ref={(node) => { labels.current[i] = node; }} className="district-landmark" lang="zh-Hans"><span className="marker-distance" lang="en">{Math.round(Math.hypot(mark.x - position.x, mark.z - position.z))} m</span><span>{mark.label}</span></span>)}</div>
+      <div className="district-labels" aria-hidden="true">{marks.map((mark, i) => <span key={`${mark.label}@${mark.x},${mark.z}`} ref={(node) => { labels.current[i] = node; }} className="district-landmark" lang={languageTag(state.language)}><span className="marker-distance" lang="en">{Math.round(Math.hypot(mark.x - position.x, mark.z - position.z))} m</span><span>{mark.label}</span></span>)}</div>
       <div className="world-caption"><span className="live-dot" />Shanghai<span>Third-person navigation</span></div>
       {loading && <div className="world-note" role="status" data-testid="city-loading">Building the neighbourhood…</div>}
       {city.error && !preview && <div className="world-note" role="status" data-testid="city-error">{city.error}</div>}
       {!preview && state.status === 'active' && state.questTarget && guidanceContainer && createPortal(<QuestCompass target={state.questTarget} position={position} yaw={runtime.current.yaw} onWalk={() => requestWalk(state.questTarget!.position)} />, guidanceContainer)}
-      <div className="district-nearby" aria-label="Nearby interactions">{nearby.filter((target) => target.kind !== 'npc').map((target) => <button key={target.id} disabled={busy || state.status !== 'active'} onClick={() => void interact(target.id)} data-target-id={target.id}><span lang="zh-Hans">{target.label}</span>{target.id === nearby[0]?.id ? ' · E' : ''}</button>)}</div>
+      <div className="district-nearby" aria-label="Nearby interactions">{nearby.filter((target) => target.kind !== 'npc').map((target) => <button key={target.id} disabled={busy || state.status !== 'active'} onClick={() => void interact(target.id)} data-target-id={target.id}><span lang={languageTag(state.language)}>{target.label}</span>{target.id === nearby[0]?.id ? ' · E' : ''}</button>)}</div>
     </>}
   </section>;
 }

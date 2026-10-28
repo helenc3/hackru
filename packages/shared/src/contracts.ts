@@ -31,6 +31,10 @@ export const TrackSchema = z.enum(['reading', 'listening', 'conversation', 'repa
 export const ItemSchema = z.enum(['hint']);
 export const DrinkSchema = z.enum(['coffee', 'tea', 'water']);
 export const TierSchema = z.union([z.literal(0), z.literal(1), z.literal(2)]);
+export const GameLanguageSchema = z.enum(['zh', 'en']);
+export type GameLanguage = z.infer<typeof GameLanguageSchema>;
+/** English verified routes can be longer than their Chinese originals. */
+export const MAX_NPC_REPLY_LENGTH = 2000;
 export const InputPreferenceSchema = z.enum(['voice', 'typed-accessibility']);
 export const InputSourceSchema = z.enum(['typed', 'stt', 'stt-edited']);
 export const ConversationSourceSchema = z.enum(['spoken', 'typed', 'edited']);
@@ -82,7 +86,7 @@ export const TurnInputSchema = z.strictObject({ text: PlayerTextSchema, source: 
 export const TurnRequestSchema = z.strictObject({ turnId: identifier, expectedVersion: count, npcId: NpcIdSchema, anchorId: identifier, input: TurnInputSchema });
 export type TurnRequest = z.infer<typeof TurnRequestSchema>;
 /** worldId selects the persistent city; omitted → the server mints a new world (new seed). */
-export const CreateSessionRequestSchema = z.strictObject({ initialTier: z.union([z.literal(0), z.literal(1)]), providerMode: z.enum(['live', 'fixture']), validationMode: z.boolean().default(false), inputPreference: InputPreferenceSchema.default('voice'), worldId: identifier.optional() });
+export const CreateSessionRequestSchema = z.strictObject({ initialTier: z.union([z.literal(0), z.literal(1)]), providerMode: z.enum(['live', 'fixture']), validationMode: z.boolean().default(false), inputPreference: InputPreferenceSchema.default('voice'), worldId: identifier.optional(), language: GameLanguageSchema.default('zh') });
 export type CreateSessionRequest = z.input<typeof CreateSessionRequestSchema>;
 
 export const SkillTrackSchema = z.strictObject({ mastery: unit, independentCount: count });
@@ -116,7 +120,7 @@ export type NpcAction = z.infer<typeof NpcActionSchema>;
 export const QuestTargetSchema = z.strictObject({ label: shortText, english: shortText, position: PositionSchema, anchorId: identifier.optional() });
 export type QuestTarget = z.infer<typeof QuestTargetSchema>;
 export const PublicStateSchema = z.strictObject({
-  sessionId: identifier, worldId: identifier, version: count, missionId: MissionIdSchema, mode: ModeSchema,
+  sessionId: identifier, worldId: identifier, version: count, missionId: MissionIdSchema, mode: ModeSchema, language: GameLanguageSchema.optional(),
   status: StatusSchema, zoneId: ZoneIdSchema, position: PositionSchema, tier: TierSchema,
   objectives: z.array(z.strictObject({ id: identifier, label: shortText, complete: z.boolean() })).max(20),
   /** Anchors from committed chunks near the player that the current quest can use, plus quest-specific spots. */
@@ -144,7 +148,7 @@ export type GameEvent = z.infer<typeof GameEventSchema>;
 export const ActionResponseSchema = z.strictObject({ state: PublicStateSchema, events: z.array(GameEventSchema).max(20) });
 export type ActionResponse = z.infer<typeof ActionResponseSchema>;
 export const StateResponseSchema = z.strictObject({ state: PublicStateSchema });
-export const TurnResponseSchema = z.strictObject({ turnId: identifier, state: PublicStateSchema, events: z.array(GameEventSchema).max(20), npcReply: z.string().min(1).max(240), actions: z.array(NpcActionSchema).max(4).optional(), speechId: identifier.optional(), feedback: CoachFeedbackSchema.optional(), vibe: z.strictObject({ intent: unit, clarity: unit, courtesy: unit }).optional(), conversationEnded: z.literal(true).optional() });
+export const TurnResponseSchema = z.strictObject({ turnId: identifier, state: PublicStateSchema, events: z.array(GameEventSchema).max(20), npcReply: z.string().min(1).max(MAX_NPC_REPLY_LENGTH), actions: z.array(NpcActionSchema).max(4).optional(), speechId: identifier.optional(), feedback: CoachFeedbackSchema.optional(), vibe: z.strictObject({ intent: unit, clarity: unit, courtesy: unit }).optional(), conversationEnded: z.literal(true).optional() });
 export type TurnResponse = z.infer<typeof TurnResponseSchema>;
 
 export const SlotSchema = z.discriminatedUnion('key', [
@@ -171,10 +175,10 @@ export const TurnEvaluationSchema = z.strictObject({
   });
 });
 export type TurnEvaluation = z.infer<typeof TurnEvaluationSchema>;
-export const TurnContextSchema = z.strictObject({ missionId: MissionIdSchema, mode: ModeSchema, tier: TierSchema, npcId: NpcIdSchema, anchorId: identifier, nameZh: shortText, persona: z.string().min(1).max(500), patience: z.number().int().min(0).max(5), allowedIntents: z.array(IntentSchema).min(1).max(10), facts: z.record(identifier, z.string().max(500)), history: z.array(z.strictObject({ role: z.enum(['player', 'npc']), text: z.string().max(500) })).max(12) });
+export const TurnContextSchema = z.strictObject({ language: GameLanguageSchema.optional(), missionId: MissionIdSchema, mode: ModeSchema, tier: TierSchema, npcId: NpcIdSchema, anchorId: identifier, nameZh: shortText, persona: z.string().min(1).max(500), patience: z.number().int().min(0).max(5), allowedIntents: z.array(IntentSchema).min(1).max(10), facts: z.record(identifier, z.string().max(500)), history: z.array(z.strictObject({ role: z.enum(['player', 'npc']), text: z.string().max(MAX_NPC_REPLY_LENGTH) })).max(12) });
 export type TurnContext = z.infer<typeof TurnContextSchema>;
 export interface DialogueProvider { evaluate(context: TurnContext, playerText: string): Promise<TurnEvaluation> }
-export interface SpeechProvider { synthesize(text: string, voiceKey: string): Promise<Uint8Array>; synthesizePcm?(text: string, voiceKey: string): Promise<Uint8Array>; /** PCM16LE 24 kHz chunks as they are generated; every chunk has an even byte length. */ streamPcm?(text: string, voiceKey: string): AsyncIterable<Uint8Array>; transcribe(audio: Uint8Array, mimeType: string): Promise<string> }
+export interface SpeechProvider { synthesize(text: string, voiceKey: string, language?: GameLanguage): Promise<Uint8Array>; synthesizePcm?(text: string, voiceKey: string, language?: GameLanguage): Promise<Uint8Array>; /** PCM16LE 24 kHz chunks as they are generated; every chunk has an even byte length. */ streamPcm?(text: string, voiceKey: string, language?: GameLanguage): AsyncIterable<Uint8Array>; transcribe(audio: Uint8Array, mimeType: string, language?: GameLanguage): Promise<string> }
 
 // Context-dependent validation stays reusable for the provider owner. Validation only:
 // confidence thresholds and progression belong to the engine.
@@ -297,7 +301,7 @@ export const ExplorationStateSchema = z.strictObject({
 });
 export type ExplorationState = z.infer<typeof ExplorationStateSchema>;
 export const InternalStateSchema = z.strictObject({
-  sessionId: identifier, worldId: identifier, version: count, missionId: MissionIdSchema, attemptId: identifier, nodeId: identifier,
+  language: GameLanguageSchema.default('zh'), sessionId: identifier, worldId: identifier, version: count, missionId: MissionIdSchema, attemptId: identifier, nodeId: identifier,
   mode: ModeSchema, status: StatusSchema, zoneId: ZoneIdSchema, position: PositionSchema, tier: TierSchema,
   lastMovementAtMs: z.number().int().nonnegative().optional(),
   flags: FlagsSchema, inventory: InventorySchema, purchases: z.array(PurchaseRecordSchema).max(50), xp: count, badges: z.array(identifier).max(10), awardedRewardIds: z.array(identifier).max(100),
@@ -319,5 +323,5 @@ export const InternalStateSchema = z.strictObject({
 });
 export type InternalState = z.infer<typeof InternalStateSchema>;
 export type EngineResult = { state: InternalState; events: GameEvent[]; conversationEnded?: true };
-export const CreateGameOptionsSchema = z.strictObject({ sessionId: identifier, worldId: identifier, attemptId: identifier, missionId: MissionIdSchema.default('Q1'), initialTier: z.union([z.literal(0), z.literal(1)]), validationMode: z.boolean().default(false), inputPreference: InputPreferenceSchema.default('voice'), providerStatus: ProviderStatusSchema, spawn: PositionSchema });
-export type CreateGameOptions = z.infer<typeof CreateGameOptionsSchema>;
+export const CreateGameOptionsSchema = z.strictObject({ language: GameLanguageSchema.default('zh'), sessionId: identifier, worldId: identifier, attemptId: identifier, missionId: MissionIdSchema.default('Q1'), initialTier: z.union([z.literal(0), z.literal(1)]), validationMode: z.boolean().default(false), inputPreference: InputPreferenceSchema.default('voice'), providerStatus: ProviderStatusSchema, spawn: PositionSchema });
+export type CreateGameOptions = Omit<z.infer<typeof CreateGameOptionsSchema>, 'language'> & { language?: GameLanguage };

@@ -66,9 +66,9 @@ export function fixtureApp() {
   return { services, app: createApp({ services }) };
 }
 
-export async function campaign(providerMode: 'fixture' | 'live' = 'fixture', validationMode = false) {
+export async function campaign(providerMode: 'fixture' | 'live' = 'fixture', validationMode = false, language?: 'zh' | 'en') {
   const { app, services } = fixtureApp();
-  const created = await request(app).post('/api/sessions').send({ initialTier: 1, providerMode, validationMode }).expect(201);
+  const created = await request(app).post('/api/sessions').send({ initialTier: 1, providerMode, validationMode, ...(language ? { language } : {}) }).expect(201);
   let state: PublicState = created.body.state;
   let position: Position = { x: 0, z: 0 };
   let count = 0;

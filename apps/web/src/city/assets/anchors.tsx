@@ -1,7 +1,8 @@
 import { useMemo, useRef, type RefObject } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { CanvasTexture, SRGBColorSpace, type Group } from 'three';
-import { npcIdentity, text, type ParamValues, type Position, type TextCatalogName } from '@vibequest/shared';
+import { npcIdentity, type ParamValues, type Position, type TextCatalogName } from '@vibequest/shared';
+import { useCityText } from '../language';
 import { candy, INK, Toon } from '../../world/toon';
 import { Npc } from '../../world/characters';
 import type { AssetComponent } from './types';
@@ -33,7 +34,7 @@ function labelTexture(zh: string, background: string, ink: string): CanvasTextur
 function Label({ catalog, textKey, width, height, position, background = candy.lemon, ink = INK }: {
   catalog: TextCatalogName; textKey: string; width: number; height: number; position: [number, number, number]; background?: string; ink?: string;
 }) {
-  const zh = text(catalog, textKey)?.zh ?? '';
+  const zh = useCityText(catalog, textKey);
   const map = useMemo(() => labelTexture(zh, background, ink), [zh, background, ink]);
   return <mesh position={position}><planeGeometry args={[width, height]} /><meshBasicMaterial map={map} toneMapped={false} /></mesh>;
 }

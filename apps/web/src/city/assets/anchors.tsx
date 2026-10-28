@@ -150,7 +150,7 @@ const origin: Position = { x: 0, z: 0 };
 function figure(defaultOutfit: string): AssetComponent {
   return function NpcFigure({ params, seed }) {
     return <group userData={{ clearView: 'solid' }}>
-      <Npc id={npcIdentity(str(params, 'nameKey', 'xiaoli'))?.look ?? 'achen'} outfit={str(params, 'outfit', defaultOutfit)} index={seed % 7} look={nobody as RefObject<{ position: Position }>} offset={origin} />
+      <Npc id={npcIdentity(str(params, 'nameKey', 'xiaoli'))?.look ?? 'achen'} outfit={str(params, 'nameKey', '') === 'laowang' ? 'identity' : str(params, 'outfit', defaultOutfit)} index={seed % 7} look={nobody as RefObject<{ position: Position }>} offset={origin} />
     </group>;
   };
 }

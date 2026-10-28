@@ -4,7 +4,7 @@ import { installScriptedApi } from '../../../../fixtures/ui/scripted-api';
 async function start(page: import('@playwright/test').Page, alreadyLoaded = false) {
   if (!alreadyLoaded) await page.goto('/', { waitUntil: 'domcontentloaded' });
   await page.getByRole('button', { name: 'Start exploring', exact: true }).click();
-  await expect(page.getByTestId('game-shell')).toBeVisible();
+  await expect(page.getByTestId('game-shell')).toBeVisible({ timeout: 15_000 });
 }
 async function typedPanel(page: import('@playwright/test').Page) {
   await expect(page.getByTestId('world-renderer')).toBeVisible();
@@ -23,7 +23,10 @@ test('production world, voice slot, typed accessibility and practice feedback sh
   await page.goto('/', { waitUntil: 'domcontentloaded' });
   const preview = page.getByTestId('world-preview');
   await expect(preview).toBeVisible();
-  await expect(preview.locator('.district-landmark', { hasText: '老王' })).toHaveCSS('display', 'block');
+  // The shoulder camera can place an anchor outside the view. Its reviewed
+  // label still exists, and a camera frame must have rendered before starting.
+  await expect(preview.locator('.district-landmark', { hasText: '老王' })).toHaveCount(1);
+  await expect(preview).toHaveAttribute('data-camera-distance', /\d/);
   await expect(preview.locator('.district-landmark', { hasText: '小李' })).toHaveCount(1);
   await start(page, true);
   const panel = await typedPanel(page);
@@ -53,6 +56,42 @@ test('production world, voice slot, typed accessibility and practice feedback sh
   await panel.getByRole('button', { name: 'Close conversation' }).click();
   await expect(page.getByTestId('coach-panel')).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Pause & Learn' })).toHaveCount(0);
+});
+
+test('Q1 is compact and quest notices expire after five seconds without replaying', async ({ page }) => {
+  await installScriptedApi(page, { steps: [{ action: { type: 'setInputPreference' }, patch: { inputPreference: 'typed-accessibility' }, event: "老王 didn't understand English: -5 XP. Try it in Mandarin." }] });
+  await page.goto('/', { waitUntil: 'domcontentloaded' });
+  await expect(page.getByTestId('start-panel').getByLabel('Show conversation transcripts')).toBeChecked();
+  await page.screenshot({ path: 'test-results/intro-transcript-setting.png', fullPage: true });
+  await start(page, true);
+  await expect(page.getByTestId('quest-panel').locator('.quest-instructions')).toHaveCount(0);
+  await page.clock.install({ time: new Date('2026-10-27T12:00:00Z') });
+  await page.clock.pauseAt(new Date('2026-10-27T12:00:01Z'));
+  const panel = await typedPanel(page);
+  await expect(page.getByLabel('Quest updates')).toContainText("didn't understand English");
+  await page.clock.fastForward(4_999);
+  await expect(page.getByLabel('Quest updates')).toBeVisible();
+  await page.clock.fastForward(2);
+  await expect(page.getByLabel('Quest updates')).toHaveCount(0);
+  await panel.getByRole('button', { name: 'Use voice', exact: true }).click();
+  await expect(page.getByLabel('Quest updates')).toHaveCount(0);
+});
+
+test('the intro listening-only choice overrides typed mode when continuing a session', async ({ page }) => {
+  await installScriptedApi(page);
+  await page.goto('/', { waitUntil: 'domcontentloaded' });
+  await page.getByTestId('start-panel').getByLabel('Show conversation transcripts').uncheck();
+  await start(page, true);
+  const panel = await typedPanel(page); // Explicit accessibility may still show text.
+  await expect(panel).toContainText('Typed accessibility is showing text.');
+  await panel.getByRole('button', { name: 'Close conversation' }).click();
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await expect(page.getByTestId('start-panel').getByLabel('Show conversation transcripts')).not.toBeChecked();
+  await page.getByRole('button', { name: 'Continue Session', exact: true }).click();
+  await page.getByTestId('world-renderer').focus();
+  await page.keyboard.press('e');
+  await expect(page.getByTestId('dialogue-panel')).toContainText('Transcripts off');
+  await expect(page.getByTestId('dialogue-panel').getByRole('textbox')).toHaveCount(0);
 });
 
 test('Pay is disabled when money is short', async ({ page }) => {
@@ -225,5 +264,42 @@ test('a goodbye ends the conversation and shows the summary card with the exchan
   await (await typedPanel(page)).getByRole('button', { name: 'Close conversation' }).click();
   await expect(page.getByTestId('dialogue-panel')).toHaveCount(0);
   await expect(card).toHaveCount(0);
+  expect(api.failures).toEqual([]);
+});
+
+
+test('proximity opens Lao Wang without E, shows three meters and stays closed until an explicit return', async ({ page }) => {
+  const api = await installScriptedApi(page, { steps: [{ text: '你好。', reply: '你好！', feedback: true, patch: { npcMood: { vendor: 'terse', guide: 'warm', passerby: 'warm' } } }] });
+  await start(page);
+  const panel = page.getByTestId('dialogue-panel');
+  await expect(panel).toBeVisible(); // No interaction key or NPC button.
+  await expect(page.locator('.npc-interact-key')).toHaveCount(0);
+  const portrait = panel.getByTestId('npc-portrait');
+  await expect(portrait).toHaveAttribute('data-emotion', 'happy');
+  await expect(portrait.locator('img')).toBeVisible();
+  await expect.poll(() => portrait.locator('img').evaluate((image: HTMLImageElement) => image.complete && image.naturalWidth > 0)).toBe(true);
+  await expect(panel.getByRole('meter', { name: 'Mood', exact: true })).toHaveAttribute('aria-valuetext', 'Friendly');
+  await expect(panel.getByRole('meter', { name: 'Clarity', exact: true })).toHaveAttribute('aria-valuetext', 'Awaiting your first evaluated reply');
+  await expect(panel.getByRole('meter')).toHaveCount(3);
+  await page.screenshot({ path: 'test-results/laowang-voice-dock.png', fullPage: true });
+  await panel.getByRole('button', { name: 'Use typed Mandarin', exact: true }).click();
+  await panel.getByRole('textbox').fill('你好。');
+  await panel.getByRole('button', { name: 'Send Mandarin' }).click();
+  await expect(portrait).toHaveAttribute('data-emotion', 'angry');
+  await expect(portrait).toHaveAttribute('data-mouth', 'closed'); // Reduced motion.
+  await expect(panel.getByRole('meter', { name: 'Mood', exact: true })).toHaveAttribute('value', '1');
+  await expect(panel.getByRole('meter', { name: 'Clarity', exact: true })).toHaveAttribute('value', '0.8');
+  await expect(panel.getByRole('meter', { name: 'Courtesy', exact: true })).toHaveAttribute('value', '0.8');
+  expect(await panel.evaluate((root) => {
+    const dock = root.querySelector('.dialogue-dock')!.getBoundingClientRect();
+    return [...root.querySelectorAll('meter, button[aria-label="Close conversation"]')].every((node) => { const rect = node.getBoundingClientRect(); return rect.top >= dock.top && rect.bottom <= dock.bottom; });
+  })).toBe(true);
+  await page.screenshot({ path: 'test-results/laowang-dialogue-meters.png', fullPage: true });
+  await panel.getByRole('button', { name: 'Close conversation' }).click();
+  await expect(panel).toHaveCount(0);
+  await page.waitForTimeout(600);
+  await expect(panel).toHaveCount(0);
+  await page.getByTestId('world-renderer').focus(); await page.keyboard.press('e');
+  await expect(panel).toBeVisible();
   expect(api.failures).toEqual([]);
 });

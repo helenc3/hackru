@@ -4,7 +4,7 @@ import { missionTitles } from './ResultPanel';
 
 /** English instructions per quest (NEW_QUESTS.md); world text stays Simplified Chinese. */
 export const missionInstructions: Record<MissionId, string> = {
-  Q1: 'Find 老王 (Lao Wang) at his drink stand a few steps from where you start (follow the arrow in this menu). Ask for a drink in Mandarin, then press Pay.',
+  Q1: '',
   Q2: 'Find 小李 (Xiao Li) on the avenue just east of the start (follow the arrow in this menu) and ask in Mandarin how to get to 上海大酒店 (Shanghai Grand Hotel).',
   Q3: 'Head east to the 黄浦江 (Huangpu River) promenade — follow the arrow in this menu or press Walk there. A passer-by waits at the viewing deck; ask them to take your photo and they will show you where to stand.',
 };
@@ -17,7 +17,7 @@ export function QuestPanel({ state, results, onReview, conversationOpen = false,
     <div className="quest-guidance" ref={guidanceRef} />
     {open && <>
     <hr className="quest-guidance-divider" />
-    <p className="quest-instructions">{worldText(missionInstructions[state.missionId], state.language).replaceAll('in Mandarin', `in ${languageName(state.language)}`)}</p>
+    {missionInstructions[state.missionId] && <p className="quest-instructions">{worldText(missionInstructions[state.missionId], state.language).replaceAll('in Mandarin', `in ${languageName(state.language)}`)}</p>}
     <ul className="mission-progress" aria-label="Quest progress" data-testid="mission-progress">{MissionIdSchema.options.map((id) => { const result = results[id]; return <li key={id} data-locked={!state.unlockedMissionIds.includes(id)}>
       <input type="checkbox" checked={state.completedMissionIds.includes(id)} readOnly tabIndex={-1} aria-label={`${missionTitles[id]} cleared`} />
       <span>{missionTitles[id]}</span>

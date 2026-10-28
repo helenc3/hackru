@@ -467,7 +467,7 @@ function interactable(state: InternalState, anchor: WorldAnchor): PublicInteract
   if (anchor.kind === 'npc') {
     if (!anchor.role || !mission.npcRoles.includes(anchor.role)) return null;
     const payable = Boolean(orderedDrink(state)) && anchor.id === state.npcState.vendor.anchorId;
-    return { ...base, kind: 'npc', role: anchor.role, ...(payable ? { choiceId: 'q1.pay' as const } : {}) };
+    return { ...base, kind: 'npc', role: anchor.role, ...(anchor.nameKey ? { nameKey: anchor.nameKey } : {}), ...(payable ? { choiceId: 'q1.pay' as const } : {}) };
   }
   if (anchor.capability === 'hotel-landmark') return { ...base, kind: 'landmark' };
   if (anchor.capability === 'river-viewpoint' && state.missionId === 'Q3') {

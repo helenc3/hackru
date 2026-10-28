@@ -6,17 +6,18 @@ import { startLiveVoice, type LiveStatus } from '../audio/live-voice';
 import { useBlockedPlay } from '../audio/audio-bus';
 import '../audio/live.css';
 import { CoachPanel } from './CoachPanel';
+import { NpcPortrait, isLaoWang } from './NpcPortrait';
+import { ConversationMeters } from './ConversationMeters';
 import { NpcActions } from './NpcActions';
+import { TimedNotice } from './EventFeed';
 import { explainElement } from '../dictionary/GlossPopover';
 import { roleNames, type ConversationSummary, type NpcTarget, type ThreadLine as Line } from './ConversationCard';
 
 const AUTO_SEND_SECONDS = 4;
 
-/** Patience cue: the NPC's mood in words, never a countdown. */
-const moodWords = { warm: 'friendly', neutral: 'getting busy', terse: 'impatient', disengaged: 'leaving' } as const;
-
-export function DialoguePanel({ state, npc, pending, turn, onAction, onSubmit, onLiveTurn, onClose }: {
+export function DialoguePanel({ state, npc, pending, turn, onAction, onSubmit, onLiveTurn, onClose, showTranscripts = true }: {
   state: PublicState; npc: NpcTarget; pending: boolean; turn: TurnResponse | null;
+  showTranscripts?: boolean;
   onAction: RendererProps['onAction']; onSubmit: (npc: NpcTarget, input: TurnRequest['input']) => Promise<void>; onLiveTurn?: (npc: NpcTarget, turn: TurnResponse) => void; onClose: (ended?: ConversationSummary) => void;
 }) {
   const name = npc.name;
@@ -35,20 +36,6 @@ export function DialoguePanel({ state, npc, pending, turn, onAction, onSubmit, o
   const firstButton = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
-  const [panelHeight, setPanelHeight] = useState<number>();
-  useEffect(() => {
-    const panel = panelRef.current, content = contentRef.current;
-    if (!panel || !content) return;
-    const observer = new ResizeObserver(() => {
-      const style = getComputedStyle(panel);
-      const chrome = parseFloat(style.paddingTop) + parseFloat(style.paddingBottom) + parseFloat(style.borderTopWidth) + parseFloat(style.borderBottomWidth);
-      const height = Math.ceil(content.getBoundingClientRect().height + chrome);
-      // Keep the room earned by the conversation when temporary controls disappear.
-      setPanelHeight((previous) => Math.max(previous ?? 0, height));
-    });
-    observer.observe(content);
-    return () => observer.disconnect();
-  }, []);
   const sendRef = useRef<() => Promise<void>>(async () => undefined);
   // Real-time lane: practice missions with live providers stream speech both ways; anything else uses the batch recorder.
   const [live, setLive] = useState<{ status: LiveStatus; message?: string; retryable?: boolean } | null>(null);
@@ -93,7 +80,9 @@ export function DialoguePanel({ state, npc, pending, turn, onAction, onSubmit, o
     return () => { pauseRef.current = null; handle.stop(); };
   }, [liveEligible, liveAttempt, state.sessionId, npc.anchorId]); // onLiveTurn is stable per session
 
-  useEffect(() => { firstButton.current?.focus(); }, []);
+  useEffect(() => {
+    if (!document.querySelector('[role=dialog]:not([data-testid="dialogue-panel"])')) firstButton.current?.focus();
+  }, []);
   // A turn that already existed when the panel opened belongs to the previous conversation: never replay it (or its goodbye).
   const openedWith = useRef(turn?.turnId ?? null);
   useEffect(() => {
@@ -126,22 +115,27 @@ export function DialoguePanel({ state, npc, pending, turn, onAction, onSubmit, o
   }
   sendRef.current = send;
   const lastNpc = thread.map((line) => line.role).lastIndexOf('npc');
+  const displayText = showTranscripts || state.inputPreference === 'typed-accessibility';
 
-  return <section ref={panelRef} style={{ height: panelHeight }} className="dialogue-panel" role="dialog" aria-modal="false" aria-labelledby="dialogue-title" data-testid="dialogue-panel" onKeyDown={(event) => {
+  return <section ref={panelRef} className={`dialogue-panel${isLaoWang(npc) ? ' has-portrait' : ''}`} role="dialog" aria-modal="false" aria-labelledby="dialogue-title" data-testid="dialogue-panel" onKeyDown={(event) => {
     // The world owner also ignores editable targets. Keep gameplay keys within the panel.
     if (event.key !== 'Escape') event.stopPropagation();
   }}>
+    {isLaoWang(npc) && <NpcPortrait npc={npc} mood={state.npcMood[npc.role]} />}
+    <div className="dialogue-dock">
     <div ref={contentRef} className="dialogue-content">
-    <header><div><span className="eyebrow">CONVERSATION</span><h2 id="dialogue-title" lang={languageTag(language)}>{name}</h2><span className="mood-label" data-mood={state.npcMood[npc.role]}>{roleNames[npc.role]} · {moodWords[state.npcMood[npc.role]]}</span></div><button ref={firstButton} className="button secondary" onClick={() => onClose()} aria-label="Close conversation">Close · Esc</button></header>
+    <header><div><span className="eyebrow">CONVERSATION</span><h2 id="dialogue-title" lang={languageTag(language)}>{name}</h2><span className="mood-label">{roleNames[npc.role]}</span></div><button ref={firstButton} className="button secondary" onClick={() => onClose()} aria-label="Close conversation">Close · Esc</button></header>
     {(thread.length > 0 || outgoing) && <div className="chat-thread" aria-live="polite">
-      {thread.map((line, index) => line.role === 'coach'
+      {thread.map((line, index) => !displayText && line.role !== 'notice' ? null : line.role === 'coach'
         ? <div key={index} className="bubble coach" data-testid="live-coach"><span>{line.feedback.understood}</span><span>{line.feedback.explanation}</span><span className="mandarin-chip" lang={languageTag(language)}>{line.feedback.improvedExample}</span></div>
-        : line.role === 'notice' ? <p key={index} className="thread-notice" role="status">{line.text}</p>
+        : line.role === 'notice' ? <TimedNotice key={index}>{line.text}</TimedNotice>
         : <p key={index} className={`bubble ${line.role}`} lang={languageTag(language)} {...(index === lastNpc ? { 'data-testid': 'npc-reply' } : {})}
           {...(line.role === 'npc' ? { tabIndex: 0, title: 'Shift+click a word, or press Enter, for pinyin and English', onKeyDown: (event: React.KeyboardEvent<HTMLElement>) => { if (event.key === 'Enter') { event.preventDefault(); explainElement(event.currentTarget); } } } : {})}>{line.text}</p>)}
-      {outgoing && <p className="bubble player sending" lang={languageTag(language)}>{outgoing}</p>}
+      {displayText && outgoing && <p className="bubble player sending" lang={languageTag(language)}>{outgoing}</p>}
     </div>}
-    {liveActive && (partial.player || partial.npc) && <div className="chat-thread" aria-hidden="true">
+    {!displayText && <p className="conversation-status">Transcripts off · listen and speak.</p>}
+    {!showTranscripts && displayText && <p className="conversation-status">Typed accessibility is showing text.</p>}
+    {displayText && liveActive && (partial.player || partial.npc) && <div className="chat-thread" aria-hidden="true">
       {partial.npc && <p className="bubble npc partial" lang={languageTag(language)}>{partial.npc}</p>}
       {partial.player && <p className="bubble player partial" lang={languageTag(language)}>{partial.player}</p>}
     </div>}
@@ -160,7 +154,7 @@ export function DialoguePanel({ state, npc, pending, turn, onAction, onSubmit, o
     {!goal && <>
     {!liveActive && <div className="recorder-mount" aria-busy={pending}><Recorder state={state} npcId={npc.role} onAction={onAction} onTranscript={(result) => { setTranscription({ id: result.transcriptionId, original: result.text }); setDraft(result.text); setCountdown(AUTO_SEND_SECONDS); }} /></div>}
     <button className="button secondary" disabled={pending} onClick={() => void onAction({ type: 'setInputPreference', preference: state.inputPreference === 'voice' ? 'typed-accessibility' : 'voice' }).catch(() => undefined)}>{state.inputPreference === 'voice' ? `Use typed ${languageLabel}` : 'Use voice'}</button>
-    {(state.inputPreference === 'typed-accessibility' || transcription) && <form onSubmit={(event) => { event.preventDefault(); void send(); }}>
+    {displayText && (state.inputPreference === 'typed-accessibility' || transcription) && <form onSubmit={(event) => { event.preventDefault(); void send(); }}>
       <label className="field-label" htmlFor="mandarin-input">{transcription ? 'What you said' : `Typed ${languageLabel}`}</label>
       <textarea id="mandarin-input" lang={languageTag(language)} value={draft} maxLength={500} rows={3} disabled={pending}
         onChange={(event) => { setCountdown(null); setDraft(event.target.value); }} onCompositionStart={() => { composing.current = true; setCountdown(null); }} onCompositionEnd={() => { composing.current = false; }}
@@ -172,7 +166,12 @@ export function DialoguePanel({ state, npc, pending, turn, onAction, onSubmit, o
     </>}
     <NpcActions state={state} anchorId={npc.anchorId} extra={turn?.actions} pending={pending} onAction={onAction} onClose={() => onClose()} onEnd={finish} />
     </>}
-    <CoachPanel state={state} turn={turn} />
+    {!displayText && transcription && <p className="conversation-status" role="status">{countdown !== null ? `Sending your recording in ${countdown}…` : 'Switch to typed Mandarin to review this recording.'}</p>}
+    </div>
+    <div className="dialogue-learning">
+      <ConversationMeters state={state} role={npc.role} turn={turn} />
+      {displayText && <CoachPanel state={state} turn={turn} showMeters={false} />}
+    </div>
     </div>
   </section>;
 }

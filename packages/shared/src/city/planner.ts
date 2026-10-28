@@ -12,7 +12,8 @@ import { createRng, hashString } from './rng.js';
 // E-W roads after cities, as in central Shanghai. The Huangpu is a straight N-S corridor with
 // promenades on both banks; creeks run E-W into it west of the river. All values are tunable.
 
-const ROAD_WIDTH = { avenue: 5, street: 3.5, lane: 1.5, promenade: 3 } as const;
+/** 1.3× the previous road widths; planner, renderer, and collision share these dimensions. */
+const ROAD_WIDTH = { avenue: 6.5, street: 4.55, lane: 1.95, promenade: 3.9 } as const;
 /** Sidewalk strip kept clear of buildings on each side of every road and creek. */
 export const SIDEWALK = 2.5;
 const CREEK = { half: 4 } as const;

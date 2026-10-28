@@ -2,7 +2,9 @@ import { Component, useEffect, useMemo, useRef, useState, type ReactNode } from 
 import { Canvas, useThree } from '@react-three/fiber';
 import { createPortal } from 'react-dom';
 import { VISIBLE_RADIUS_CHUNKS, chunkOf, chunkOrigin, seedFromWorldId, text, worldLayout, languageTag, type GameLanguage, type ChunkManifest, type Position, type RendererProps } from '@vibequest/shared';
-import { distance, nearbyTargets, nextLeg, targetAction, walkingPath } from './navigation';
+import { AutoEngage } from './auto-engage';
+import { movementWaitMs } from './movement-sync';
+import { distance, nearbyTargets, nextLeg, targetAction } from './navigation';
 import { registerWalkHandler } from './walk-request';
 import { DEFAULT_PITCH, dragOrbit } from './camera';
 import { Cue } from './decor';
@@ -82,12 +84,24 @@ function anchorLabels(city: CityHandle, position: Position, language: GameLangua
  * `preview` renders a local seeded city behind the welcome screen; it is inert and must not look like
  * the live world to tests or assistive tech. `manifests` gives a static city (fixtures/tests).
  */
-export function WorldRenderer({ state, onAction, onTalk, preview = false, manifests, conversationOpen = false, guidanceContainer }: RendererProps & { preview?: boolean; manifests?: readonly ChunkManifest[]; conversationOpen?: boolean; guidanceContainer?: HTMLElement | null }) {
+export function WorldRenderer({ state, onAction, onTalk, preview = false, manifests, conversationOpen = false, autoEngage = true, guidanceContainer }: RendererProps & { preview?: boolean; manifests?: readonly ChunkManifest[]; conversationOpen?: boolean; autoEngage?: boolean; guidanceContainer?: HTMLElement | null }) {
   const city = useCity(preview ? null : state, { manifests });
   const [hasWebGl, setHasWebGl] = useState(webGlIsAvailable);
   const [position, setPosition] = useState(() => initialPosition(state));
   const [busy, setBusy] = useState(false);
+  const autoTalk = useRef(new AutoEngage());
+  const autoAllowed = useRef(false);
+  autoAllowed.current = !preview && autoEngage && !conversationOpen && state.status === 'active' && hasWebGl;
   const root = useRef<HTMLElement>(null);
+  const [mouseLocked, setMouseLocked] = useState(false);
+  const [lockError, setLockError] = useState(false);
+  const [boundedLook, setBoundedLook] = useState(false);
+  const bounded = useRef(false);
+  const boundedPointer = useRef<{ x: number; y: number } | null>(null);
+  const lockRequested = useRef(false);
+  const lockPending = useRef(false);
+  const lockAllowed = useRef(false);
+  lockAllowed.current = !preview && !conversationOpen && state.status === 'active' && hasWebGl;
   const labels = useRef<(HTMLSpanElement | null)[]>([]);
   const current = useRef({ state, onAction, onTalk });
   current.current = { state, onAction, onTalk };
@@ -96,9 +110,81 @@ export function WorldRenderer({ state, onAction, onTalk, preview = false, manife
   const syncPromise = useRef<Promise<void>>(Promise.resolve());
   const drag = useRef<{ x: number; y: number; startX: number; startY: number; moved: boolean; pointerId: number } | null>(null);
   const sessionKey = `${state.sessionId}:${state.worldId}`;
+  const releaseMouse = () => {
+    lockRequested.current = false; lockPending.current = false; bounded.current = false; boundedPointer.current = null; setBoundedLook(false);
+    runtime.current.keys.clear();
+    if (document.pointerLockElement === root.current) document.exitPointerLock();
+  };
+  const captureDenied = () => {
+    lockPending.current = false;
+    if (!lockRequested.current || !lockAllowed.current || document.pointerLockElement === root.current) return;
+    // Embedded/background browsers can refuse capture. Keep mouse-follow usable inside
+    // the world, clearly distinguished from native, unbounded cursor capture.
+    bounded.current = true; boundedPointer.current = null; setBoundedLook(true); setLockError(true);
+    runtime.current.active = true; root.current?.focus({ preventScroll: true });
+  };
+  const lockMouse = () => {
+    if (!lockAllowed.current || lockPending.current || document.pointerLockElement === root.current) return;
+    lockRequested.current = true;
+    const node = root.current;
+    if (!node?.requestPointerLock) { captureDenied(); return; }
+    node.focus({ preventScroll: true });
+    lockPending.current = true;
+    try { void node.requestPointerLock()?.catch(captureDenied).finally(() => { lockPending.current = false; }); }
+    catch { captureDenied(); }
+  };
+  useEffect(() => {
+    const node = root.current;
+    const changed = () => {
+      const locked = document.pointerLockElement === node;
+      lockPending.current = false;
+      if (locked && (!lockAllowed.current || !lockRequested.current)) { document.exitPointerLock(); return; }
+      setMouseLocked(locked); drag.current = null;
+      runtime.current.keys.clear(); runtime.current.path = []; runtime.current.goal = undefined;
+      if (locked) { bounded.current = false; setBoundedLook(false); runtime.current.active = true; setLockError(false); node?.focus({ preventScroll: true }); }
+      else { lockRequested.current = false; }
+    };
+    const failed = () => captureDenied();
+    const look = (event: MouseEvent) => {
+      if (document.pointerLockElement !== node || !lockAllowed.current) return;
+      const r = runtime.current;
+      const next = dragOrbit(r.yaw, r.pitch ?? DEFAULT_PITCH, event.movementX, event.movementY);
+      r.yaw = next.yaw; r.pitch = next.pitch;
+    };
+    document.addEventListener('pointerlockchange', changed);
+    document.addEventListener('pointerlockerror', failed);
+    document.addEventListener('mousemove', look);
+    const key = (event: KeyboardEvent) => {
+      if (document.pointerLockElement !== node && !bounded.current && !lockPending.current) return;
+      if (event.code === 'Escape') { event.preventDefault(); releaseMouse(); return; }
+      if (document.pointerLockElement !== node && !bounded.current) return;
+      // Some browsers focus body/canvas during capture. Keep world controls working there.
+      if (event.target !== node && lockAllowed.current) {
+        const codes = ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
+        if (codes.includes(event.code)) { event.preventDefault(); runtime.current.keys.add(event.code); }
+        if (event.code === 'KeyE' && !event.repeat) node?.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyE', bubbles: true }));
+        if ((event.code === 'ShiftLeft' || event.code === 'ShiftRight') && !event.repeat) releaseMouse();
+      }
+    };
+    const keyUp = (event: KeyboardEvent) => runtime.current.keys.delete(event.code);
+    document.addEventListener('keydown', key);
+    document.addEventListener('keyup', keyUp);
+    return () => {
+      document.removeEventListener('pointerlockchange', changed);
+      document.removeEventListener('pointerlockerror', failed);
+      document.removeEventListener('mousemove', look);
+      document.removeEventListener('keydown', key);
+      document.removeEventListener('keyup', keyUp);
+      if (document.pointerLockElement === node) document.exitPointerLock();
+    };
+  }, []);
+  useEffect(() => {
+    if (conversationOpen || preview || state.status !== 'active' || !hasWebGl) releaseMouse();
+  }, [conversationOpen, preview, state.status, hasWebGl]);
   useEffect(() => {
     const r = runtime.current;
-    r.generation++; r.position = initialPosition(current.current.state); r.lastSent = null; r.pending = null;
+    autoTalk.current.reset();
+    r.generation++; r.position = initialPosition(current.current.state); r.lastSent = null; r.lastAckAt = undefined; r.pending = null;
     r.keys.clear(); r.path = []; r.busy = false; r.syncing = false; syncPromise.current = Promise.resolve();
     setPosition({ ...r.position }); setBusy(false);
   }, [sessionKey]);
@@ -118,7 +204,7 @@ export function WorldRenderer({ state, onAction, onTalk, preview = false, manife
     runtime.current.keys.clear(); runtime.current.path = []; runtime.current.goal = undefined;
   }, [conversationOpen]);
   useEffect(() => {
-    const clear = () => { runtime.current.keys.clear(); runtime.current.path = []; runtime.current.active = false; drag.current = null; };
+    const clear = () => { runtime.current.keys.clear(); runtime.current.path = []; runtime.current.active = false; drag.current = null; releaseMouse(); };
     window.addEventListener('blur', clear);
     document.addEventListener('visibilitychange', clear);
     return () => { clear(); window.removeEventListener('blur', clear); document.removeEventListener('visibilitychange', clear); runtime.current.generation++; };
@@ -128,8 +214,12 @@ export function WorldRenderer({ state, onAction, onTalk, preview = false, manife
     const r = runtime.current;
     const generation = r.generation;
     if (r.lastSent && distance(r.lastSent, next) < .02) return;
+    const multiplier = current.current.state.providerStatus === 'fixture' ? testProfile().movementMultiplier : 1;
+    const wait = movementWaitMs(r.lastSent, next, r.lastAckAt, performance.now(), multiplier);
+    if (wait > 0) await new Promise<void>((resolve) => setTimeout(resolve, Math.ceil(wait)));
+    if (generation !== r.generation) return;
     await current.current.onAction({ type: 'move', position: next });
-    if (generation === r.generation) r.lastSent = { ...next };
+    if (generation === r.generation) { r.lastSent = { ...next }; r.lastAckAt = performance.now(); }
   }
 
   function sync(next: Position) {
@@ -153,19 +243,31 @@ export function WorldRenderer({ state, onAction, onTalk, preview = false, manife
     })();
   }
 
-  async function interact(id: string) {
+  function autoBlocked() {
+    const focused = document.activeElement;
+    return !autoAllowed.current || document.hidden || Boolean(document.querySelector('.game-settings[open], [role=dialog]'))
+      || Boolean(focused && focused !== document.body && focused !== document.documentElement && !root.current?.contains(focused));
+  }
+
+  async function interact(id: string, automatic = false) {
     const r = runtime.current;
-    if (r.busy || current.current.state.status !== 'active' || !hasWebGl) return;
+    if (r.busy || conversationOpen || current.current.state.status !== 'active' || !hasWebGl) return;
     const target = nearbyTargets(current.current.state, r.position).find((item) => item.id === id);
     if (!target) return;
     const generation = r.generation;
-    r.busy = true; r.path = []; r.keys.clear(); r.pending = null; setBusy(true);
+    r.busy = true; r.goal = undefined; r.path = []; r.keys.clear(); r.pending = null; setBusy(true);
     try {
       await syncPromise.current;
       if (generation !== r.generation) return;
       await flushPosition({ ...r.position });
       if (generation !== r.generation) return;
-      if (target.kind === 'npc') current.current.onTalk(target.id);
+      if (target.kind === 'npc') {
+        // A player can open a HUD panel while the authoritative position is being
+        // saved. Recheck after the await so a late greeting never steals its focus.
+        if (automatic && autoBlocked()) return;
+        autoTalk.current.engaged(current.current.state, r.position);
+        releaseMouse(); current.current.onTalk(target.id);
+      }
       else {
         const action = targetAction(target, current.current.state.photo);
         if (action) await current.current.onAction(action);
@@ -179,13 +281,23 @@ export function WorldRenderer({ state, onAction, onTalk, preview = false, manife
   const nearby = nearbyTargets(state, position);
   const marks = useMemo(() => anchorLabels(city, position, state.language), [state.language, city.revision, Math.floor(position.x / 10), Math.floor(position.z / 10)]);
   const loading = !preview && !city.ready(position);
+  const interactRef = useRef(interact); interactRef.current = interact;
+  useEffect(() => {
+    const blocked = autoBlocked() || busy || loading;
+    const id = autoTalk.current.candidate(state, position, blocked);
+    if (id) void interactRef.current(id, true);
+  }, [position, state, preview, conversationOpen, autoEngage, busy, loading, hasWebGl]);
   const movementKeys = ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
-  return <section ref={root} tabIndex={0} className="world-renderer district-world" aria-label="Shanghai streets — keyboard or click to move" data-testid={preview ? 'world-preview' : 'world-renderer'}
+  return <section ref={root} tabIndex={0} className="world-renderer district-world" aria-label="Shanghai streets — WASD to walk, mouse to look" data-testid={preview ? 'world-preview' : 'world-renderer'} data-mouse-locked={mouseLocked} data-look-mode={mouseLocked ? 'captured' : boundedLook ? 'bounded' : 'free'}
     data-world-id={city.worldId} data-chunks={city.manifests.size} data-city-status={city.status}
-    onFocus={(event) => { runtime.current.active = event.target === root.current; }}
-    onBlur={() => { runtime.current.keys.clear(); runtime.current.path = []; runtime.current.active = false; }}
+    onFocus={(event) => { runtime.current.active = document.pointerLockElement === root.current || event.target === root.current; }}
+    onBlur={(event) => {
+      if (document.pointerLockElement === root.current || lockPending.current || event.currentTarget.contains(event.relatedTarget as Node | null)) return;
+      runtime.current.keys.clear(); runtime.current.path = []; runtime.current.active = false;
+    }}
     onKeyDown={(event) => {
       if (event.target !== root.current || event.nativeEvent.isComposing) return;
+      if ((event.code === 'ShiftLeft' || event.code === 'ShiftRight') && !event.repeat) { event.preventDefault(); if (mouseLocked || bounded.current) releaseMouse(); else lockMouse(); }
       if (movementKeys.includes(event.code)) { event.preventDefault(); if (!conversationOpen) { runtime.current.keys.add(event.code); runtime.current.path = []; } }
       if (event.code === 'KeyE' && !event.repeat) { event.preventDefault(); const target = nearbyTargets(current.current.state, runtime.current.position)[0]; if (target) void interact(target.id); }
     }}
@@ -193,12 +305,25 @@ export function WorldRenderer({ state, onAction, onTalk, preview = false, manife
     onPointerDown={(event) => {
       if (event.target instanceof HTMLCanvasElement && (event.button === 0 || event.button === 2)) {
         root.current?.focus();
+        if (document.pointerLockElement === root.current || bounded.current) return;
         drag.current = { x: event.clientX, y: event.clientY, startX: event.clientX, startY: event.clientY, moved: false, pointerId: event.pointerId };
-        event.currentTarget.setPointerCapture(event.pointerId);
+        // Pointer capture and pointer lock are mutually exclusive; request only mouse lock.
+        lockMouse();
       }
     }}
     onContextMenu={(event) => { if (event.target instanceof HTMLCanvasElement) event.preventDefault(); }}
     onPointerMove={(event) => {
+      if (document.pointerLockElement === root.current) return;
+      if (bounded.current && lockAllowed.current) {
+        if (!(event.target instanceof HTMLCanvasElement)) { boundedPointer.current = null; return; }
+        const previous = boundedPointer.current;
+        boundedPointer.current = { x: event.clientX, y: event.clientY };
+        if (!previous) return;
+        const r = runtime.current;
+        const next = dragOrbit(r.yaw, r.pitch ?? DEFAULT_PITCH, event.clientX - previous.x, event.clientY - previous.y);
+        r.yaw = next.yaw; r.pitch = next.pitch;
+        return;
+      }
       const gesture = drag.current;
       if (!gesture || gesture.pointerId !== event.pointerId) return;
       if (!gesture.moved && Math.hypot(event.clientX - gesture.startX, event.clientY - gesture.startY) < 5) return;
@@ -211,14 +336,10 @@ export function WorldRenderer({ state, onAction, onTalk, preview = false, manife
     onPointerUp={(event) => {
       const gesture = drag.current;
       if (!gesture || gesture.pointerId !== event.pointerId) return;
-      if (!conversationOpen && !gesture.moved && !runtime.current.busy && current.current.state.status === 'active') {
-        const point = runtime.current.groundPoint?.(event.clientX, event.clientY);
-        if (point) { runtime.current.keys.clear(); runtime.current.goal = undefined; runtime.current.path = walkingPath(city.view, runtime.current.position, point); }
-      }
       drag.current = null;
       if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
     }}
-    onPointerCancel={() => { drag.current = null; }}>
+    onPointerCancel={() => { drag.current = null; }} onPointerLeave={() => { boundedPointer.current = null; }}>
     {hasWebGl ? <CanvasBoundary onFailure={() => { runtime.current.keys.clear(); runtime.current.path = []; runtime.current.active = false; setHasWebGl(false); }}><Canvas dpr={testProfile().lightweight ? .5 : [1, 1.5]} camera={{ position: [state.position.x, 8.5, state.position.z + 9], fov: 52, near: .1, far: 150 }} gl={{ antialias: !testProfile().lightweight, powerPreference: 'high-performance' }}
       fallback={<CompatibilityRecovery />}>
       <ContextLossHandler onFailure={() => { runtime.current.keys.clear(); runtime.current.path = []; runtime.current.active = false; setHasWebGl(false); }} />
@@ -226,7 +347,11 @@ export function WorldRenderer({ state, onAction, onTalk, preview = false, manife
       <FarRiver river={river} runtime={runtime} />{!preview && state.questTarget && <QuestBeacon target={state.questTarget.position} still={still} />}
     </Canvas></CanvasBoundary> : <CompatibilityRecovery />}
     {hasWebGl && <>
-      <div className="district-labels" aria-hidden="true">{marks.map((mark, i) => <span key={`${mark.label}@${mark.x},${mark.z}`} ref={(node) => { labels.current[i] = node; }} className="district-landmark" lang={languageTag(state.language)}><span className="marker-distance" lang="en">{Math.round(Math.hypot(mark.x - position.x, mark.z - position.z))} m</span><span>{mark.label}</span>{!preview && !busy && state.status === 'active' && nearby[0]?.kind === 'npc' && nearby[0].id === mark.id && <kbd className="npc-interact-key" lang="en" aria-label="Press E to talk">E</kbd>}</span>)}</div>
+      {!preview && !conversationOpen && state.status === 'active' && <div className="camera-controls">
+        <button type="button" className="button secondary" onClick={() => { if (mouseLocked || bounded.current) releaseMouse(); else lockMouse(); }}>{mouseLocked ? 'Unlock mouse · Esc' : boundedLook ? 'Release mouse look · Esc' : 'Lock mouse · Shift'}</button>
+        {lockError && boundedLook && <span role="status">Browser blocked mouse capture. Move over the world to look; Esc releases the cursor.</span>}
+      </div>}
+      <div className="district-labels" aria-hidden="true">{marks.map((mark, i) => <span key={`${mark.label}@${mark.x},${mark.z}`} ref={(node) => { labels.current[i] = node; }} className="district-landmark" lang={languageTag(state.language)}><span className="marker-distance" lang="en">{Math.round(Math.hypot(mark.x - position.x, mark.z - position.z))} m</span><span>{mark.label}</span></span>)}</div>
       <div className="world-caption"><span className="live-dot" />Shanghai<span>Third-person navigation</span></div>
       {loading && <div className="world-note" role="status" data-testid="city-loading">Building the neighbourhood…</div>}
       {city.error && !preview && <div className="world-note" role="status" data-testid="city-error">{city.error}</div>}

@@ -28,6 +28,8 @@ test('player world: buy a drink, get verified hotel directions, and a river phot
     if (/\/chunks(\/restore)?$/.test(new URL(response.url()).pathname) && response.ok()) committed.push(...(await response.json()).chunks);
   });
   await startWorld(page);
+  await expect(page.getByTestId('world-renderer')).toHaveAttribute('data-fps', /./);
+  await page.screenshot({ path: 'test-results/game-shoulder-camera.png', fullPage: true });
   await expect(page.locator('[data-testid="validation-harness"]')).toHaveCount(0);
   const worldId = (await page.getByTestId('world-renderer').getAttribute('data-world-id'))!;
   let state = await playerState(page, request);

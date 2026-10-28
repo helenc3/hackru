@@ -1,0 +1,52 @@
+/* The world remains live behind an original cutout; only the dock accepts pointer input. */
+.dialogue-panel {
+  top: auto; right: 24px; left: 24px; bottom: 24px;
+  width: auto; max-height: none; overflow: visible;
+  padding: 0; border: 0; border-radius: 0; background: none; box-shadow: none;
+  transition: none; animation: none; pointer-events: none;
+}
+.dialogue-dock {
+  position: relative; z-index: 1; display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(240px, 1fr);
+  gap: 22px; height: min(46dvh, 470px); overflow: hidden;
+  padding: 18px 24px; border: 4px solid var(--ink); border-radius: 24px;
+  background: var(--cream); box-shadow: 6px 7px 0 var(--ink); pointer-events: auto;
+}
+.dialogue-content, .dialogue-learning { min-width: 0; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+.dialogue-content { padding-right: 8px; }
+.dialogue-learning { border-left: 2px solid #dfd0d8; padding-left: 20px; }
+.dialogue-panel header { position: sticky; top: 0; z-index: 2; margin-bottom: 8px; padding-bottom: 7px; background: var(--cream); }
+.dialogue-panel header h2 { margin: 0; }
+.dialogue-panel h2 { font-size: 23px; }
+.dialogue-panel .chat-thread { max-height: 145px; overflow-y: auto; overscroll-behavior: contain; margin: 8px 0; }
+.dialogue-panel .bubble { margin: 5px 0; padding: 8px 12px; font-size: 16px; }
+.dialogue-panel .recorder-mount { margin-bottom: 6px; }
+.dialogue-panel .coach-panel { border: 0; margin-top: 12px; padding-top: 0; }
+.dialogue-panel .coach-panel h3 { margin-top: 8px; }
+.dialogue-panel textarea { max-height: 85px; min-height: 56px; }
+.dialogue-panel .npc-actions { margin-top: 8px; }
+.npc-portrait {
+  position: absolute; right: 0; bottom: calc(100% - 16px); width: min(540px, 43vw);
+  height: min(390px, 40dvh); pointer-events: none; user-select: none;
+}
+.npc-portrait img { width: 100%; height: 100%; object-fit: contain; object-position: bottom right; }
+.conversation-meters { position: sticky; top: 0; z-index: 1; display: grid; gap: 9px; padding: 6px 0 8px; background: var(--cream); }
+.conversation-meters > div { display: grid; grid-template-columns: 66px minmax(65px, 1fr) 40px; align-items: center; gap: 9px; font-size: 12px; font-weight: 700; }
+.conversation-meters meter { width: 100%; height: 16px; accent-color: var(--mint); }
+.conversation-mood meter { grid-column: 2 / 4; }
+.conversation-mood[data-mood="terse"] meter, .conversation-mood[data-mood="disengaged"] meter { accent-color: var(--raspberry); }
+.conversation-mood[data-mood="terse"] meter::-webkit-meter-optimum-value,
+.conversation-mood[data-mood="disengaged"] meter::-webkit-meter-optimum-value { background: var(--raspberry); }
+.conversation-mood[data-mood="neutral"] meter::-webkit-meter-optimum-value { background: var(--lemon); }
+.conversation-mood[data-mood="terse"] meter::-moz-meter-bar,
+.conversation-mood[data-mood="disengaged"] meter::-moz-meter-bar { background: var(--raspberry); }
+.meter-awaiting { color: var(--text-muted); }
+@media (max-width: 760px) {
+  .dialogue-panel { left: 10px; right: 14px; bottom: 14px; }
+  .dialogue-dock { padding: 12px; gap: 12px; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto; height: 52dvh; }
+  .dialogue-learning { border-left: 0; border-top: 2px solid #dfd0d8; padding: 8px 0 0; max-height: 140px; }
+  .conversation-meters { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+  .conversation-meters > div { display: flex; flex-wrap: wrap; gap: 5px; }
+  .conversation-meters meter { min-width: 45px; flex: 1; }
+  .npc-portrait { height: min(260px, 32dvh); width: min(350px, 55vw); }
+}
+@media (prefers-reduced-motion: reduce) { .npc-portrait { animation: none; } }

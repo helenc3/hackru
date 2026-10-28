@@ -46,7 +46,7 @@ async function orderedTea(state: InternalState) {
 it('keeps scenery signs out of the projected interactions', () => {
   const state = projectPublicState(game(), NOW, fakeWorld);
   expect(state.interactables.some((target) => target.id === 'a.menu')).toBe(false);
-  expect(state.interactables.some((target) => target.id === 'a.vendor')).toBe(true);
+  expect(state.interactables.find((target) => target.id === 'a.vendor')).toMatchObject({ nameKey: 'xiaolin' });
 });
 
 describe('Q1 buy a drink', () => {

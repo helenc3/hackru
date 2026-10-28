@@ -82,6 +82,19 @@ input:focus-visible, textarea:focus-visible, select:focus-visible {
   margin-top: 15px;
 }
 
+.transcript-setting {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 18px;
+  font-weight: 700;
+}
+
+.transcript-help {
+  margin-top: 6px;
+  font-size: 12px;
+}
+
 .start-actions, .result-actions {
   display: flex;
   gap: 12px;

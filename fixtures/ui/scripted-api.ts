@@ -14,7 +14,7 @@ export const fixtureState = (missionId: MissionId, validation = false): PublicSt
   sessionId: `ui-${validation ? 'validation' : 'player'}-${missionId}`, worldId: 'ui-world', version: 0, missionId, mode: 'practice', status: 'active', zoneId: 'shopping', position: spawn, tier: 0,
   objectives: [{ id: `${missionId.toLowerCase()}.goal`, label: goals[missionId], complete: false }],
   interactables: [
-    { id: `ui.${roles[missionId][0]}`, kind: 'npc', role: roles[missionId][0], label: roles[missionId][1], position: spawn },
+    { id: `ui.${roles[missionId][0]}`, kind: 'npc', role: roles[missionId][0], label: roles[missionId][1], nameKey: missionId === 'Q1' ? 'laowang' : missionId === 'Q2' ? 'xiaoli' : 'xiaomei', position: spawn },
   ],
   npcMood: { vendor: 'warm', guide: 'warm', passerby: 'warm' }, inventory: { hint: 1, cny: 20, drinks: [] }, purchases: [],
   xp: 0, badges: [], unlockedMissionIds: ['Q1', 'Q2', 'Q3'].slice(0, ['Q1', 'Q2', 'Q3'].indexOf(missionId) + 1), completedMissionIds: [],

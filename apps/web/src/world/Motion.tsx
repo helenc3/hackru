@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { Group, Vector3, Vector2, Raycaster, Plane, PerspectiveCamera } from 'three';
+import { Group, Vector3, PerspectiveCamera } from 'three';
 import { WORLD_RULES, type Position, type PublicState } from '@vibequest/shared';
 import { distance, movePlayer, zoneAt } from './navigation';
 import type { CityHandle } from '../city/use-city';
@@ -8,7 +8,7 @@ import { Player, type Gait } from './characters';
 import { initialPosition, type Runtime } from './runtime';
 import { useAudioActivity } from '../audio/audio-bus';
 import { testProfile } from './test-profile';
-import { DEFAULT_PITCH, orbitDistance } from './camera';
+import { buildingCameraVolumes, cameraDistance, CAMERA_HEIGHT, DEFAULT_PITCH, orbitDistance, SHOULDER_OFFSET } from './camera';
 
 export type Landmark = { id?: string; label: string; x: number; z: number };
 
@@ -23,8 +23,8 @@ export function Motion({ runtime, root, labels, marks, city, state, tick, sync, 
   const clock = useRef({ ui: 0, frames: 0, elapsed: 0, wasMoving: false });
   const projected = useRef(new Vector3());
   const framing = useRef(0);
-  const ray = useRef(new Raycaster());
-  const ground = useRef(new Plane(new Vector3(0, 1, 0), 0));
+  const boom = useRef({ origin: new Vector3(), desired: new Vector3(), target: new Vector3() });
+  const cameraObstacles = [...city.manifests.values()].map(buildingCameraVolumes);
   const activity = useAudioActivity();
   const footsteps = useRef<HTMLAudioElement[]>([]);
   const stride = useRef({ distance: 0, next: 0 });
@@ -41,20 +41,15 @@ export function Motion({ runtime, root, labels, marks, city, state, tick, sync, 
       for (const clip of clips) { clip.pause(); clip.removeAttribute('src'); clip.load(); }
     };
   }, []);
-  useFrame(({ camera, size, gl }, delta) => {
+  useFrame(({ camera, size }, delta) => {
     const r = runtime.current;
     const profile = testProfile();
     const multiplier = state.providerStatus === 'fixture' ? profile.movementMultiplier : 1;
     city.focus(r.position);
     // Movement waits until the chunk under the player is committed (server validates the same manifests).
-    const blocked = conversationOpen || !city.ready(r.position) || !r.active || r.busy || state.status !== 'active' || document.activeElement !== root.current || document.hidden;
+    const ownsMouse = document.pointerLockElement === root.current;
+    const blocked = conversationOpen || !city.ready(r.position) || (!r.active && !ownsMouse) || r.busy || state.status !== 'active' || (!ownsMouse && document.activeElement !== root.current) || document.hidden;
     if (conversationOpen) { r.keys.clear(); r.goal = undefined; }
-    r.groundPoint = (x, y) => {
-      const bounds = gl.domElement.getBoundingClientRect();
-      ray.current.setFromCamera(new Vector2((x - bounds.left) / bounds.width * 2 - 1, 1 - (y - bounds.top) / bounds.height * 2), camera);
-      const point = ray.current.ray.intersectPlane(ground.current, new Vector3());
-      return point ? { x: point.x, z: point.z } : null;
-    };
     if (blocked) r.path = [];
     const k = r.keys;
     const right = blocked ? 0 : Number(k.has('KeyD') || k.has('ArrowRight')) - Number(k.has('KeyA') || k.has('ArrowLeft'));
@@ -79,7 +74,8 @@ export function Motion({ runtime, root, labels, marks, city, state, tick, sync, 
     }
     if (avatar.current) {
       avatar.current.position.set(r.position.x, 0, r.position.z);
-      if (distance(previous, r.position) > .0001) avatar.current.rotation.y = Math.atan2(r.position.x - previous.x, r.position.z - previous.z);
+      // The avatar always faces away from the camera, including when strafing/backing up.
+      avatar.current.rotation.y = r.yaw + Math.PI;
     }
     gait.current.moving = moving;
     gait.current.speed = Math.min(distance(previous, r.position) / Math.max(delta, 1e-4), 4.5);
@@ -101,8 +97,16 @@ export function Motion({ runtime, root, labels, marks, city, state, tick, sync, 
     }
     const pitch = r.pitch ?? DEFAULT_PITCH;
     const orbit = orbitDistance(pitch);
-    camera.position.set(r.position.x + Math.sin(r.yaw) * orbit * Math.cos(pitch), .7 + orbit * Math.sin(pitch), r.position.z + Math.cos(r.yaw) * orbit * Math.cos(pitch));
-    camera.lookAt(r.position.x, .7, r.position.z);
+    const b = boom.current;
+    b.origin.set(r.position.x, CAMERA_HEIGHT, r.position.z);
+    b.target.set(r.position.x + Math.cos(r.yaw) * SHOULDER_OFFSET, CAMERA_HEIGHT, r.position.z - Math.sin(r.yaw) * SHOULDER_OFFSET);
+    b.desired.set(b.target.x + Math.sin(r.yaw) * orbit * Math.cos(pitch), CAMERA_HEIGHT + orbit * Math.sin(pitch), b.target.z + Math.cos(r.yaw) * orbit * Math.cos(pitch));
+    const allowed = cameraDistance(b.origin, b.desired, cameraObstacles);
+    camera.position.copy(b.desired).sub(b.origin).setLength(allowed).add(b.origin);
+    // Keep the viewing direction steady when the boom compresses against a wall.
+    b.target.sub(b.desired).add(camera.position);
+    camera.lookAt(b.target);
+    if (avatar.current) avatar.current.visible = allowed > .65;
     // Shift the optical center without resizing the world or changing the orbit.
     // A 20% view offset places the player at 30% of the full viewport width.
     const targetFraming = conversationOpen ? .2 : 0;
@@ -125,6 +129,9 @@ export function Motion({ runtime, root, labels, marks, city, state, tick, sync, 
     c.ui += delta; c.elapsed += delta; c.frames++;
     root.current?.setAttribute('data-position-x', r.position.x.toFixed(3));
     root.current?.setAttribute('data-position-z', r.position.z.toFixed(3));
+    root.current?.setAttribute('data-camera-yaw', r.yaw.toFixed(3));
+    root.current?.setAttribute('data-avatar-yaw', (r.yaw + Math.PI).toFixed(3));
+    root.current?.setAttribute('data-camera-distance', allowed.toFixed(3));
     if (c.ui >= .1) {
       c.ui = 0;
       tick({ ...r.position });

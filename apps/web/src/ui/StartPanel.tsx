@@ -2,9 +2,10 @@ import { useState } from 'react';
 import { useDeviceCheck } from '../audio/use-device-check';
 import type { CreateSessionRequest, GameLanguage } from '@vibequest/shared';
 
-export function StartPanel({ validation, fixtures, pending, resumeId, onStart, onContinue }: {
+export function StartPanel({ validation, fixtures, pending, resumeId, onStart, onContinue, showTranscripts = true, onTranscriptsChange }: {
   validation: boolean; fixtures: boolean; pending: boolean; resumeId: string | null;
   onStart: (options: CreateSessionRequest) => Promise<void>; onContinue: () => Promise<void>;
+  showTranscripts?: boolean; onTranscriptsChange?: (show: boolean) => void;
 }) {
   const [language, setLanguage] = useState<GameLanguage>('zh');
   const [provider, setProvider] = useState<'live' | 'fixture'>(validation ? 'fixture' : 'live');
@@ -19,8 +20,10 @@ export function StartPanel({ validation, fixtures, pending, resumeId, onStart, o
     {recordingUrl && <audio ref={microphonePlayer} controls autoPlay src={recordingUrl} aria-label="Your microphone test recording" />}
     <audio ref={audioPlayer} src="/audio/rutgers-university-zh.mp3" preload="auto" onError={() => setAudio('The audio check clip could not load. Please reload and try again.')} />
     <div className="setup-row"><button className="button secondary" disabled={checking || pending} onClick={() => void checkAudio()}>Check audio</button><p role="status">{audio}</p></div>
+    <label className="transcript-setting"><input type="checkbox" checked={showTranscripts} onChange={(event) => onTranscriptsChange?.(event.target.checked)} /> Show conversation transcripts</label>
+    <p className="transcript-help">Turn off to practise by listening and speaking. Typed accessibility remains available.</p>
     </div><section className="intro-controls" aria-labelledby="intro-controls-title"><h3 id="intro-controls-title">Controls</h3><p>Explore the streets and follow your current quest.</p>
-      <dl className="controls-list"><dt>WASD / Arrow keys</dt><dd>Walk</dd><dt>Click the world</dt><dd>Walk there</dd><dt>Drag sideways</dt><dd>Orbit the camera</dd><dt>Drag up / down</dt><dd>Tilt and zoom the camera</dd><dt>E</dt><dd>Interact with the nearest target</dd><dt>Esc</dt><dd>Close a conversation</dd></dl>
+      <dl className="controls-list"><dt>WASD / Arrow keys</dt><dd>Walk and strafe</dd><dt>Click the world / Shift</dt><dd>Lock the mouse to look around</dd><dt>Move the mouse</dt><dd>Turn the player and shoulder camera</dd><dt>Talk</dt><dd>Walk close to an NPC to begin speaking</dd><dt>E</dt><dd>Interact with objects / talk again</dd><dt>Esc</dt><dd>Release the mouse / close a conversation</dd></dl>
     </section></div>
     <div className="start-actions"><button className="button primary" disabled={pending} onClick={() => void onStart({ language, initialTier: 0, providerMode: validation ? 'fixture' : provider, validationMode: validation, inputPreference: 'voice' }).catch(() => undefined)}>{pending ? 'Connecting…' : validation ? 'Start validation session' : 'Start exploring'}<span aria-hidden="true">↗</span></button>
       {resumeId && <p className="environment-notice">Continue keeps your session’s original language.</p>}

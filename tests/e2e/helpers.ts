@@ -17,7 +17,7 @@ async function walkToQuestTargetImpl(page: Page) {
   const compass = page.getByTestId('quest-compass');
   await expect(compass).toBeVisible({ timeout: 15000 });
   await page.getByTestId('walk-there').click();
-  await expect.poll(async () => Number(await compass.getAttribute('data-distance')), { timeout: 150_000, intervals: [100] }).toBeLessThanOrEqual(1);
+  await expect.poll(async () => await page.getByTestId('dialogue-panel').isVisible() || Number(await compass.getAttribute('data-distance')) <= 1, { timeout: 150_000, intervals: [100] }).toBe(true);
 }
 
 /** Hold one movement key until the avatar passes `destination` on `axis`; the camera starts at yaw 0 (W = −z, D = +x). */
@@ -88,16 +88,16 @@ async function walkRouteImpl(page: Page, waypoints: Position[]) {
 }
 
 export async function interact(page: Page, targetId: string) {
-  const world = page.getByTestId('world-renderer');
   const id = await sessionId(page);
   const state: PublicState = (await (await page.request.get(`/api/sessions/${id}`)).json()).state;
   const target = state.interactables.find((entry) => entry.id === targetId);
   expect(target, `Missing target ${targetId}`).toBeTruthy();
   if (target!.kind === 'npc') {
-    await expect(page.getByLabel('Press E to talk')).toBeVisible();
-    await world.focus();
-    await page.keyboard.press('e');
+    // Walking into proximity must open this NPC without an interaction key.
+    // The world opens the panel only after the final position is acknowledged.
     await expect(page.getByTestId('dialogue-panel')).toBeVisible();
+    const synced = await serverState(page.request, id!);
+    expect(Math.hypot(synced.position.x - target!.position.x, synced.position.z - target!.position.z)).toBeLessThanOrEqual(2);
     await expect(page.getByTestId('dialogue-panel')).toContainText(target!.label);
     return;
   }

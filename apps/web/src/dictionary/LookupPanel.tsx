@@ -29,8 +29,10 @@ export function LookupPanel() {
       if (event.key !== '/' || event.isComposing || event.ctrlKey || event.metaKey || event.altKey || typing(event.target)) return;
       event.preventDefault(); setOpen(true);
     };
-    document.addEventListener('keydown', shortcut);
-    return () => document.removeEventListener('keydown', shortcut);
+    // Non-editable conversation controls stop bubbling gameplay keys. The
+    // dictionary shortcut still belongs to the HUD while a conversation is open.
+    document.addEventListener('keydown', shortcut, true);
+    return () => document.removeEventListener('keydown', shortcut, true);
   }, []);
   useEffect(() => { if (open) input.current?.focus(); }, [open]);
 

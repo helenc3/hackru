@@ -80,7 +80,9 @@ export function DialoguePanel({ state, npc, pending, turn, onAction, onSubmit, o
     return () => { pauseRef.current = null; handle.stop(); };
   }, [liveEligible, liveAttempt, state.sessionId, npc.anchorId]); // onLiveTurn is stable per session
 
-  useEffect(() => { firstButton.current?.focus(); }, []);
+  useEffect(() => {
+    if (!document.querySelector('[role=dialog]:not([data-testid="dialogue-panel"])')) firstButton.current?.focus();
+  }, []);
   // A turn that already existed when the panel opened belongs to the previous conversation: never replay it (or its goodbye).
   const openedWith = useRef(turn?.turnId ?? null);
   useEffect(() => {

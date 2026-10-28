@@ -5,6 +5,7 @@ export type Runtime = {
   position: Position; yaw: number; keys: Set<string>; active: boolean;
   busy: boolean; syncing: boolean; lastSync: number; lastSent: Position | null;
   pending: Position | null; generation: number;
+  lastAckAt?: number;
   pitch?: number; path?: Position[];
   /** Collision over committed manifests; movement waits until the player's chunk is committed. */
   view?: Walkable; ready?: (position: Position) => boolean;

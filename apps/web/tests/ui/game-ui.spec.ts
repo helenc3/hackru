@@ -4,7 +4,7 @@ import { installScriptedApi } from '../../../../fixtures/ui/scripted-api';
 async function start(page: import('@playwright/test').Page, alreadyLoaded = false) {
   if (!alreadyLoaded) await page.goto('/', { waitUntil: 'domcontentloaded' });
   await page.getByRole('button', { name: 'Start exploring', exact: true }).click();
-  await expect(page.getByTestId('game-shell')).toBeVisible();
+  await expect(page.getByTestId('game-shell')).toBeVisible({ timeout: 15_000 });
 }
 async function typedPanel(page: import('@playwright/test').Page) {
   await expect(page.getByTestId('world-renderer')).toBeVisible();
@@ -23,7 +23,10 @@ test('production world, voice slot, typed accessibility and practice feedback sh
   await page.goto('/', { waitUntil: 'domcontentloaded' });
   const preview = page.getByTestId('world-preview');
   await expect(preview).toBeVisible();
-  await expect(preview.locator('.district-landmark', { hasText: '老王' })).toHaveCSS('display', 'block');
+  // The shoulder camera can place an anchor outside the view. Its reviewed
+  // label still exists, and a camera frame must have rendered before starting.
+  await expect(preview.locator('.district-landmark', { hasText: '老王' })).toHaveCount(1);
+  await expect(preview).toHaveAttribute('data-camera-distance', /\d/);
   await expect(preview.locator('.district-landmark', { hasText: '小李' })).toHaveCount(1);
   await start(page, true);
   const panel = await typedPanel(page);

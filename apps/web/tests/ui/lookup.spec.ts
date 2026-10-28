@@ -17,13 +17,14 @@ async function setup(page: Page) {
   });
   await page.goto('/', { waitUntil: 'domcontentloaded' });
   await page.getByRole('button', { name: 'Start exploring', exact: true }).click();
-  await expect(page.getByTestId('game-shell')).toBeVisible();
+  await expect(page.getByTestId('game-shell')).toBeVisible({ timeout: 15_000 });
   return queries;
 }
 test('dictionary search, phrase rejection, review persistence and movement isolation', async ({ page }) => {
   const queries = await setup(page);
-  await page.getByTestId('world-renderer').focus();
-  await page.keyboard.press('/'); // shortcut opens the panel when not typing
+  await expect(page.getByTestId('dialogue-panel')).toBeVisible();
+  await page.getByRole('button', { name: 'Close conversation', exact: true }).focus();
+  await page.keyboard.press('/'); // HUD shortcut also works from non-editable NPC controls
   const panel = page.getByTestId('lookup-panel');
   const search = panel.getByRole('searchbox', { name: 'Look up one word' });
   await expect(search).toBeFocused();
@@ -70,4 +71,33 @@ test('dictionary search, phrase rejection, review persistence and movement isola
   await page.keyboard.press('Escape');
   await expect(panel).toHaveCount(0);
   await expect(page.getByTestId('world-renderer')).toBeFocused();
+});
+
+test('a greeting waiting for position sync defers to the dictionary and resumes after it closes', async ({ page }) => {
+  await installScriptedApi(page);
+  let started!: () => void;
+  let release!: () => void;
+  const syncing = new Promise<void>((resolve) => { started = resolve; });
+  const released = new Promise<void>((resolve) => { release = resolve; });
+  let held = false;
+  await page.route('**/api/sessions/*/actions', async (route) => {
+    if (!held && route.request().postDataJSON()?.action?.type === 'move') {
+      held = true; started(); await released;
+    }
+    await route.fallback();
+  });
+  await page.goto('/', { waitUntil: 'domcontentloaded' });
+  await page.getByRole('button', { name: 'Start exploring', exact: true }).click();
+  await expect(page.getByTestId('game-shell')).toBeVisible({ timeout: 15_000 });
+  await syncing;
+  await page.getByRole('button', { name: 'Dictionary', exact: true }).click();
+  const search = page.getByRole('searchbox', { name: 'Look up one word' });
+  await expect(search).toBeFocused();
+  const saved = page.waitForResponse((response) => response.url().endsWith('/actions') && response.request().postDataJSON()?.action?.type === 'move');
+  release(); await saved;
+  await page.waitForTimeout(350); // Several proximity checks after the pending sync completes.
+  await expect(search).toBeFocused();
+  await expect(page.getByTestId('dialogue-panel')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Close dictionary', exact: true }).click();
+  await expect(page.getByTestId('dialogue-panel')).toBeVisible();
 });

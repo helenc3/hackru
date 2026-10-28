@@ -3,6 +3,7 @@ import { Canvas, useThree } from '@react-three/fiber';
 import { createPortal } from 'react-dom';
 import { VISIBLE_RADIUS_CHUNKS, chunkOf, chunkOrigin, seedFromWorldId, text, worldLayout, languageTag, type GameLanguage, type ChunkManifest, type Position, type RendererProps } from '@vibequest/shared';
 import { AutoEngage } from './auto-engage';
+import { movementWaitMs } from './movement-sync';
 import { distance, nearbyTargets, nextLeg, targetAction } from './navigation';
 import { registerWalkHandler } from './walk-request';
 import { DEFAULT_PITCH, dragOrbit } from './camera';
@@ -89,6 +90,8 @@ export function WorldRenderer({ state, onAction, onTalk, preview = false, manife
   const [position, setPosition] = useState(() => initialPosition(state));
   const [busy, setBusy] = useState(false);
   const autoTalk = useRef(new AutoEngage());
+  const autoAllowed = useRef(false);
+  autoAllowed.current = !preview && autoEngage && !conversationOpen && state.status === 'active' && hasWebGl;
   const root = useRef<HTMLElement>(null);
   const [mouseLocked, setMouseLocked] = useState(false);
   const [lockError, setLockError] = useState(false);
@@ -181,7 +184,7 @@ export function WorldRenderer({ state, onAction, onTalk, preview = false, manife
   useEffect(() => {
     const r = runtime.current;
     autoTalk.current.reset();
-    r.generation++; r.position = initialPosition(current.current.state); r.lastSent = null; r.pending = null;
+    r.generation++; r.position = initialPosition(current.current.state); r.lastSent = null; r.lastAckAt = undefined; r.pending = null;
     r.keys.clear(); r.path = []; r.busy = false; r.syncing = false; syncPromise.current = Promise.resolve();
     setPosition({ ...r.position }); setBusy(false);
   }, [sessionKey]);
@@ -211,8 +214,12 @@ export function WorldRenderer({ state, onAction, onTalk, preview = false, manife
     const r = runtime.current;
     const generation = r.generation;
     if (r.lastSent && distance(r.lastSent, next) < .02) return;
+    const multiplier = current.current.state.providerStatus === 'fixture' ? testProfile().movementMultiplier : 1;
+    const wait = movementWaitMs(r.lastSent, next, r.lastAckAt, performance.now(), multiplier);
+    if (wait > 0) await new Promise<void>((resolve) => setTimeout(resolve, Math.ceil(wait)));
+    if (generation !== r.generation) return;
     await current.current.onAction({ type: 'move', position: next });
-    if (generation === r.generation) r.lastSent = { ...next };
+    if (generation === r.generation) { r.lastSent = { ...next }; r.lastAckAt = performance.now(); }
   }
 
   function sync(next: Position) {
@@ -236,12 +243,17 @@ export function WorldRenderer({ state, onAction, onTalk, preview = false, manife
     })();
   }
 
-  async function interact(id: string) {
+  function autoBlocked() {
+    const focused = document.activeElement;
+    return !autoAllowed.current || document.hidden || Boolean(document.querySelector('.game-settings[open], [role=dialog]'))
+      || Boolean(focused && focused !== document.body && focused !== document.documentElement && !root.current?.contains(focused));
+  }
+
+  async function interact(id: string, automatic = false) {
     const r = runtime.current;
     if (r.busy || conversationOpen || current.current.state.status !== 'active' || !hasWebGl) return;
     const target = nearbyTargets(current.current.state, r.position).find((item) => item.id === id);
     if (!target) return;
-    if (target.kind === 'npc') autoTalk.current.engaged(current.current.state, r.position);
     const generation = r.generation;
     r.busy = true; r.goal = undefined; r.path = []; r.keys.clear(); r.pending = null; setBusy(true);
     try {
@@ -249,7 +261,13 @@ export function WorldRenderer({ state, onAction, onTalk, preview = false, manife
       if (generation !== r.generation) return;
       await flushPosition({ ...r.position });
       if (generation !== r.generation) return;
-      if (target.kind === 'npc') { releaseMouse(); current.current.onTalk(target.id); }
+      if (target.kind === 'npc') {
+        // A player can open a HUD panel while the authoritative position is being
+        // saved. Recheck after the await so a late greeting never steals its focus.
+        if (automatic && autoBlocked()) return;
+        autoTalk.current.engaged(current.current.state, r.position);
+        releaseMouse(); current.current.onTalk(target.id);
+      }
       else {
         const action = targetAction(target, current.current.state.photo);
         if (action) await current.current.onAction(action);
@@ -265,9 +283,9 @@ export function WorldRenderer({ state, onAction, onTalk, preview = false, manife
   const loading = !preview && !city.ready(position);
   const interactRef = useRef(interact); interactRef.current = interact;
   useEffect(() => {
-    const blocked = preview || conversationOpen || !autoEngage || busy || loading || !hasWebGl || state.status !== 'active' || document.hidden || Boolean(document.querySelector('.game-settings[open], [role=dialog]'));
+    const blocked = autoBlocked() || busy || loading;
     const id = autoTalk.current.candidate(state, position, blocked);
-    if (id) void interactRef.current(id);
+    if (id) void interactRef.current(id, true);
   }, [position, state, preview, conversationOpen, autoEngage, busy, loading, hasWebGl]);
   const movementKeys = ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
   return <section ref={root} tabIndex={0} className="world-renderer district-world" aria-label="Shanghai streets — WASD to walk, mouse to look" data-testid={preview ? 'world-preview' : 'world-renderer'} data-mouse-locked={mouseLocked} data-look-mode={mouseLocked ? 'captured' : boundedLook ? 'bounded' : 'free'}

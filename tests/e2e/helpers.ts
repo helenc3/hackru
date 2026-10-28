@@ -94,8 +94,10 @@ export async function interact(page: Page, targetId: string) {
   expect(target, `Missing target ${targetId}`).toBeTruthy();
   if (target!.kind === 'npc') {
     // Walking into proximity must open this NPC without an interaction key.
-    expect(Math.hypot(state.position.x - target!.position.x, state.position.z - target!.position.z)).toBeLessThanOrEqual(2);
+    // The world opens the panel only after the final position is acknowledged.
     await expect(page.getByTestId('dialogue-panel')).toBeVisible();
+    const synced = await serverState(page.request, id!);
+    expect(Math.hypot(synced.position.x - target!.position.x, synced.position.z - target!.position.z)).toBeLessThanOrEqual(2);
     await expect(page.getByTestId('dialogue-panel')).toContainText(target!.label);
     return;
   }
